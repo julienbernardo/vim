@@ -1,0 +1,268 @@
+<?php
+
+function xml_get_options($tab) {
+	$xml = "<options>\n";
+	foreach($tab as $opt => $val) {
+		$xml .= "	<".strtolower($opt).">".fix_xml($val)."</".strtolower($opt).">\n";
+	}
+	$xml .= "</options>\n";
+	return $xml;
+}
+
+function xml_operation_result($success, $tab_mess = array()) {
+	$success = !empty($success) ? 'true' : 'false';
+	$errorMess = !empty($tab_mess) ? $tab_mess[0] : '';
+	$xml  = "<operation>\n";
+	$xml .= "	<success>".fix_xml($success)."</success>\n";
+	$xml .= "	<errorMess>".fix_xml($errorMess)."</errorMess>\n";
+	$xml .= "</operation>";
+	return $xml;
+}
+
+function xml_get_tour_images($tab_images) {
+	$nb = count($tab_images);
+	$xml = "<ArrayOfImage>\n";
+	for($i=0; $i<$nb; $i++) {
+		$url_image = str_replace(
+			array('%PATH%', '%SIZE%', '%ID%', '%EXT%'),
+			array('still', SIZE_STILL, $tab_images[$i]['ID_IMAGE'], 'jpg'),
+			URL_MEDIA
+		);
+		$xml .= "<Image>\n";
+		$xml .= " <name>".fix_xml($tab_images[$i]['NOM_IMAGE'])."</name>\n";
+		$xml .= " <language>".fix_xml($tab_images[$i]['ID_LANGUE'])."</language>\n";
+		$xml .= " <url>".fix_xml($url_image)."</url>\n";
+		$xml .= "</Image>\n";
+	}
+	$xml .= "</ArrayOfImage>\n";
+	return $xml;
+}
+
+function xml_get_user_light($tab_user) {
+	$xml  = "<User>\n";
+	$xml .= " <userID>".fix_xml($tab_user['ID_UTILISATEUR'])."</userID>\n";
+	$xml .= " <distribID>".fix_xml($tab_user['ID_DISTRIBUTEUR'])."</distribID>\n";
+	$xml .= "</User>\n";
+	return $xml;
+}
+
+function xml_get_user($tab_user) {
+	$xml = "<User>\n";
+	$photo_agent = $logo_company = '';
+	if(!empty($tab_user)) {
+		$tab_pattern = array('%PATH%', '%SIZE%', '%ID%', '%EXT%');
+		if(is_guid($tab_user['LOGO_USER'])) {
+			$tab_replace = array('agent', '', $tab_user['LOGO_USER'], $tab_user['LOGO_USER_EXT']);
+			$photo_agent = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+		if(is_guid($tab_user['LOGO_COMPANY'])) {
+			$tab_replace = array('agency', '', $tab_user['LOGO_COMPANY'], $tab_user['LOGO_COMPANY_EXT']);
+			$logo_company = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+	}
+	$latitude = $tab_user['LATITUDE'];
+	$longitude = $tab_user['LONGITUDE'];
+	if(!is_numeric($latitude) || !is_numeric($longitude)) {
+		$latitude = $longitude = '';
+	}
+
+	$xml .= " <userID>".fix_xml($tab_user['ID_UTILISATEUR'])."</userID>\n";
+	$xml .= "	<userCode>".fix_xml($tab_user['PREFIXE_PORTAIL'])."</userCode>\n";
+	$xml .= "	<userFirstName>".fix_xml($tab_user['PRENOM_UTILISATEUR'])."</userFirstName>\n";
+	$xml .= "	<userLastName>".fix_xml($tab_user['NOM_UTILISATEUR'])."</userLastName>\n";
+	$xml .= "	<userPhone>".fix_xml(sanitize_xml($tab_user['TELEPHONE_UTILISATEUR']))."</userPhone>\n";
+	$xml .= "	<userEmail>".fix_xml($tab_user['EMAIL_UTILISATEUR'])."</userEmail>\n";
+	$xml .= "	<companyName>".fix_xml($tab_user['NOM_SOCIETE'])."</companyName>\n";
+	$xml .= "	<companyWebSite>".fix_xml(sanitize_xml($tab_user['SITEWEB_SOCIETE']))."</companyWebSite>\n";
+	$xml .= "	<companyAddress>".fix_xml($tab_user['ADRESSE'])."</companyAddress>\n";
+	$xml .= "	<companyCity>".fix_xml($tab_user['VILLE'])."</companyCity>\n";
+	$xml .= "	<companyZip>".fix_xml($tab_user['CODE_POSTAL'])."</companyZip>\n";
+	$xml .= "	<companyState>".fix_xml($tab_user['ETAT'])."</companyState>\n";
+	$xml .= "	<companyCountry>".fix_xml($tab_user['ID_PAYS'])."</companyCountry>\n";
+	$xml .= "	<companyLatitude>".fix_xml($latitude)."</companyLatitude>\n";
+	$xml .= "	<companyLongitude>".fix_xml($longitude)."</companyLongitude>\n";
+	$xml .= "	<language>".fix_xml($tab_user['ID_LANGUE'])."</language>\n";
+	$xml .= "	<photoAgent>".fix_xml($photo_agent)."</photoAgent>\n";
+	$xml .= "	<logoCompany>".fix_xml($logo_company)."</logoCompany>\n";
+	$xml .= "	<created>".fix_xml($tab_user['DATE_CREATION'])."</created>\n";
+	$xml .= "	<updated>".fix_xml($tab_user['DATE_MODIFICATION'])."</updated>\n";
+	$xml .= "</User>";
+
+	return $xml;
+}
+
+
+
+function xml_get_users($tab_users) {
+	$xml .= "<ArrayOfUser>\n";
+	$nb = count($tab_users);
+	$tab_pattern = array('%PATH%', '%SIZE%', '%ID%', '%EXT%');
+	for($i=0; $i<$nb; $i++) {
+		$xml .= "<User>\n";
+		$photo_agent = $logo_company = '';
+		if(is_guid($tab_user['LOGO_USER'])) {
+			$tab_replace = array('agent', '', $tab_users[$i]['LOGO_USER'], $tab_users[$i]['LOGO_USER_EXT']);
+			$photo_agent = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+		if(is_guid($tab_users[$i]['LOGO_COMPANY'])) {
+			$tab_replace = array('agency', '', $tab_users[$i]['LOGO_COMPANY'], $tab_users[$i]['LOGO_COMPANY_EXT']);
+			$logo_company = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+
+		$latitude = $tab_users[$i]['LATITUDE'];
+		$longitude = $tab_users[$i]['LONGITUDE'];
+		if(!is_numeric($latitude) || !is_numeric($longitude)) {
+			$latitude = $longitude = '';
+		}
+		
+		$xml .= " <userID>".fix_xml($tab_users[$i]['ID_UTILISATEUR'])."</userID>\n";
+		$xml .= " <userCode>".fix_xml($tab_users[$i]['PREFIXE_PORTAIL'])."</userCode>\n";
+		$xml .= " <userFirstName>".fix_xml($tab_users[$i]['PRENOM_UTILISATEUR'])."</userFirstName>\n";
+		$xml .= " <userLastName>".fix_xml($tab_users[$i]['NOM_UTILISATEUR'])."</userLastName>\n";
+		$xml .= " <userPhone>".fix_xml($tab_users[$i]['TELEPHONE_UTILISATEUR'])."</userPhone>\n";
+		$xml .= " <userEmail>".fix_xml($tab_users[$i]['EMAIL_UTILISATEUR'])."</userEmail>\n";
+		$xml .= " <companyName>".fix_xml($tab_users[$i]['NOM_SOCIETE'])."</companyName>\n";
+		$xml .= " <companyWebSite>".fix_xml($tab_users[$i]['SITEWEB_SOCIETE'])."</companyWebSite>\n";
+		$xml .= " <companyAddress>".fix_xml($tab_users[$i]['ADRESSE'])."</companyAddress>\n";
+		$xml .= " <companyCity>".fix_xml($tab_users[$i]['VILLE'])."</companyCity>\n";
+		$xml .= " <companyZip>".fix_xml($tab_users[$i]['CODE_POSTAL'])."</companyZip>\n";
+		$xml .= " <companyState>".fix_xml($tab_users[$i]['ETAT'])."</companyState>\n";
+		$xml .= " <companyCountry>".fix_xml($tab_users[$i]['ID_PAYS'])."</companyCountry>\n";
+		$xml .= " <companyLatitude>".fix_xml($latitude)."</companyLatitude>\n";
+		$xml .= " <companyLongitude>".fix_xml($longitude)."</companyLongitude>\n";
+		$xml .= " <language>".fix_xml($tab_users[$i]['ID_LANGUE'])."</language>\n";
+		$xml .= " <photoAgent>".fix_xml($photo_agent)."</photoAgent>\n";
+		$xml .= " <logoCompany>".fix_xml($logo_company)."</logoCompany>\n";
+		$xml .= " <created>".fix_xml($tab_users[$i]['DATE_CREATION'])."</created>\n";
+		$xml .= " <updated>".fix_xml($tab_users[$i]['DATE_MODIFICATION'])."</updated>\n";
+		$xml .= "</User>\n";
+	}
+	$xml .= "</ArrayOfUser>";
+	return $xml;
+}
+
+function xml_get_tour($tab_tour) {
+	$xml = $url_tour = '';
+	if(!empty($tab_tour)) {
+		$url_tour = str_replace(
+			array('#ID#', '#PORTAL#', '#REF#', '#PUB#'), 
+			array($tab_tour['ID_VISITE'], urlencode($tab_tour['CODE_PORTAIL']), urlencode($tab_tour['REF_PORTAIL']), $tab_tour['ID_DIFFUSION_PORTAIL']), 
+			$tab_tour['URL_VIEWER']
+		);
+	}
+	$xml .= "<Tour>\n";
+	$xml .= " <images>".fix_xml($tab_tour['NB_ACTIVE_IMAGE'])."</images>\n";
+	$xml .= " <reference>".fix_xml($tab_tour['REF_PORTAIL'])."</reference>\n";
+	$xml .= " <created>".fix_xml($tab_tour['DATE_CREATION_VISITE'])."</created>\n";
+	$xml .= " <updated>".fix_xml($tab_tour['DATE_MODIFICATION_VISITE'])."</updated>\n";
+	$xml .= " <url>".fix_xml($url_tour)."</url>\n";
+	$xml .= "</Tour>\n";
+	return $xml;
+}
+
+
+function xml_get_listing($tab_tour) {
+	$lock = (int)$tab_tour['VERROU_ANNONCE'];
+	// Modif 2010-12-03 : Si verrou complet et 1ere remontee, modifier annonce
+		if($tab_tour['NB_REMONTEES']==0 && $lock==2) $lock = 1;
+	$xml = '';
+	$xml .= "<Tour>\n";
+	$xml .= " <tourID>".fix_xml($tab_tour['ID_VISITE'])."</tourID>\n";
+	$xml .= " <userID>".fix_xml($tab_tour['ID_UTILISATEUR'])."</userID>\n";
+	$xml .= " <lock>".$lock."</lock>\n";
+	$xml .= " <lock_tts>".fix_xml($tab_tour['LOCK_TTS'])."</lock_tts>\n";
+	$xml .= " <images>".(int)$tab_tour['NB_ACTIVE_IMAGE']."</images>\n";
+	$xml .= " <desc>".fix_xml($tab_tour['DESCRIPTION'])."</desc>\n";
+	$xml .= "</Tour>\n";
+	return $xml;
+}
+
+function xml_get_listings($tab_tour) {
+	$xml .= "<Tours>";
+	$nb = count($tab_tour);
+	for($i=0; $i<$nb; $i++) {
+		$xml .= "<Tour>\n";
+		$xml .= " <tourID>".fix_xml($tab_tour[$i]['ID_VISITE'])."</tourID>\n";
+		$xml .= " <userID>".fix_xml($tab_tour[$i]['ID_UTILISATEUR'])."</userID>\n";
+		$xml .= "</Tour>\n";
+	}
+	$xml .= "</Tours>";
+	return $xml;
+}
+
+
+
+function xml_get_tour_info($tab_tour) {
+	$xml = '';
+	$xml .= "<Tour>\n";
+	$xml .= " <tourID>".fix_xml($tab_tour['ID_VISITE'])."</tourID>\n";
+	$xml .= " <userID>".fix_xml($tab_tour['ID_UTILISATEUR'])."</userID>\n";
+	$xml .= " <created>".fix_xml($tab_tour['DATE_CREATION_VISITE'])."</created>\n";
+	$xml .= " <updated>".fix_xml($tab_tour['DATE_MODIFICATION_VISITE'])."</updated>\n";
+	$xml .= "</Tour>\n";
+	return $xml;
+}
+
+function xml_get_tours($tab_tours) {
+	$xml .= "<ArrayOfTour>\n";
+	$nb = count($tab_tours);
+	for($i=0; $i<$nb; $i++) {
+		$url_tour = str_replace(
+			array('#ID#', '#PORTAL#', '#REF#', '#PUB#'), 
+			array($tab_tours[$i]['ID_VISITE'], urlencode($tab_tours[$i]['CODE_PORTAIL']), urlencode($tab_tours[$i]['REF_PORTAIL']), $tab_tours[$i]['ID_DIFFUSION_PORTAIL']), 
+			$tab_tours[$i]['URL_VIEWER']
+		);
+		$xml .= "<Tour>\n";
+		$xml .= " <images>".fix_xml($tab_tours[$i]['NB_ACTIVE_IMAGE'])."</images>\n";
+		$xml .= " <reference>".fix_xml($tab_tours[$i]['REF_PORTAIL'])."</reference>\n";
+		$xml .= " <created>".fix_xml($tab_tours[$i]['DATE_CREATION_VISITE'])."</created>\n";
+		$xml .= " <updated>".fix_xml($tab_tours[$i]['DATE_MODIFICATION_VISITE'])."</updated>\n";
+		$xml .= " <url>".fix_xml($url_tour)."</url>\n";
+		$xml .= "</Tour>\n";
+	}
+	$xml .= "</ArrayOfTour>\n";
+	return $xml;
+}
+
+function xml_get_tour_publication($tab_pub) {
+	$xml  = "<pubs>\n";
+	$nb = count($tab_pub);
+	for($i=0; $i<$nb; $i++) {
+		$xml .= " <pub partner=\"".fix_xml($tab_pub[$i]['ID_PORTAIL'])."\" ref=\"".fix_xml($tab_pub[$i]['REF_PORTAIL'])."\" />\n";
+	}
+	$xml .= "</pubs>";
+	return $xml;
+}
+
+function xml_get_user_infos($tab_user) {
+	list($lat, $lon) = explode('#', $tab_user['GPS']);
+	if(!is_numeric($lat) || !is_numeric($lon)) {
+		$lat = $lon = '';
+	}
+
+	$xml  = "<user>\n";
+	$xml .= "\t<company_name>".fix_xml($tab_user['NOM_SOCIETE'])."</company_name>\n";
+	$xml .= "\t<company_email>".fix_xml($tab_user['EMAIL_SOCIETE'])."</company_email>\n";
+	$xml .= "\t<company_address>".fix_xml($tab_user['ADRESSE'])."</company_address>\n";
+	$xml .= "\t<company_city>".fix_xml($tab_user['VILLE'])."</company_city>\n";
+	$xml .= "\t<company_zip>".fix_xml($tab_user['CODE_POSTAL'])."</company_zip>\n";
+	$xml .= "\t<company_country>".fix_xml($tab_user['ID_PAYS'])."</company_country>\n";
+	$xml .= "\t<company_latitude>".fix_xml($lat)."</company_latitude>\n";
+	$xml .= "\t<company_longitude>".fix_xml($lon)."</company_longitude>\n";
+	$xml .= "\t<company_phone>".fix_xml($tab_user['TELEPHONE_SOCIETE'])."</company_phone>\n";
+	$xml .= "\t<user_phone>".fix_xml($tab_user['TELEPHONE_UTILISATEUR'])."</user_phone>\n";
+	$xml .= "\t<user_email>".fix_xml($tab_user['EMAIL_UTILISATEUR'])."</user_email>\n";
+	$xml .= "\t<logo_agency>".fix_xml($tab_user['URL_LOGO_AGENCY'])."</logo_agency>\n";
+	$xml .= "\t<logo_agent>".fix_xml($tab_user['URL_LOGO_AGENT'])."</logo_agent>\n";
+	$xml .= "\t<partners>";
+
+	foreach($tab_user['PARTNERS'] as $partner => $prefix) {
+		$xml .= "\t<partner id=\"".fix_xml($partner)."\">".fix_xml($prefix)."</partner>\n";
+	}
+
+	$xml .= "\t</partners>";
+	$xml .= "</user>";
+
+	return $xml;
+
+}

@@ -1,0 +1,414 @@
+<?php
+require_once 'DB.php';
+require_once 'HTTP/Request.php';
+require_once '/var/www/cron.previsite.net/include/global.php';
+require_once '/var/www/cron.previsite.net/include/fonctions.php';
+require_once '/var/www/cron.previsite.net/include/fonction.cron.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('previsite/GetDsn.php');
+
+//ini_set('memory_limit', '-1');
+//ini_set('max_execution_time', '0');
+$debug = ($_REQUEST['debug'] == 'true');
+if(!checkScriptAlone() && !$debug){ exit;}
+$bases = array(
+	array('name'=> '11', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.11/PREVISITE_REALESTATE?unicode=yes'),
+	array('name'=> '17', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '19', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.19/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '21', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.21/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '211', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.211/PREVISITE_SOFTWARE?unicode=yes'),
+	//array('name'=> '213', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.213/PREVISITE_SOFTWARE?unicode=yes'),
+);
+
+//$date_reference = date('Y-m-d H:i:s', time()-60*60);
+$date_reference = mktime(9, 0, 0); 
+event_log('-----------------------------------');
+event_log('---------------START---------------');
+event_log('-----------------------------------');
+
+$getDsn = new GetDsn(array('MEMCACHED' => true));
+
+$logs = array('GENERATION' => array(), 'DIFFUSIONS' => array());
+
+if(isset($logs['GENERATION'])){
+	$logs['GENERATION'] = array('SIZE' => 0, 'DONE' => 0, 'TOTAL'=> 0, 'FAILED' => array(), 'WAITING' => array());
+	$db = array('name' => 'video', 'dsn' => 'odbtp(mssql)://previsite_account:travel001@10.0.4.10/PREVISITE_VIDEO?unicode=yes');
+//	$sql = "SELECT count(*) FROM VIDEO_CRON WHERE ID_STATUT_CRON >= 0";
+//	$logs['GENERATION']['WAITING'] = sql_getOne($sql, $db, $debug);
+	$sql = "SELECT ID_DISTRIBUTEUR, ID_VIDEO FROM VIDEO_CRON WHERE ID_STATUT_CRON >= 0 ORDER BY ID_DISTRIBUTEUR DESC";
+	$result = sql_query($sql, $db, $debug);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		if(!is_array($logs['GENERATION']['WAITING'][$row['ID_DISTRIBUTEUR']])){ 
+			$logs['GENERATION']['WAITING'][$row['ID_DISTRIBUTEUR']] = array();
+		}
+		$logs['GENERATION']['WAITING'][$row['ID_DISTRIBUTEUR']][] = $row['ID_VIDEO'];
+	}
+
+	$sql = "SELECT ID_CONVERSION, ID_VIDEO, ID_VISITE, ID_DISTRIBUTEUR, TAILLE_VIDEO, ID_STATUT_CONVERSION FROM VIDEO_CRON_SUIVI WHERE DATE_CONVERSION BETWEEN '".date('Y-m-d H:i:s', $date_reference-24*60*60)."' AND '".date('Y-m-d H:i:s', $date_reference)."' order by ID_DISTRIBUTEUR";
+	$result = sql_query($sql, $db, $debug);
+	$rows = array();
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		$rows[] = $row;
+	}
+	sql_disconnect($db, $debug);
+	$db['name'] = 'getWaiting';
+	$db['dsn'] = "";
+	$tmp = array('TTS' => 0, 'GENERATION' => 0);
+	if(count($logs['GENERATION']['WAITING']) > 0){
+		foreach($logs['GENERATION']['WAITING'] as $distrib => $ids){
+			$dsn = $getDsn->byDistrib($distrib);
+			if($db['dsn'] == "" || $db['dsn'] != $dsn){
+				sql_disconnect($db, $debug);
+				$db['dsn'] = $dsn;
+			}
+			$sql = "SELECT WAIT_TTS,TYPE_SON, ID_STATUT_TTS FROM VIDEO INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE LEFT JOIN TTS ON VIDEO.ID_VISITE=TTS.ID_VISITE WHERE ID_VIDEO IN ('".implode("', '", $ids)."')";
+			$result = sql_query($sql, $db, $debug);
+			while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+				if(($row['TYPE_SON'] == 'TTS'  && $row['ID_STATUT_TTS'] == '1') || $row['WAIT_TTS'] != '1'){
+					$tmp['GENERATION']++;
+				}else{
+					$tmp['TTS']++;
+				}
+			}
+		}
+	}
+	$logs['GENERATION']['WAITING'] = $tmp;
+	$db['name'] = 'getError';
+	for($i=0; $i < count($rows); $i++){
+		if($rows[$i]['ID_STATUT_CONVERSION']  >= 0){
+			$logs['GENERATION']['DONE']++;
+			$logs['GENERATION']['SIZE'] += $rows[$i]['TAILLE_VIDEO'];
+		}else{
+			$dsn = $getDsn->byDistrib($rows[$i]['ID_DISTRIBUTEUR']);
+			if($dsn != $db['dsn']){
+				sql_disconnect($db, $debug);
+				$db['dsn'] = $dsn;
+			}
+			$sql = "SELECT TYPE_CONVERSION, REF_VIDEO_PROFIL, RESULT_TEXT_CONVERSION FROM VIDEO_CONVERSION WHERE ID_CONVERSION='".$rows[$i]['ID_CONVERSION']."' AND ID_STATUT_CONVERSION < 0";
+			$result = sql_query($sql, $db, $debug);
+			while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+				if(!is_array($logs['GENERATION']['FAILED'][$row['RESULT_TEXT_CONVERSION']])){ 
+					$logs['GENERATION']['FAILED'][$row['RESULT_TEXT_CONVERSION']] = array();
+				}
+				$logs['GENERATION']['FAILED'][$row['RESULT_TEXT_CONVERSION']][] = array_merge($rows[$i], $row);
+			}
+		}
+		$logs['GENERATION']['TOTAL']++;
+	}
+	sql_disconnect($db, $debug);
+}
+
+if(isset($logs['DIFFUSIONS'])){
+	foreach($bases as $db){
+		$sql = "SELECT VIDEO.ID_VIDEO,SITE_DIFFUSION, LOGIN_DIFFUSION, ID_DISTRIBUTEUR, RESULT_CODE_DIFFUSION, RESULT_TEXT_DIFFUSION, RESULT_DESCRIPTION_DIFFUSION,ID_STATUT_DIFFUSION FROM VIDEO_DIFFUSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO WHERE DATE_MODIFICATION_DIFFUSION BETWEEN '".date('Y-m-d H:i:s', $date_reference-24*60*60)."' AND '".date('Y-m-d H:i:s', $date_reference)."' AND ID_STATUT_DIFFUSION NOT IN (0,1) order by ID_DISTRIBUTEUR";
+		$result = sql_query($sql, $db, $debug);
+		$rows = array();
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$rows[] = $row;
+		}
+		for($i =0; $i < count($rows); $i++){
+			if(!isset($logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']])){ 
+				$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']] = array('DONE_TOTAL' => 0, 'DONE' => 0, 'WAITING' => 0, 'DELETE' => 0, 'DELETE_TOTAL' => 0, 'ERROR' => array('DELETE' => array(), 'DONE' => array()));
+			}
+			if($rows[$i]['RESULT_CODE_DIFFUSION'] == 0 ){
+				$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']]['DONE']++; 
+				$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']]['DONE_TOTAL']++; 
+			}else if($rows[$i]['RESULT_CODE_DIFFUSION'] == -1){
+				$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']]['DELETE']++; 
+				$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']]['DELETE_TOTAL']++; 
+			}else{
+				$action = ($rows[$i]['RESULT_CODE_DIFFUSION'] > 0 ? "DONE" : "DELETE");
+				$error = $rows[$i]['RESULT_CODE_DIFFUSION'].". ".$rows[$i]['RESULT_TEXT_DIFFUSION'].($rows[$i]['RESULT_DESCRIPTION_DIFFUSION'] != "" ? ' ('.$rows[$i]['RESULT_DESCRIPTION_DIFFUSION'].')' : '');
+				if(!isset($logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']]['ERROR'][$action][$error])){ 
+					$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']]['ERROR'][$action][$error] = array();
+				}
+				$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']]['ERROR'][$action][$error][] = $rows[$i];
+				$logs['DIFFUSIONS'][$rows[$i]['SITE_DIFFUSION']][$action.'_TOTAL']++; 
+			}
+		}
+		$sql = "SELECT SITE_DIFFUSION, count(*) NB FROM VIDEO_DIFFUSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE WHERE ID_STATUT_DIFFUSION in (0, 1)  AND ID_STATUT_VISITE > 0 group by SITE_DIFFUSION";
+		$result = sql_query($sql, $db, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			if(!isset($logs['DIFFUSIONS'][$row['SITE_DIFFUSION']])){ 
+				$logs['DIFFUSIONS'][$row['SITE_DIFFUSION']] = array('DONE_TOTAL' => 0, 'DONE' => 0, 'WAITING' => 0, 'DELETE' => 0, 'DELETE_TOTAL' => 0, 'ERROR' => array('DELETE' => array(), 'DONE' => array()));
+			}
+			$logs['DIFFUSIONS'][$row['SITE_DIFFUSION']]['WAITING'] += $row['NB'];
+		}
+		sql_disconnect($db, $debug);
+	}
+}
+$resume = array();
+if(count($logs['GENERATION']) > 0){
+	$resume[] = '<table class="main">';
+	$resume[] = "	<tr><th>Generation</th></tr>";
+	$resume[] = '	<tr><td>';
+	$resume[] = '		<table class="subtitle"><tr><th>Done</th><th>Failed</th><th>Total</th><th>Waiting</th><th>Waiting TTS</th></tr>';
+   	$resume[] = '		<tr><td>'.number_format($logs['GENERATION']['DONE'], 0, ",", " ").' ('.number_format($logs['GENERATION']['SIZE']/1024, 0, ",", " ").' Mo)</td><td>'.number_format(($logs['GENERATION']['TOTAL'] - $logs['GENERATION']['DONE']), 0, ",", " ").'</td><td>'.number_format($logs['GENERATION']['TOTAL'], 0, ",", " ").'</td><td><a href="http://video.previsite.net/detail_cron.php" target="_blank" >'.number_format($logs['GENERATION']['WAITING']['GENERATION'], 0, ",", " ").'</a></td><td>'.number_format($logs['GENERATION']['WAITING']['TTS'], 0, ",", " ").'</td></tr>';
+	$resume[] = '		</table>';
+	$resume[] = '	</td></tr>';
+	if(count($logs['GENERATION']['FAILED']) > 0){
+		$resume[] = '<tr><td><table class="list"><tr><th>Error</th><th>Nb</th><th></th></tr>';
+		uasort($logs['GENERATION']['FAILED'], 'sortLogs');
+		foreach($logs['GENERATION']['FAILED'] as $k=>$v){
+			$resume[] =  '<tr><td>'.$k.'</td><td class="bold">'.number_format(count($v), 0, ",", " ").'</td><td><a target="_blank" href="http://video.previsite.net/detail_video.php?id='.$v[0]['ID_CONVERSION'].'&tour='.$v[0]['ID_VISITE'].'&distrib='.$v[0]['ID_DISTRIBUTEUR'].'">sample</a></td></tr>';
+//			for($i=0; $i < count($v); $i++){
+//				$resume[] = '<li><a target="_blank" href="http://video.previsite.net/detail_video.php?id='.$v[$i]['ID_CONVERSION'].'&tour='.$v[$i]['ID_VISITE'].'">'.$v[$i]['ID_VISITE'].'</a></li>';
+//				break;
+//			}
+//			$resume[] = "</ul></li>";
+		}
+		$resume[] = '</table></td></tr>';
+	}
+	$resume[] = "</table>";
+}
+
+if(count($logs['DIFFUSIONS']) > 0){
+	ksort($logs['DIFFUSIONS']);
+	foreach($logs['DIFFUSIONS'] as $site => $row){
+		$resume[] = '<br />';
+		$resume[] = '<table class="main"><tr><th> '.ucfirst(strtolower($site))."</th></tr>";
+		$resume[] = '	<tr><td>';
+		$resume[] = '		<table class="subtitle">';
+		$resume[] = '		<tr><th colspan="2">Published</th><th colspan="2">Unpublished</th><th></th></tr>';
+		$resume[] = '		<tr><th>Done</th><th>Failed</th><th>Done</th><th>Failed</th><th>Waiting</th></tr>';
+		$resume[] = '		<tr><td>'.number_format($row['DONE'], 0, ",", " ").'</td><td>'.number_format(($row['DONE_TOTAL'] - $row['DONE']), 0, ",", " ").'</td><td>'.number_format($row['DELETE'], 0, ",", " ").'</td><td>'.number_format($row['DELETE_TOTAL'] - $row['DELETE'], 0, ",", " ").'</td><td>'.number_format($row['WAITING'], 0, ",", " ").'</td></tr>';
+		$resume[] = '		</table>';
+		$resume[] = '	</td></tr>';
+		$fields = array('DONE', 'DELETE');
+		foreach($fields as $field){
+			if(count($row['ERROR'][$field]) > 0){
+				$resume[] = '<tr><th> '.ucfirst(strtolower($field))."</th></tr>";
+				$resume[] = '<tr><td><table class="list"><tr><th>Error</th><th>Nb</th><th></th></tr>';
+				uasort($row['ERROR'][$field], 'sortLogs');
+				foreach($row['ERROR'][$field] as $k=>$v){
+					$resume[] =  "<tr><td>".$k."</td><td>".number_format(count($v), 0, ",", " ").'</td><td><a target="_blank" href="http://video.previsite.net/rediffuse.php?site='.$v[0]['SITE_DIFFUSION'].'&login='.$v[0]['LOGIN_DIFFUSION'].'&id='.$v[0]['ID_VIDEO'].'&distrib='.$v[0]['ID_DISTRIBUTEUR'].'">sample</a></td></tr>';
+//					for($i=0; $i < count($v); $i++){
+//						$resume[] = '<li><a target="_blank" href="http://video.previsite.net/detail_diffusion.php?site='.$v[$i]['SITE_DIFFUSION'].'&login='.$v[$i]['LOGIN_DIFFUSION'].'&id='.$v[$i]['ID_VIDEO'].'&distrib='.$v[$i]['ID_DISTRIBUTEUR'].'">'.$v[$i]['ID_VIDEO'].'</a></li>';
+//						break;
+//					}
+//					$resume[] = "</ul></li>";
+				}	
+				$resume[] = '</table></td></tr>';
+			}
+		}
+		$resume[] = '</table>';
+	}
+}
+sendAlertEmail(implode("\n", $resume), array(), $debug);
+event_log('-----------------------------------');
+event_log('----------------END----------------');
+event_log('-----------------------------------');
+exit;
+function sortLogs($a, $b){ 
+	return count($a) < count($b);
+}
+
+function sendAlertEmail($body, $emails_report = array(), $debug = false){
+	$content = <<<HTML
+ <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Previsite Video</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<style type="text/css">
+html {	height: 100%;	margin: 0;}
+body {	height: 100px;	margin: 0;	background-color: #fff;	background-repeat: repeat-x;}
+#barre{	width:100%;	height:9px;	background-color:#db6460;	}
+img {	border: 0;}
+body, p, a, td, th, label {	font-family: Verdana, Arial, Helvetica, sans-serif;	font-size: 11px;	color: #585858;}
+input, textarea, checkbox, radio {	font-family: Verdana, Arial, Helvetica, sans-serif;	font-size: 10px;	color: #585858;}
+.marg_t_30{ margin-top:30px;}
+div#logo {	margin:0 auto;	padding-top: 20px;	width: 200px;}
+table{  border-spacing: 0pt 0pt;}
+.list td{  height:22px;border-bottom: 1px solid #D4D4D4;padding-left:2px;padding-right:2px;text-align:center;} 
+
+table.main{ width:850px; margin-bottom:50px;border:1px solid #AEAEAE;}
+th{	padding-left:2px;padding-right:2px;border-bottom:1px solid #D4D4D4;height:22px;}
+
+table.subtitle { width:100%;text-align:center;margin-bottom:10px;}
+table.subtitle td, table.subtitle th, table.subtitle a{ font-size:14px;}
+table.subtitle th, table.list th{ background-color:#EEEEEE;}
+table.subtitle tr{ font-weight:bold;}
+table.list{ width:100%;}
+table.list tr:hover{ background-color:#FDF2E1;}
+	</style>
+</head>
+<body>
+	<div id="barre">&nbsp;</div>
+	<div id="global">
+		<div id="logo"><a href="http://video.previsite.net/"><img src="http://video.previsite.net/images/logo_video.png" alt="Video" border="0" /></a></div>
+		<div id="contact">&nbsp;</div>
+		<div id="content">
+			<div id="content_header"></div>
+			<div id="content_text" class="h_auto">
+				<div align="center" class="marg_t_30">%BODY%<div>
+			<div>
+		</div>
+	</div>
+</body>
+HTML;
+	$phpmail = new PHPMailer();
+	$phpmail->IsSMTP();
+	$phpmail->IsHTML(true);
+	$phpmail->Host      = SMTP_MAIL;
+	$phpmail->From      = "report@previsite.com";
+	$phpmail->FromName  = 'Video resume';
+	$phpmail->WordWrap  = 70;
+	$phpmail->Subject   = 'Video resume '.date('Y-m-d');
+
+	$phpmail->Body = str_replace('%BODY%', $body, $content);
+	$phpmail->AddAddress("report@previsite.com","Report");
+	if($debug){ 
+		echo $phpmail->Body;
+		exit;
+	}
+//	$phpmail->AddAddress("julien@previsite.com","Report");
+	if(count($emails_report) > 0){
+		foreach($emails_report as $email_report){
+			$phpmail->AddAddress( $email_report, "");
+		}
+	}
+	$phpmail->Send();
+}
+
+/**
+*	sql request for cron
+**/
+function sql_connect(&$db, $debug = false){
+	$log_function = $type."_log";
+	if($db['dsn'] != ""){
+		if(!isset($db['conn'])){
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] '.$db['name']);}
+			//PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'pear_error_handler');
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] CONNECT TO '.$db['dsn']);}
+			$db['conn'] = DB::connect($db['dsn']);
+		}
+		if(!PEAR::isError($db['conn'])){ 
+			return false;
+		}else{
+			event_log('[SQL_CONNECT][ERROR] '.$db['name'].': '.$db['conn']->getCode().'. '.$db['conn']->getMessage().' ('.$db['dsn'].')');
+		}
+	}
+	unset($db['conn']);
+	return false;
+}
+
+function sql_disconnect(&$db, $debug = false){
+	$log_function = "event_log";
+	if($debug){ 
+		$log_function('[DEBUG][SQL_DISCONNECT] '.$db['name']);
+	}
+	if(isset($db['conn'])){
+		$db['conn']->disconnect();
+		unset($db['conn']);
+	}
+}
+
+function sql_query($sql, &$db, $debug = false, $r = 0, $nbTry = 0){
+	if($sql != ""){
+		$log_function = "event_log";
+		$log_error = "";
+		sql_connect($db, $debug);
+		if(isset($db['conn'])){
+			if($r == 0){
+				if($debug){ $log_function('[DEBUG][SQL_QUERY] '.$db['name'].':'.$sql);}
+				$result = $db['conn']->query($sql);
+			}else{
+				if($debug){ $log_function('[DEBUG][SQL_GETONE] '.$db.':'.$sql);}
+				$result = $db['conn']->getOne($sql);
+			}
+			if(!PEAR::isError($result)){ return $result;}
+			else{
+				$log_error = '[SQL_QUERY][ERROR] '.$db['name'].':'.$result->getCode().". ".$result->getMessage().' ('.$result->getUserInfo().') ';
+				$log_function($log_error, $script_name);
+			}
+		}else{
+			$log_error = '[SQL_QUERY][ERROR] '.$db['name'].': Connection failed';
+			$log_function($log_error, $script_name);
+		}
+		if($nbTry < 10 && !$debug){
+			$nbTry++;
+			sql_disconnect($db, $debug);
+			$log_function('[SQL_QUERY][ERROR] wait '.($nbTry*60).'s before next try ('.$nbTry.')');
+			sleep($nbTry*60);
+			return sql_query($sql, $db, $debug,$r, $nbTry);
+		}else{
+			sql_disconnect($db, $debug);
+			event_log('[SQL_QUERY][ERROR] '.$db['name'].' SCRIPT STOPPED');
+			event_log('REQUEST:'.$sql);
+			event_log($log_error, "", $debug);
+			exit;
+		}
+	}
+	return false;
+}
+
+function sql_getOne($sql, &$db, $debug = false){
+	return sql_query($sql, $db, $debug, 1);
+}
+$content = "";
+foreach($bases as $base){
+	$db_data['name'] = $base['name'];
+	$obj_conn['dsn'] = $base['dsn'];
+	event_log('[DB:'.$base['name'].'] START');
+	$sql_where = array(
+		array('site' => 'YOUTUBE', 'error'=> 'Authentication with Google failed. Reason: BadAuthentication'),
+		array('site' => 'YOUTUBE', 'error'=> 'Authentication with Google failed. Reason: AccountDisabled'),
+		array('site' => 'YOUTUBE', 'error'=> 'Authentication with Google failed. Reason: NoLinkedYouTubeAccount'),
+		array('site' => 'DAILYMOTION', 'error'=> 'Login failed: invalid_grant (Invalid credentials.)'),
+	);
+	$login_error= array();
+	foreach($sql_where as $where){
+		$sql = "SELECT distinct ID_UTILISATEUR, VIDEO.ID_DISTRIBUTEUR, NOM_DISTRIBUTEUR, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, RESULT_DESCRIPTION_DIFFUSION 
+			FROM VIDEO_DIFFUSION 
+			INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO 
+			INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO.ID_DISTRIBUTEUR 
+			INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE 
+			WHERE DATE_MODIFICATION_DIFFUSION BETWEEN '".date('Y-m-d', mktime()-24*60*60)." 00:00:00' AND '".date('Y-m-d')." 00:00:00' AND site_diffusion='".$where['site']."' AND RESULT_DESCRIPTION_DIFFUSION='".$where['error']."' 
+			AND ID_STATUT_VISITE > 0";
+		$result = db_query($sql, $db_data['name']);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$key = $r['LOGIN_DIFFUSION']."/".$r['PASSWORD_DIFFUSION'];
+			if(!is_array($login_error[$where['site']])){ $login_error[$where['site']] = array();}
+			$login_error[$where['site']][$key] = $r;
+		}
+	}
+	if(count($login_error) >0){
+		foreach($login_error as $site=>$tab){
+			if(count($tab) > 0){
+				event_log('[DB:'.$base['name'].']['.$site.'] '.count($tab).' found');
+				foreach($tab as $r){
+					$content .= "\t- ".$r['LOGIN_DIFFUSION']."/".$r['PASSWORD_DIFFUSION'].": \n";
+					$content .= "\t\t -> site:".$site."\n";
+					$content .= "\t\t -> error:".$r['RESULT_DESCRIPTION_DIFFUSION']."\n";
+					$content .= "\t\t -> distributor:".$r['NOM_DISTRIBUTEUR']."(".$r['ID_DISTRIBUTEUR'].")\n";
+					$content .= "\t\t -> example user:".$r['ID_UTILISATEUR']."\n\n";
+				}
+			}
+		}
+	}
+	db_close();
+}
+if($content != ""){
+		$phpmail = new PHPMailer();
+		$phpmail->IsSMTP();
+		$phpmail->IsHTML(false);
+		$phpmail->Host      = SMTP_MAIL;
+		$phpmail->From      = "cron@previsite.com";
+		$phpmail->FromName  = 'Diffusion Resume '.date('Y-m-d');
+		//$phpmail->WordWrap  = 70;
+		$phpmail->Subject   = 'Diffusion Resume '.date('Y-m-d');
+
+		$phpmail->Body = $content;
+//		$phpmail->AddAddress("social@previsite.com", "Social");
+//		$phpmail->AddAddress("gateway@previsite.com", "Gateway");
+		$phpmail->AddAddress("report@previsite.com", "Report");
+//		$phpmail->AddAddress("julien@previsite.com", "Julien");
+		$phpmail->Send();
+	}
+	event_log('[DB:'.$base['name'].'] END');
+event_log('-----------------------------------');
+event_log('----------------END----------------');
+event_log('-----------------------------------');
+exit;
+?>

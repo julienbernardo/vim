@@ -1,0 +1,234 @@
+<?php
+require_once('DB.php');
+require_once 'HTTP/Request.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('include/global.php');
+require_once('include/function.db.php');
+require_once('previsite/GetDsn.php');
+
+require_once(PATH_INCLUDE.'global.php');
+require_once(PATH_INCLUDE.'function.php');
+require_once(PATH_INCLUDE.'function.db.php');
+require_once(PATH_INCLUDE.'function.ws.php');
+require_once(PATH_INCLUDE.'function.cron.php');
+require_once(PATH_INCLUDE.'function.import.data.php');
+require_once(PATH_INCLUDE.'function.import.software.php');
+
+$todo 	= $_REQUEST['todo'];
+$script = $_REQUEST['script'];
+$file	= $_REQUEST['file'];
+$import = $_REQUEST['import'];
+$order	= $_REQUEST['order'];
+$usercode = $_REQUEST['usercode'];
+$ref_portail = $_REQUEST['ref_portail'];
+$do 	= $_REQUEST['do'];
+$type	= $_REQUEST['type'];
+//$cfg_file = $_REQUEST['cfg_file'];
+$tables = explode( ';', $_REQUEST['tables']);
+
+$list_srv_include = $list_srv;
+
+
+$srv	= !empty($_REQUEST['srv']) ? $_REQUEST['srv'] : $_COOKIE['last_server'];
+if(empty($srv)) {
+	$srv = 'dev';
+}
+
+if(!array_key_exists($srv, $list_srv)){ $srv = "";}
+else{ $list_srv_include = array(ho => $list_srv_include[$srv]);}
+foreach($list_srv_include as $k=>$v){
+    $path = PATH_INCLUDE."config_import_".$k.".php";
+    if(file_exists($path)){ require_once($path);}
+    $path = PATH_INCLUDE."config_export_".$k.".php";
+    if(file_exists($path)){ require_once($path);}
+}
+
+$output = "false";
+switch($todo){
+	case "test":
+		$output = array();
+		$mktime = mktime(23,30,0);
+		echo date('Y-m-d H:i:s', $mktime)."<br />";
+		echo (is_cron_import( "gateway_debug2", true,$mktime) ? "true" : "false");exit;
+		echo "php -l ".PATH_EXPORT."video.php<br />";
+		$phpTest = exec("php -l ".PATH_EXPORT."video.php", $output, $return_var);
+		echo $phpTest;
+		if(preg_match('/^No syntax errors detected in/i', $phpTest) == 0){
+			echo   	" - Error:".implode("<br />", $output);
+		}
+		exit;
+		echo '<iframe src="http://www.w3schools.com" width="100%" height="100%"></iframe>';
+		exit;
+	case "get_cron_log":
+		$output = get_cron_file_log($srv, $type, $_REQUEST['hour']);
+		break;
+		
+	case "get_scripts":
+		$types = array('import', 'export');
+		
+		if(!empty($list_srv[$srv])) {
+			$cmd_top = 'sudo ssh '.$list_srv[$srv].' uptime';
+		} else {
+			$cmd_top = ' uptime';
+		}
+
+		$top_result = shell_exec($cmd_top);
+?>
+			<h2 align="center"><span id="ligne">Server Load</span></h2>
+<?php
+		echo '<p style="text-align: center"">'.$top_result.'</p>';
+		
+		foreach($types as $type){
+			$uType = strtoupper($type);
+			$function = "get".ucFirst($type)."OnServer";
+			$scripts = $function($srv, true);
+			if(count($scripts)> 0){
+?>
+			<h2 align="center"><span id="ligne"><?=ucFirst($type);?></span>
+			</h2>
+	       	<table width="100%" border="0" cellpadding="0" cellspacing="0" id="project" class="tab">
+	            <tr style="text-align:left;background-color:#fff;">
+	            	<th></th>
+	                <th>Name</th>
+	                <th>Last launch</th>
+<?php if($type == "export"){ ?>
+	                <th>Done</th>
+	                <th>Failed</th>
+<?php } ?>
+	                <th>Partner</th>
+	                <th align="center">db</th>
+	                <th align="center">Period</th>
+	                <th colspan="2" align="right" title="new <?=$type;?>"><a href="<?=str_replace( array('#TYPE#', '#SCRIPT#'), array($type, ''), URL_MANAGE_SCRIPT);?>" ><img src="images/page_add.gif" /> </a></th>
+	            </tr>
+<?php
+				foreach($scripts as $script){
+					$function = 'get'.ucFirst($type).'Infos';
+					$config = $function($script);
+					$is_activated = ($config['ID_STATUT_'.$uType] == 1);
+					$desc = get_cron_infos($script, $type);
+					
+					if($config['ID_STATUT_CRON_EXECUTION'] > -1 && $config['ID_STATUT_CRON_EXECUTION'] < 3){ $state = "working";}
+					else if($is_activated){ $state = "waiting";}
+					else{ $state = "stop";}
+
+					$script_pid = '';
+					$regex_pid = '/'.preg_quote('- (PID ', '/').'(\d+)/';
+					
+					$get_pid = false;
+
+					if($desc['start'] != "-"){
+						$last_duration = convert_duration_for_print($desc['duration_seconde']);
+						$last_duration = "<span style='color:".( ($config['TEMPS_MAX_'.$uType]*3600*24 - $desc['duration_seconde']) < 0 ? 'color:red' :'')."'><b>".$last_duration."</b> (max:".$config['TEMPS_MAX_'.$uType]."h)</span>";					
+
+						$last_launch = time() - strtotime($desc['start']);
+						if($desc['end'] != "-"){
+							if($last_launch < 48*60*60){ $last_launch = "<b >".convert_duration_for_print($last_launch," ")."</b>";}
+							else{ $last_launch = "<span class='color_".( !$is_activated ? 'orange' : 'red')."'><b>".round($last_launch/86400)."</b> days</span>";}
+							$desc = "since ".$last_launch." during ".$last_duration;
+						}else{
+							if($last_launch < $config['TEMPS_MAX_'.$uType]*60*60){ $last_launch = "<b >".convert_duration_for_print($last_launch, " ")."</b>";}
+							else{ $last_launch = "<span class='color_".( !$is_activated ? 'orange' : 'red')."'><b>".($last_launch < 48*60*60 ? convert_duration_for_print($last_launch, " ") : round($last_launch/86400)." days" )."</b></span>";}
+							$desc = "in progress since ".$last_launch." (max:".$config['TEMPS_MAX_'.$uType]."h)</span>";
+							$get_pid = true;
+						}
+					}else if($type == "import" && $config['ID_STATUT_CRON_EXECUTION'] === 0){ 
+						$desc = "parsage in progress...";
+						$get_pid = true;
+					}else{ $desc = "-";}
+					
+					
+					if($get_pid) {
+						if('EXPORT'==$uType) {
+							$file_log = PATH_LOG.'export_'.$script.'-'.date('Y-m-d').'.log';
+						} else {
+							$file_log = PATH_LOG.$script.'-'.date('Y-m-d').'.log';
+						}
+						if(is_file($file_log)) {
+							$handle = fopen($file_log, 'r');
+							$max_rows = 10;
+							// ne parser que les 10 premieres lignes pour trouver le pid...
+							if($handle!==false) {
+								while(empty($script_pid) && --$max_rows>0 && ($row = fgets($handle))) {
+									if(preg_match($regex_pid, $row, $tab_tmp)) {
+										$script_pid = $tab_tmp[1];
+									}
+								}
+								fclose($handle);
+							}
+						}
+						if($script_pid) {
+							$desc .= '  (current PID: <span class="color_orange">'.$script_pid.'</span>)';
+						} else {
+							$desc .= '  (current PID: <span class="color_red">UNKNOWN</span>)';
+						}
+					}
+					
+					
+					$class = "tab".(($cpt%2 == 0)? "0" : "1");
+					$database = "-";
+					if($type == "import"){
+						$getDsn = new GetDsn(false);
+						if(is_guid($config['ID_PORTAIL'])){
+							$dsn = $getDsn->byPartner($config['ID_PORTAIL']);
+							if(preg_match('/@\d+\.\d+\.\d+\.(\d+)\//i', $dsn, $result) > 0){
+								$database = $result[1];
+							}
+						}
+					}else{
+						$options = getExportOptions($script);
+						if($options['EXPORT']['DNS'] !=""){
+							$database = $options['EXPORT']['DNS']['VALEUR_EXPORT_OPTION'];
+						}
+						
+						$portals = array_values(getExportPortails($script, false));
+						$config['NOM_PORTAIL'] = "";
+						for($i=0;$i < count($portals); $i++){
+							$config['NOM_PORTAIL'] .= $portals[$i]['NOM_PORTAIL'].";";
+						}
+						if($config['NOM_PORTAIL'] == ""){ $config['NOM_PORTAIL'] = "-";}
+						else{ $config['NOM_PORTAIL'] = preg_replace('/;$/i', '', $config['NOM_PORTAIL']);}
+						if(preg_match('/^DONE:([^;]+);FAILED:([^;]+)/i', $config['RESUME_CRON'] , $resume) > 0){
+							$done = $resume[1];
+							$failed = $resume[2];
+							$resume = explode( '/', $failed);
+							if($resume[0] > 0.2*$resume[1]){ $failed = "<b>".$failed."</b>";}
+						}else{ 
+							$done = "-";
+							$failed = "-";
+						}
+					}
+?>
+	            <tr class="<?=$class;?>" id="script_<?=$type."_".$cpt;?>">
+	            	<td style="width:16px;"></td>
+	                <td>
+	                	<a href="manage_<?=($type);?>?script=<?=$config['CODE_'.$uType];?>" ><?=$config['NOM_'.$uType];?></a>
+	                </td>
+	                <td class="nowrap space"><em><?=$desc;?></em></td>
+<?php if($type == "export"){ ?>
+	                <td ><em><?=$done;?></em></td>
+	                <td class="space"><em><?=$failed;?></em></td>
+<?php }?>
+	                <td class="resume"><em <?=($type == "export" && strlen($config['NOM_PORTAIL']) > 40 ? 'title="'.$config['NOM_PORTAIL'].'"' : '' );?>><?=$config['NOM_PORTAIL']?></em></td>
+	                <td align="center" title="<?=$config['NOM_TABLE_'.$uType];?>"><?=$database;?></td>
+	                <td align="center"><?=($config['PERIODE_'.$uType] != "" ? $config['PERIODE_'.$uType] : "-");?></td>
+	                <td class="ico"><img src="images/icon_<?=$state;?>.gif" alt="status" /></td>
+	                <td class="ico pointer"><a href="manage_<?=$type;?>?script=<?=$config['CODE_'.$uType];?>"><img src="images/page_edit.png" alt="edit" /></a></td>
+	            </tr>
+<?php
+					$cpt++;
+				}
+?>
+	        </table>
+	        <input type="hidden" name="current_server" id="current_server" value="<?=$srv?>" />
+	        <br/>
+	        <br />
+<?
+			}
+		}
+		setcookie('last_server', $srv, time()+3600);
+		
+		exit;
+}
+echo $output;
+exit;
+?>

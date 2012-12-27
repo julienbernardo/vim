@@ -1,0 +1,454 @@
+<?php
+require_once('DB.php');
+require_once('include/global.php');
+require_once('include/security.php');
+require_once('include/function.php');
+require_once('include/function.db.php');
+
+$db_data['name'] = 'gateway';
+$db_data['pool'][$db_data['name']]['NAME'] = $db_data['name']; 
+$db_data['pool'][$db_data['name']]['DSN'] = DSN_GATEWAY; 
+
+$script = $_REQUEST['script'];
+
+//$listPortal = getListPortal();
+$listPortalImport = getListPortalImport();
+$listPortalExport = getListPortalExport2();
+echo count($listPortalExport);
+$listExport = getListPortalExport(true, true);
+
+$listOptions = getListOptions();
+
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Previsite Gateway</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="styles/styles.css" rel="stylesheet" type="text/css" />
+	<script type="text/javascript" src="scripts/jquery-1.4.2.min.js"></script>
+	<script type="text/javascript" src="scripts/jquery-ui-1.8.18.min.js"></script>
+	<script type="text/javascript" src="scripts/jquery.json-2.3.min.js"></script>
+	<script type="text/javascript" src="scripts/scripts_import.js"></script>
+</head>
+<body>
+<div id="barre">&nbsp;</div>
+	<div id="global">
+  	  <div id="logo"><a href="/manage"><img src="images/logo_gateway.png" alt="Gateway" border="0" /></a></div>
+		<div id="contact">&nbsp;</div>
+		<div id="content">
+		    <div id="content_header"></div>
+		    <div id="content_text" class="h_auto">
+		        <h1>Previsite gateway</h1>
+		        <!-- import -->
+		        <div class="content">
+				    <div class="part">
+				    	<div class="title" onclick="togglePart('part_import');" >Import<input id="part_import_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+				    	<div id="part_import">
+							<div class="row">
+								<div class="col"><span>Script name </span><input class="field" type="text" id="import_code" name="code" value="<?=$script;?>" maxlength="50"/></div>
+								<div class="col2" ><label for="import_activate">Activate </label><input type="checkbox" id="import_activate" class="checkbox"/></div>
+								<div class="col_right"><span id="import_update"></span></div>
+							</div>
+							<div class="row">
+								<div class="col"><span>Name </span><input class="field" type="text" id="import_name" name="name" value="" maxlength="100"/></div>
+								<div class="col2"><span>Server </span>
+			   						<select id="import_server" class="small field">
+			<?php
+			foreach($list_srv as $k=>$v){
+				echo '<option value="'.$k.'">'.$k.'</option>';
+			}
+			?>		        	
+									</select>
+						    	</div>
+								<div class="col_right"><input type="button" value="Import conf" onclick="showBoxImport('import');"/></div>
+						  	</div>
+						  	<div class="row col"><span class="vtop">Description </span>
+						  		<textarea id="import_description" class="field small"></textarea>
+						  	</div>
+	   					</div>
+	   				</div>
+				    
+				    <!-- DB -->
+				    <div class="part">
+	   		        	<div class="title" onclick="togglePart('part_db');">DB<input id="part_db_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+	   		        	<div id="part_db">
+							<div class="row">
+								<div class="col">
+									<span>Partner</span><select id="db_partner" class="field" onchange="getTablesList(this.value);"><option value="" selected="selected">-- select a partner --</option>
+	<?php
+	$old_cat = "";
+	foreach($listPortalImport as $opt) {
+		if($old_cat != $opt['ID_TYPE_BUNDLE'] && $old_cat != "") echo "</optgroup>";
+		if($old_cat != $opt['ID_TYPE_BUNDLE']) echo "<optgroup label=\"".($opt['ID_TYPE_BUNDLE'] == '2' ? 'Bundle + VT' : 'Bundle')."\">";
+		echo "<option value=\"".$opt['ID_PORTAIL']."\">".($opt['NOM_PORTAIL'])."</option>";
+		$old_cat = $opt['ID_TYPE_BUNDLE'];
+	}
+	echo "</optgroup>";
+	?>
+									</select>
+								</div>
+								<div class="col_full"><span id="db_dsn" class="bold"></span></div>
+							</div>
+							<div class="row col"><span>Table Name</span><select id="db_table" class="field"><option value="" >-- select a table --</option></select></div>
+						</div>
+				    </div>
+				    
+	   				<!-- Execution -->
+	   				<div class="part">
+		   				<div class="title" onclick="togglePart('part_execution');">Execution<input id="part_execution_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+		   				<div id="part_execution">
+							<div class="row col3">
+								<div><span>Period </span><input class="small field" type="text" id="execution_period" name="period" value=""/>(ex:0-1)</div>
+								<div><span>Archive Delay</span><input class="small field" type="text" id="execution_archive" name="archive" value=""/> in days</div>
+								<div><span>Time Max</span><input class="small field" type="text" id="execution_time" name="time" value=""/> in hour</div>
+								<div><span class="right">Current State</span><img id="execution_state" class="checkbox" src="images/icon_waiting.gif"/> <span class="pid"></span></div>
+							</div>
+							
+							<div class="list">
+								<div class="subtitle">
+									Steps
+									<div onclick="addStep();">Add step</div>
+								</div>
+								<ul>
+	<?php
+		if(count($listOptions['STEPS']) > 0){
+			foreach($listOptions['STEPS'] as $r){ ?>
+									<li onclick="manageStep('<?=$r['REF_OPTION'];?>');" id="execution_aff_<?=$r['REF_OPTION'];?>"><?=$r['REF_OPTION'];?></li>
+	<?php	}
+		}
+	?>
+								</ul>
+								<div class="add" id="execution_steps">
+	<?php
+		if(count($listOptions['STEPS']) > 0){
+			$part = "";
+			foreach($listOptions['STEPS'] as $r){ 
+				preg_match('/^([^_]+)/i', $r['REF_OPTION'], $result);
+				if($part != $result[1]){
+					if($part != ""){ echo "<hr />";}
+					$part = $result[1];
+
+				}
+	?>
+									<div onclick="manageStep('<?=$r['REF_OPTION'];?>');"><input onclick="this.checked = !this.checked;" id="execution_check_<?=$r['REF_OPTION'];?>" type="checkbox" onchange="manageStep(this.checked, '<?=$r['REF_OPTION'];?>');" /><span><?=$r['REF_OPTION'];?></span></div>
+	<?php	}
+		}
+	?>
+									<br />
+									<div class="btn save"><input type="button" name="Save" value="Save" onclick="saveImport();"/></div>
+									<div class="btn cancel"><input type="button" value="Close" onclick="addStep();"/></div>
+								</div>
+							</div>
+						</div>
+				    </div>
+				    
+				    <!-- Partners -->
+				    <div class="part">
+	   		        	<div class="title" onclick="togglePart('part_partners');">Portals<input id="part_partners_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+	   		        	<div id="part_partners">
+		   		        	<div class="row">
+		   		        		<div class="col"><span>Portal </span><select id="partners_choice" class="field" onchange="addPortail(this.value);">
+								<option value="" selected="selected">-- select a portal --</option>
+	<?php
+	$old_cat = "";
+	foreach($listPortalExport as $opt) {
+		if($old_cat != $opt['ID_TYPE_BUNDLE'].$opt['ID_TYPE_PORTAIL'] && $old_cat != "") echo "</optgroup>";
+		if($old_cat != $opt['ID_TYPE_BUNDLE'].$opt['ID_TYPE_PORTAIL']) echo "<optgroup label=\"".$opt['TYPE_BUNDLE']." / ".$opt['TYPE_PORTAIL']."\">";
+		echo "<option value=\"".$opt['ID_PORTAIL']."\">".$opt['NOM_PORTAIL']."</option>";
+		$old_cat = $opt['ID_TYPE_BUNDLE'].$opt['ID_TYPE_PORTAIL'];
+	}
+	echo "</optgroup>";
+	?>
+									</select><img src="/images/wp.png" class="top cursor" onclick="showBoxImport('wp');"/>
+								</div>
+		   		        	</div>
+		   		        	<div class="row">
+		   		        		<table class="diffusions" id="partners_table" cellspacing="0">
+		   		        			<tr class="header hidden">
+										<th></th>
+										<th>Usercode</th>
+										<th>Password</th>
+										<th>Nb Img Min</th>
+										<!--th>Activate</th-->
+										<th class="img"><input type="checkbox" onclick="portalActiveChangeAll(this);"/><img class="passive" src="/images/icon_update.gif" alt="Force update" onclick="portalsForceUpdateAll(this);"/></th>
+										<th></th>
+										<th></th>
+									</tr>
+									<tr class="hidden" id="partners_portail">
+										<td class="name"></td>
+										<td><input class="field" name="login" type="text" value=""/></td>
+										<td><input class="field" name="password" type="text" value=""/></td>
+										<td><input class="field small" name="limit" type="text" value="1"/></td>
+										<td class="img"><input type="checkbox" checked onclick="portalActiveChange(this);"/><img class="active" src="/images/icon_update.gif" alt="Force update" onclick="portalsForceUpdate(this);"/></td>
+										<td class="link">Add an option</td>
+										<td class="img"><img src="images/del.png" /></td>
+									</tr>
+									<tr class="hidden" id="partners_portail_options">
+										<td class="id"></td>
+										<td colspan="6" class="options">
+											<div class="row">
+												<span>Options</span><select class="field" ><option>-- Select an option --</option>
+		<?php
+			if(count($listOptions['DIFFUSION']) > 0){
+				foreach($listOptions['DIFFUSION'] as $r){
+					echo '<option value="'.$r['REF_OPTION'].'§§'.$r['VALEUR_OPTION'].'">'.$r['REF_OPTION'].'</option>';
+				}
+			}
+		?>
+												</select>
+											</div>
+											<table cellspacing="0">
+												<tr class="hidden">
+													<td class="name"></td>
+													<td><input class="field" type="text" value="" /></td>
+													<td class="img"><img src="images/del.png" /></td>
+												</tr>
+											</table>
+										</td>
+									</tr>
+		   		        		</table>
+		   		        	</div>
+	   		        	</div>
+			    	</div>
+			    	
+			    	<!-- Options -->
+			    	<div class="part">
+			    		<div class="title" onclick="togglePart('part_options')">Options<input id="part_options_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+			    		<div id="part_options">
+							<div class="row col"><span>Options </span><select id="options_choice" class="field" onchange="addOptions('options_table', this.value, '');"><option>-- Select an option --</option>
+	<?php
+			if(count($listOptions['IMPORT']) > 0){
+				foreach($listOptions['IMPORT'] as $r){
+					echo '<option value="'.$r['REF_OPTION'].'">'.$r['REF_OPTION'].'</option>';
+				}
+			}
+	?>
+				    		</select><a href="/manage_option" ><img src="/images/add.gif" class="top" /></a></div>
+							<div class="row">
+								<table id="options_table" cellspacing="0" class="options">
+	<?php
+			if(count($listOptions['IMPORT']) > 0){
+				foreach($listOptions['IMPORT'] as $r){
+	?>
+									<tr id="options_table_<?=$r['REF_OPTION'];?>" class="hidden">
+										<td class="name"><?=$r['REF_OPTION'];?></td>
+										<td><input class="field" type="text" value="<?=$r['VALEUR_OPTION'];?>"/> <input type="hidden" value="<?=$r['REF_CATEGORIE_OPTION'];?>" /></td>
+										<td class="img" onclick="deleteOptions('options_table_<?=$r['REF_OPTION'];?>')"><img src="images/del.png"/></td>
+										<td class="infos"><span title="<?=$r['DESCRIPTION_OPTION'];?>"><?=$r['DESCRIPTION_OPTION'];?></span></td>
+									</tr>
+	<?php
+				}
+			}
+	?>
+								</table>
+							</div>
+						</div>
+			    	</div>
+			    	
+			    	<!-- Users -->
+			    	<div class="part">
+			    		<div class="title" onclick="togglePart('part_users');">Users<input id="part_users_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+			    		<div id="part_users">
+			    			<div class="row">
+			    				<div class="col">Search: <input type="text" class="field" name="search" value="" /><img onclick="searchUser();" class="vmiddle" src="images/icon_view.gif" /></div>
+			    				<div class="col_right link" onclick="updateUser('');">new user</div>
+			    				<div class="col2" id="part_users_count"></div>
+			    			</div>
+			    			<div class="row">
+								<table class="list">
+									<tr class="header">
+										<th>Usercode</th>
+										<th>Name</th>
+										<th>Company</th>
+										<th>Modification</th>
+										<th></th>
+										<th></th>
+									</tr>
+									<tr class="footer"><td colspan="5"><span class="link">See more user</span></td></tr>
+								</table>
+							</div>
+							<div class="row resume">
+								<div class="col_right"><input type="button" value="Import users" onclick="showBoxImport('user');"/></div>
+							</div>
+			    		</div>
+			    	</div>
+			    	
+			    	<!-- Logs -->
+			    	<div class="part">
+			    		<div class="title" onclick="togglePart('part_logs');">Logs<input id="part_logs_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+			    		<div id="part_logs">
+							<div class="row">
+								<table class="resume">
+									<tr class="header">
+										<th>Date</th>
+										<th>During</th>
+										<th>Users</th>
+										<th>Tours</th>
+										<th>Images</th>
+										<th>Plans</th>
+										<th>Transactions</th>
+									</tr>
+									<tr class="footer"><td colspan="7"><span class="link">See more user</span></td></tr>
+								</table>
+							</div>
+							<div class="row resume_small">
+								<input class="save" type="button" value="Execute" onclick="executeImport(this.value);"/>
+								<input class="update" type="button" value="Update" onclick="showBoxImport('update');"/>	
+								<input class="cancel" type="button" value="Check" onclick="checkImport();"/>
+								
+							</div>
+							<div class="row" id="logs_list">
+								<ul>
+								</ul>
+								<textarea readonly></textarea>
+							</div>
+						</div>
+		    		</div>
+		    	</div>
+		    	<div class="footer">
+		    		<div class="row resume" id="end">
+						<input type="button" name="Save" value="Save" class="save" onclick="saveImport();"/>
+						<div class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+		    			<input type="button" name="Cancel" value="Back" class="cancel" onclick="goToHome();"/>
+		    		</div>	
+	    		</div>
+		    </div>
+		    <div id="content_footer"></div>
+		</div>
+	</div>
+	<div id="box" class="hidden">
+		<div id="box_import" class="content">
+			<div class="title"> Import config_import.php conf</div>
+			<div class="row col">
+				<select class="field" name="server" onchange="getImportsByServer(this.value);">
+					<option value="">-- select a server --</option>		
+<?php
+		foreach($list_srv as $k=>$v){
+			echo '<option value="'.$k.'">'.$k.'</option>';
+		}
+?>
+				</select>
+			</div>
+			<div class="row col"><select class="field hidden" name="import" onchange="showValidationImport(this.value);"><option value="">-- select an import --</option></select></div>
+			<div class="row last">
+	    		<input type="button" name="Save" value="Ok" class="save hidden" onclick="loadImportInfos();"/>
+	    		<div class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+        		<input type="button" name="Cancel" value="Close" class="cancel" onclick="hideBoxImport();"/>
+        	</div>	
+		</div>
+		<div id="box_user" class="content">
+			<div class="title"> Import users</div>
+			<div class="row">
+				<div class="col">
+					<select class="field" name="script" onchange="checkUsers(this.value);" id="box_user_select">
+					</select>
+				</div>
+				<div class="col2">
+					<input type="button" value="check" onclick="checkUsers($('#box_user_select').val());" />
+				</div>
+			</div>
+			<br />
+			<div class="row" id="box_user_result_users"></div>
+			<br />
+			<div class="row" id="box_user_result_fields"></div>
+			<br />
+			<div class="row last">
+	    		<input type="button" name="save" value="Import" class="save hidden" onclick="importUsers();"/>
+	    		<div class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+        		<input type="button" name="cancel" value="Close" class="cancel" onclick="hideBoxImport();"/>
+        	</div>	
+		</div>
+		<div id="box_update" class="content">
+			<div class="title"> Update users</div>
+			<div class="row col">
+				<select class="field field_no_title" name="do">
+					<option value="">-- select an action --</option>
+					<option value="user">Update infos</option>
+					<option value="video">Regenerate videos</option>
+				</select>
+			</div>
+			<div class="row col">
+				Usercode <input type="text" name="usercode" class="field" value="" />
+			</div>
+			<div class="row col">
+				Ref portail <input type="text" name="ref_portail" class="field" value="" />
+			</div>
+			<div class="row col3">
+				<div><input name="users" id="box_update_users" checked="checked" type="checkbox"> <label for="box_update_users">Users</label></div>
+				<div><input name="tours" id="box_update_tours" checked="checked" type="checkbox"> <label for="box_update_tours">Tours</label></div>
+				<div><input name="images" id="box_update_images" type="checkbox"> <label for="box_update_images">Images</label></div>
+			</div>
+			<div class="row" id="box_update_result"></div>
+			<div class="row last">
+	    		<input type="button" name="save" value="Check" class="save" onclick="updateData('');"/>
+	    		<div class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+        		<input type="button" name="cancel" value="Close" class="cancel" onclick="hideBoxImport();"/>
+        	</div>	
+		</div>
+		<div id="box_wp" class="content">
+			<div class="title">WorldPosting</div>
+			
+			<div class="row col3 align_left">
+<?php
+foreach($listExport as $export){
+?>
+				<div><input id="check_<?=$export['ID_PORTAIL'];?>" checked="checked" type="checkbox" value="<?=$export['ID_PORTAIL'].'§§'.$export['NOM_PORTAIL'];?>"> <label for="check_<?=$export['ID_PORTAIL'];?>" title="<?=$export['NOM_PORTAIL'];?>"><?=$export['NOM_PORTAIL'];?></label></div>	
+<?php
+}
+?>
+			</div>
+			<div class="row">
+        		<table class="diffusions" id="template_partners_table" cellspacing="0">
+        			<tr class="header">
+						<th>Usercode</th>
+						<th>Password</th>
+						<th>Nb Img Min</th>
+						<th>Activate</th>
+					</tr>
+					<tr id="template_portail">
+						<td><input class="field" name="login" type="text" value=""/></td>
+						<td><input class="field" name="password" type="text" value=""/></td>
+						<td><input class="field small" name="limit" type="text" value="0"/></td>
+						<td class="img"><input type="checkbox" checked onclick="portalActiveChange(this);"/><img class="active" src="/images/icon_update.gif" alt="Force update" onclick="portalsForceUpdate(this);"/></td>
+					</tr>
+					<tr id="template_portail_options">
+						<td colspan="4" class="options">
+							<div class="row">
+								<span>Options</span><select class="field" onchange="addPortalOptions('template_portail_options', this.value);" ><option>-- Select an option --</option>
+<?php
+if(count($listOptions['DIFFUSION']) > 0){
+foreach($listOptions['DIFFUSION'] as $r){
+	echo '<option value="'.$r['REF_OPTION'].'§§'.$r['VALEUR_OPTION'].'">'.$r['REF_OPTION'].'</option>';
+}
+}
+?>
+								</select>
+							</div>
+							<table cellspacing="0">
+								<tr class="hidden">
+									<td class="name"></td>
+									<td><input class="field" type="text" value="" /></td>
+									<td class="img"><img src="images/del.png" /></td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+        		</table>
+        	</div>
+			<br />
+			<div class="row last">
+	    		<input type="button" name="save" value="Ok" class="save" onclick="addWpPortail();"/>
+	    		<div class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+        		<input type="button" name="cancel" value="Close" class="cancel" onclick="hideBoxImport();"/>
+        	</div>	
+		</div>
+	</div>
+	<script type="text/javascript">
+		var gb_new = true;
+		var gb_import_code = '';
+		loadScript('<?=$script;?>');
+	</script>
+</body>
+</html>
+

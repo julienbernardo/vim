@@ -1,0 +1,114 @@
+<?php
+require_once 'HTTP/Request.php';
+
+define('URL_S3', 'http://s3.amazonaws.com/media.us1.previsite.com/maps/%GUID%.png');
+define('URL_UPLOAD', 'http://upload.previsite.com/video.php');
+define('URL_MAPQUEST', 'http://open.mapquestapi.com/staticmap/v4/getmap?size=#WIDTH#,#HEIGHT#&zoom=#ZOOM#&center=#LAT#,#LON#&scalebar=false&imagetype=png');
+//http://staticmap.openstreetmap.de/staticmap.php?center=#LAT#,#LON#&zoom=#ZOOM#&size=#WIDTH#x#HEIGHT#
+//http://open.mapquestapi.com/staticmap/v4/getmap?size=#WIDTH#,#HEIGHT#&zoom=#ZOOM#&center=#LAT#,#LON#&scalebar=false&imagetype=png
+//http://ojw.dev.openstreetmap.org/StaticMap/?lat=#LAT#&lon=#LON#&z=#ZOOM#&w=#WIDTH#&h=#HEIGHT#&mode=Location&zoom_to_clicks=off&show=1&layer=mapnik&att=none
+//http://pafciu17.dev.openstreetmap.org/?module=map&zoom=#ZOOM#&width=#WIDTH#&height=#HEIGHT#&type=mapnik&center=#LON#,#LAT#&scaleBarPos=without
+
+$lat = (float)$_GET['lat'];
+$lon = (float)$_GET['lon'];
+$zoom = (int)$_GET['zoom'];
+$size = $_GET['size'];
+$type = $_GET['type'];
+$zip = $_GET['zip'];
+$country = $_GET['country'];
+$force_refresh = !empty($_GET['refresh']);
+$crop_height_border = 23;
+
+if(empty($zoom)) {
+	$zoom = 12;
+} else if($zoom>21) {
+	$zoom = 21;
+} else if($zoom<0) {
+	$zoom = 0;
+}
+
+
+// http://geoloc.previsite.net/O/40.714728_-73.998672/12/satellite.png?refresh=1
+/*
+191F4B45-53AD-2D10-DBE2-E7479443BBE7;E5607DDA-327B-2432-8A43-C5E25D54432C;59C4948B-DB6D-FDAF-E15D-CD67B8347126;38429EA1-8BAD-1795-807E-B46BCF131567;D8801E1B-B034-6EC3-7BE5-C89DFB3BE84A;E65658AE-276C-70B5-BA67-25CBB1050D5E
+
+*/
+if($zoom<=11) {
+	$lat = round($lat, 2);
+	$lon = round($lon, 2);
+}
+
+// RS 2011-10-31 : Ajout du zoom pour cle memcache
+if(empty($size)) {
+	$width = 640;
+	$height = 640;
+	$key = strtolower($zoom.$type.$lat.$lon);
+} else {
+	list($width, $height) = explode("x", $size);
+	$key = strtolower($zoom.$type.$lat.$lon.$size);
+}
+$key = md5($key."openstreetmap");
+$guid = strtoupper(preg_replace('/^([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})$/i', '$1-$2-$3-$4-$5', $key));
+
+$mc = memcache_connect('10.0.4.62', 11211);
+$url_redirect = memcache_get($mc, $key);
+
+if($force_refresh || empty($url_redirect)) {
+	$local_file = '/tmp/'.$guid.'.'.$type;
+	$replace = array(
+		'search' => array('#WIDTH#', '#HEIGHT#', '#ZOOM#', '#LAT#', '#LON#'),
+		'replace' => array(urlencode($width), urlencode($height+$crop_height_border*2), urlencode($zoom), urlencode($lat), urlencode($lon)),
+	);
+	$url_map = str_replace($replace['search'], $replace['replace'], URL_MAPQUEST);
+	
+	if($type == 'redgrey') {
+		$url_map .= "&pois=".urlencode("mcenter,".$lat.",".$lon);
+	}
+	if($_REQUEST['debug']) die($url_map);
+	// Sauvegarde image
+	$content_image = @file_get_contents($url_map);
+	
+	// Suppression du logo
+	//$thumb = imagecreatetruecolor($width, $height);
+	//$source = imagecreatefromstring($content_image);
+	//// Redimensionnement
+	//imagecopy($thumb, $source, 0, 0, 0, $crop_height_border, $width, $height);
+	//imagedestroy($source);
+	////start buffering
+	//ob_start();
+	//imagepng($thumb);
+	//$content_image =  ob_get_contents();
+	//ob_end_clean();
+
+	if(!empty($content_image)) {
+		file_put_contents($local_file, $content_image);
+
+		$req = new HTTP_Request(URL_UPLOAD);
+		$req->setMethod(HTTP_REQUEST_METHOD_POST);
+
+		$req->addFile('file01', $local_file);
+		$response = $req->sendRequest();
+
+		if(PEAR::isError($response)) {
+			$result_upload = $response->getMessage();
+		} else {
+			$result_upload = $req->getResponseBody();
+		}
+		// Sauvegarde memcache de l'URl
+		if('true'===$result_upload) {
+			$url_redirect = str_replace('%GUID%', $guid, URL_S3);
+			memcache_set($mc, $key, $url_redirect);
+		}
+	}
+}
+
+memcache_close($mc);
+
+if(!empty($url_redirect)) {
+	header('Location: '.$url_redirect);
+} else if(!empty($content_image)) {
+	header('Content-type: image/jpeg');
+	echo $content_image;
+}
+
+

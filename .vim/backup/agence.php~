@@ -1,0 +1,1229 @@
+<?php
+
+//main function
+function create_stupeflix_xml_AGENCE($infos){
+	global $videos_options;
+	
+	$id_video = $infos['ID_VIDEO'];
+	$id_user = $infos['ID_UTILISATEUR'];
+	$type_function = "AGENCE";	
+	//reference visite
+	$list_profiles = $videos_options['TYPE']['AGENCE']['PROFIL'];
+	$profil_size = getProfilSize($list_profiles);
+	$infos['PROFIL_SIZE'] = $profil_size;
+	$result = array('error_code'=> 0);
+	
+	$infos['URL_LOGO'] = 'http://dev.video.previsite.net/images/template/AGENCE/laforet/logo.png';
+	if($infos['LATITUDE'] != "" && $infos['LONGITUDE'] != ""){
+		$url_map_base = createMapImage($id_video, $infos['LATITUDE'], $infos['LONGITUDE'], $profil_size['WIDTH'], $profil_size['HEIGHT']);
+
+		$infos['MAPS'] = array(
+			str_replace(array('maptype=mobile', 'zoom=14'), array('maptype=satellite', 'zoom=11'), $url_map_base),
+			str_replace(array('maptype=mobile', 'zoom=14'), array('maptype=satellite', 'zoom=12'), $url_map_base),
+			str_replace(array('maptype=mobile', 'zoom=14'), array('maptype=satellite', 'zoom=13'), $url_map_base),
+			str_replace(array('maptype=mobile', 'zoom=14'), array('maptype=satellite', 'zoom=12'), $url_map_base),
+			str_replace(array('zoom=14'), array('zoom=12'), $url_map_base),
+		);
+	}
+	$infos['CODE_POSTAL_VILLE'] = $infos['CODE_POSTAL']." ".$infos['VILLE'];
+	$infos['EMPLOYES']  = $infos['EMPLOYE'];
+	if($infos['EMPLOYE'] != ""){ 
+		$infos['AGENTS'] = explode( ';', $infos['EMPLOYE']);
+		$tmp = array();
+		foreach($infos['AGENTS'] as $k=>$v){
+			$tmp = explode("/", $v);
+			$infos['AGENTS'][$k] = array('NAME'=>$tmp[0], 'TITLE'=>$tmp[1]);
+		}
+	}
+	$infos['ZONES']  = $infos['ZONE'];
+	if($infos['ZONE'] != ""){ $infos['ZONE'] = explode(';', $infos['ZONE']);}
+	if($infos['DIFFUSION'] != ""){ 
+		$infos['DIFFUSIONS'] = explode(';', $infos['DIFFUSION']);
+		$diffusions = array();
+		if(count($infos['DIFFUSIONS']) > 0){
+			foreach($infos['DIFFUSIONS'] as $v){
+				list($k,$v) = explode(":", $v);
+				$diffusion[$k] = $v;
+			}
+		}
+		$infos['DIFFUSIONS'] = array();
+		if($diffusion['facebook'] != ""){ $infos['DIFFUSIONS']['FACEBOOK'] = 'www.facebook.com/pages/'.$diffusion['facebook'];}
+		if($diffusion['twitter'] != ""){ $infos['DIFFUSIONS']['TWITTER'] = 'www.twitter.com/'.$diffusion['twitter'];}
+		if($diffusion['youtube'] != "" || $diffusion['dailymotion'] != ""){ 
+			$infos['DIFFUSIONS']['VIDEO'] = array();
+			if($diffusion['youtube'] != ""){	$infos['DIFFUSIONS']['VIDEO'][] = 'www.youtube.com/'.$diffusion['youtube'];}
+			if($diffusion['dailymotion'] != ""){	$infos['DIFFUSIONS']['VIDEO'][] = 'www.dailymotion.com/'.$diffusion['dailymotion'];}
+		}
+	}
+	$infos['PROFILE'] = $list_profiles;
+	$infos['MUSIC']	= '11111130-8F9D-4405-9FFB-FCF00658E9F7';
+	if(count($infos['LOGOS'])  > 0){
+		$tmp = array();
+		for($i=0;$i<count($infos['LOGOS']) ; $i++){
+			$tmp[$i] = str_replace('#ID#', $infos['LOGOS'][$i], URL_IMG_AGENCY);
+		}
+		$infos['LOGOS'] = $tmp; 
+	}
+	
+	$xml_header = write_stupeflix_xml_head();
+	$xml_footer = write_stupeflix_xml_foot();
+
+	$profiles = write_stupeflix_xml_content_agence($infos);
+	$profiles['xml'] = $xml_header.$profiles['xml'].$xml_footer;
+
+	$result['user'] 		= $infos;
+	$result['type'] 		= $type_function;
+	$result['profiles']		= array($profiles);
+	$result['error_code'] 	= 0;
+
+	return $result;
+}
+//xml function
+function write_stupeflix_xml_content_agence($infos){
+	$url_template 	= str_replace('#TEMPLATE#' , "AGENCE", URL_VIDEO_TEMPLATE)."laforet/";
+	$path_template 	= str_replace('#TEMPLATE#' , "AGENCE", PATH_VIDEO_TEMPLATE)."laforet/";
+		
+	$tmp_img = PATH_TEMP.rand().".jpg";
+		
+	$url_intro_video = $url_template."intro_sans_logo.mp4";
+	$url_nuage = $url_template."nuage.png";
+	$url_logo = $url_template."logo.png";
+	$url_picto_adresse = $url_template."picto_address.png";
+	$url_picto_mail = $url_template."picto_mail.png";
+	$url_picto_phone = $url_template."picto_phone.png";
+	$url_onde = $url_template."onde_geoloc.png";
+	$url_picto_facebook = $url_template."picto_facebook.png";
+	$url_picto_twitter = $url_template."picto_twitter.png";
+	$url_picto_video = $url_template."picto_video.png";
+	$url_guillemets = $url_template."guillemets.png";
+	
+	$fontname = ' face="ffdinregular" ';
+	$fontname_title = ' face="ffdincondensedblack" ';
+	$fontname_subtitle = ' face="ffdincondensedregular" ';
+
+	$profile = $infos['PROFILE'];
+	
+	if(count($infos['LOGOS']) == 0){ $infos['LOGOS'] = array($url_logo);}
+	
+	//infos agence
+	$infos_agence_position_text = 0.025;
+	$infos_agence_bgcolor_text = "#DDDDDD";
+	$infos_agence_start_animation = 2.2;
+	$infos_agence_ecart = 0.1;
+	$infos_agence_duration = 6.20;
+	$infos_agence_start_zoom = $infos_agence_start_animation+$infos_agence_ecart*2;
+	$infos_agence_ecart_zoom = 0.8;
+	$logo_agence_infos_duration = 3;
+	$logo_agence_infos_duration_transition = 1;
+	
+	//zone
+	$zone_bgcolor_text = "#FFFFFF";
+	$zone_animation_out = 0.25;
+	$zone_pos_start = 0.10;
+	$zone_animation_start = 1.4;
+	$zone_animation_duration = 0.25;
+	$zone_animation_space_between = $zone_animation_duration*0.75;
+	$zone_animation_start_zoom = ($zone_animation_start+($zone_animation_space_between*count($infos['ZONE'])));
+	$zone_start_nuage_animation = $zone_animation_start_zoom + ($zone_animation_duration*2*count($infos['ZONE']))+1.3;
+	$zone_duration = $zone_start_nuage_animation+2;
+	
+	//description 
+	$description_start = 1;
+	$description_duration_zoom = 0.25;
+	$description_duration = 6;
+
+	//agent information
+	$infos_agence_top_background = 0.35;
+	$font_limit_agence_name = getAdvancedTextFontSize(520, fix_xml($infos['NOM_AGENCE']), 50, true);
+	$text = array('ADRESSE', 'CODE_POSTAL_VILLE', 'TELEPHONE', 'EMAIL');
+	$text_reference = "";
+	foreach($text as $v){
+		if(strlen($infos[$v]) > strlen($text_reference)){ $text_reference = $infos[$v];}
+	}	
+	$font_limit_agence_infos = getAdvancedTextFontSize(250, fix_xml($text_reference), 12, true);
+
+	$agent_name_start = 1.2;
+	$agent_name_duration = 2;
+	$agence_infos_duration = $agent_name_start+count($infos['AGENTS'])*($agent_name_duration-0.17)+1;
+	$nuages = array(
+		array(	'alpha' => '0.85', 
+				'start' => array('scale'=> '2,2,2', 'pos'=>'-0.5,-0.3,0', 'orient'=>'0,0,0,0'),
+				'end' => array('scale'=> '2.1,2.1,2.1', 'pos'=>'-0.6,-0.2,0', 'orient'=>'0,0,0,0'),
+		),
+		array(	'alpha' => '1', 
+				'start' => array('scale'=> '2.7,2.7,2.7', 'pos'=>'1.1,-0.3,0', 'orient'=>'0,180,0,0'),
+				'end' => array('scale'=> '2.9,2.9,2.9', 'pos'=>'1.0,-0.4,0', 'orient'=>'0,180,0,0'),
+		),
+		array('alpha' => '0.95', 
+				'start' => array('scale'=> '2.7,2.7,2.7', 'pos'=>'0.15,0.95,0', 'orient'=>'0,180,0,0'),
+				'end' => array('scale'=> '2.7,2.7,2.7', 'pos'=>'0.25,1.0,0', 'orient'=>'0,180,0,0'),
+		),
+		array(	'alpha' => '1',
+//				'start' => array('scale'=> '2.2,2.2,2.2', 'pos'=>'-0.9,-0.05,0', 'orient'=>'0,180,0,0'),
+//				'end' => array('scale'=> '2.4,2.4,2.4', 'pos'=>'-1.0,-0.05,0', 'orient'=>'0,180,0,0'),
+				'start' => array('scale'=> '2.1,2.1,2.1', 'pos'=>'-0.9,-0.05,0', 'orient'=>'0,180,0,0'),
+				'end' => array('scale'=> '2.3,2.3,2.3', 'pos'=>'-1.0,-0.05,0', 'orient'=>'0,180,0,0'),
+		),
+	);
+	
+	//diffusion
+	$diffusion_duration_intro = 3;
+	$diffusion_animation_text_start = 0.5;
+	$diffusion_animation_text_space = 0.1;
+	$diffusion_animation_logo_start = 1.3;
+	$diffusion_background = array(
+		'facebook' => array('bgcolor'=>'#3b5998', 'textcolor' => '#FFFFFF', 'logo' => fix_xml($url_template.'picto_facebook_white.png'), 'logo_overlay' => 'top="0.25" left="-0.05" width="0.34" height="0.7"', 'alpha'=> '0.2', 'font_limit_width' => 525),
+		'twitter' => array('bgcolor'=>'#bfddec', 'textcolor' => '#FFFFFF', 'logo' => fix_xml($url_template.'picto_twitter_white.png'), 'logo_overlay' => 'top="0.54" left="0.01" width="0.29" height="0.30"', 'alpha'=> '0.2', 'font_limit_width' => 470),
+		'video' => array('bgcolor'=>'#fbfbfb', 'textcolor' => '#333333', 'logo' => fix_xml($url_template.'picto_video.png'), 'logo_overlay' => 'top="0.50" left="0.05" width="0.20" height="0.4"', 'alpha'=> '1', 'font_limit_width' => 450),
+	);
+	
+	//end
+	$duration_logo_end = 6;
+	
+	$xml = array();	
+	$xml[] = '  	<stack>';
+	$xml[] = '  		<sequence>';
+	//intro start
+	$duration_intro = 8.25;
+	$infos['URL_LOGO'] = $url_logo;
+	$logo_position = array('y'=>'0.3', 'x'=>'0.39', 'width'=>'0.223', 'height'=>'0.4');
+
+	$xml[] = '  		<!-- intro -->';
+	$xml[] = '		  	<stack>';
+	$xml[] = '		  		<overlay duration="'.$duration_intro.'">';
+	$xml[] = '				  <video filename="'.fix_xml($url_intro_video).'" speed="1.0" skip="0.0" audio="true" volume="0.3"/>';
+	$xml[] = '				</overlay>';
+	$xml[] = '		  		<sequence>';
+	$xml[] = '				  	<stack>';
+	$xml[] = '				  		<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '							<sequence>';
+	$xml[] = '								<effect type="none" duration="2.5">';
+	$xml[] = '									<image color="#000000" />';
+	$xml[] = '								</effect>';
+	$xml[] = '								<transition type="crossfade" duration="2.0" />';
+	$xml[] = '								<effect type="none" duration="7">';
+	$xml[] = '									<image color="#FFFFFF" />';
+	$xml[] = '								</effect>';
+	$xml[] = '							</sequence>';
+	$xml[] = '						</filter>';
+//	$xml[] = '				  		<overlay top="0.295" left="0.3475" width="0.305" height="0.41" duration="'.$duration_intro.'"> ';
+	$xml[] = '				  		<overlay top="'.($logo_position['y']-0.005).'" left="'.($logo_position['x']-0.0025).'" width="'.($logo_position['width']+0.005).'" height="'.($logo_position['height']+0.01).'" duration="'.$duration_intro.'">';
+	$xml[] = '							<image color="#FFFFFF" />';
+	$xml[] = '						</overlay>';
+//	$xml[] = '				  		<overlay top="0.3" left="0.35" width="0.3" height="0.4" duration="..">';
+	$xml[] = '				  		<overlay top="'.$logo_position['y'].'" left="'.$logo_position['x'].'" width="'.$logo_position['width'].'" height="'.$logo_position['height'].'" duration="..">';
+	$xml[] = '							<image filename="'.fix_xml($infos['URL_LOGO']).'" />';
+	$xml[] = '						</overlay>';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key pos="0,0.50,0" scale="0.5,0.5,1" orient="0,0,0" time="0.0" />';
+	$xml[] = '							<key pos="0,0,0" scale="0.5,0.5,1" orient="0,0,0" time="1.0" />';
+	$xml[] = '							<key pos="0,-0.15,0" scale="1,1,1" orient="0,0,0" time="5" />';
+	$xml[] = '							<key pos="0,-0.15,0" scale="1,1,1" orient="0,0,0" time="6.9" />';
+	$xml[] = '							<key pos="0,-0.15,0" scale="1.2,1.2,1.2" orient="0,0,-13" time="8.2" />';
+	$xml[] = '						</animator>';
+	$xml[] = '					</stack>';
+	$xml[] = '				</sequence>';
+	$xml[] = '				<stack>';
+	$xml[] = '					<sequence>';
+	$xml[] = '						<overlay duration="'.$duration_intro.'">';
+	$xml[] = '							<image filename="'.$url_nuage.'">';
+	$xml[] = '								<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.5" />';
+	$xml[] = '							</image>';
+	$xml[] = '						</overlay>';
+	$xml[] = '						<transition type="crossfade" duration="0.5" />';
+	$xml[] = '						<effect type="none" duration="1">';
+	$xml[] = '							<image color="#FFFFFF" />';
+	$xml[] = '						</effect>';
+	$xml[] = '					</sequence>';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="4,4,4" pos="0.0,-2,0" orient="0,0,0" time="0" />';
+	$xml[] = '						<key scale="4,4,4" pos="0.0,-2,0" orient="0,0,0" time="'.($duration_intro-0.5-1.2).'" />';
+	$xml[] = '						<key scale="4,4,4" pos="0.1,-0.1,0" orient="0,0,-17.5" time="'.($duration_intro-0.5).'" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</stack>';
+	$xml[] = '			</stack>';
+	$xml[] = '  			<!-- intro  end -->';
+	//intro end
+	//map start
+	$xml[] = '  			<!-- map -->';
+	$xml[] = '			<stack>';
+	$xml[] = '				<sequence>';
+	$xml[] = '					<overlay duration="1.3">';
+	$xml[] = '						<image filename="'.fix_xml($infos['MAPS'][0]).'" />';
+	$xml[] = '						<animator type="custom">';
+//	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="0.5"/>';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="0.0"/>';
+	$xml[] = '							<key scale="2.6,2.6,2.6" pos="0.0,0.0,0.0" time="1.3"/>';
+	$xml[] = '						</animator>';
+	$xml[] = '					</overlay>';
+	$xml[] = '					<transition	type="crossfade" duration="0.25" />';
+	$xml[] = '					<overlay duration="0.75">';
+	$xml[] = '						<image filename="'.fix_xml($infos['MAPS'][1]).'" />';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="0"/>';
+	$xml[] = '							<key scale="2.2,2.2,2.2" pos="0.0,0.0,0.0" time="0.75"/>';
+	$xml[] = '						</animator>';
+	$xml[] = '					</overlay>';
+	$xml[] = '					<transition	type="crossfade" duration="0.25" />';
+	$xml[] = '					<overlay duration="1.0">';
+	$xml[] = '						<image filename="'.fix_xml($infos['MAPS'][2]).'" />';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="0"/>';
+	$xml[] = '							<key scale="1.3,1.3,1.3" pos="0.0,0.0,0.0" time="0.75"/>';
+	$xml[] = '						</animator>';
+	$xml[] = '					</overlay>';
+	$xml[] = '				</sequence>';
+	$xml[] = '				<stack>';
+	$xml[] = '					<sequence>';
+	$xml[] = '						<effect type="none" duration="1">';
+	$xml[] = '							<image color="#FFFFFF" />';
+	$xml[] = '						</effect>';
+	$xml[] = '						<transition type="crossfade" duration="1.0" />';
+	$xml[] = '						<overlay duration="2.0">';
+	$xml[] = '							<image filename="'.fix_xml($url_nuage).'" />';
+	$xml[] = '						</overlay>';
+	$xml[] = '						<transition type="crossfade" duration="1.0" />';
+	$xml[] = '						<text type="zone" duration="1.0"></text>';
+	$xml[] = '					</sequence>';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="4,4,4" pos="0.1,-0.1,0" orient="0,0,0" time="0.5" />';
+	$xml[] = '						<key scale="4,4,4" pos="0.1,1.8,0" orient="0,0,-17.5" time="2.9" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</stack>';
+	$xml[] = '			</stack>';
+	$xml[] = '			<!-- map end -->';
+	// map end
+	//agence start
+	$xml[] = '			<!-- agence infos -->';
+	$xml[] = '			<stack>';
+	$xml[] = '				<overlay duration="'.$infos_agence_duration.'">';
+	$xml[] = '					<image filename="'.fix_xml($infos['MAPS'][2]).'" />';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="1.3,1.3,1.3" pos="0.0,0.0,0.0" time="0"/>';
+	$xml[] = '					</animator>';
+	$xml[] = '				</overlay>';
+	$xml[] = '				<stack>';
+	//cercles
+	$xml[] = '					<overlay top="0.25" left="0.225" width="0.25" height="0.40">';
+	$xml[] = '						<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '							<stack>';
+	$xml[] = '								<sequence> ';
+	$xml[] = '									<effect type="none" duration="'.(($infos_agence_start_zoom+($infos_agence_ecart + $infos_agence_ecart_zoom)*2)+0.32).'">';
+	$xml[] = '										<image color="#FFFFFF" />';
+	$xml[] = '									</effect>';
+	$xml[] = '									<transition type="crossfade" duration="0.25" />';
+	$xml[] = '									<effect type="none" duration="2">';
+	$xml[] = '										<image color="#000000" />';
+	$xml[] = '									</effect>';
+	$xml[] = '								</sequence>';
+	$xml[] = '								<sequence> ';
+	$xml[] = '									<effect type="none" duration="'.($infos_agence_start_zoom+0.30).'">';
+	$xml[] = '										<image color="#FFFFFF" />';
+	$xml[] = '									</effect>';
+	$xml[] = '									<transition type="crossfade" duration="0.25" />';
+	$xml[] = '									<effect type="none" duration="1">';
+	$xml[] = '										<image color="#000000" />';
+	$xml[] = '									</effect>';
+	$xml[] = '								</sequence>';
+	$xml[] = '							</stack>';
+	$xml[] = '						</filter>';
+	$xml[] = '						<overlay top="0" left="0" width="1" height="1" duration="'.$infos_agence_duration.'">';
+	$xml[] = '							<image filename="'.fix_xml($url_onde).'" >';
+	$xml[] = '								<filter type="alpha" alphaStart="0.55" alphaEnd="0.55" duration="1.0" />';
+	$xml[] = '							</image>';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key scale="0,0,0" pos="0.0,0.0,0.0" time="0"/>';
+	$xml[] = '								<key scale="0,0,0" pos="0.0,0.0,0.0" time="'.$infos_agence_start_zoom.'"/>';
+	$xml[] = '								<key scale="1.3,1.3,1.3" pos="0.0,0.0,0.0" time="'.($infos_agence_start_zoom+0.35).'"/>';
+	$xml[] = '								<key scale="0,0,0" pos="0.0,0.0,0.0" time="'.($infos_agence_start_zoom+0.36).'"/>';
+	$xml[] = '								<key scale="0,0,0" pos="0.0,0.0,0.0" time="'.($infos_agence_start_zoom+($infos_agence_ecart + $infos_agence_ecart_zoom)*2).'"/>';
+	$xml[] = '								<key scale="1.3,1.3,1.3" pos="0.0,0.0,0.0" time="'.(($infos_agence_start_zoom+($infos_agence_ecart + $infos_agence_ecart_zoom)*2)+0.35).'"/>';
+	$xml[] = '								<key scale="0,0,0" pos="0.0,0.0,0.0" time="'.(($infos_agence_start_zoom+($infos_agence_ecart + $infos_agence_ecart_zoom)*2)+0.36).'"/>';
+	$xml[] = '							</animator>';
+	$xml[] = '						</overlay>';
+	$xml[] = '					</overlay>';
+	//fin cercles
+	$xml[] = '					<stack>';	
+	$xml[] = '						<sequence>';
+	$xml[] = '							<text type="zone" duration="1.90"></text>';
+	$xml[] = '							<transition type="over" direction="up" duration="0.5"/>';
+	$xml[] = '							<overlay top="'.$infos_agence_top_background.'" right="0.05" width="0.45" height="0.60" duration="'.($infos_agence_duration-1.4).'">';
+	$xml[] = '								<effect type="none">';
+	$xml[] = '									<image color="'.$infos_agence_bgcolor_text.'">';
+	$xml[] = '										<filter type="alpha" alphaStart="0.45" alphaEnd="0.45" duration="1.0" />';
+	$xml[] = '									</image>';
+	$xml[] = '								</effect>';
+	$xml[] = '							</overlay>';
+	$xml[] = '						</sequence>';
+	$xml[] = '						<stack>';
+	$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '								<overlay top="'.($infos_agence_top_background+0.08).'" left="0.50" width="0.45" height="0.20">';
+	$xml[] = '									<sequence> ';
+	$xml[] = '										<effect type="none" duration="'.$infos_agence_start_animation.'">';
+	$xml[] = '											<image color="#000000" />';
+	$xml[] = '										</effect>';
+	$xml[] = '										<transition type="crossfade" duration="0.3" />';
+	$xml[] = '										<effect type="none" duration="'.$infos_agence_duration.'">';
+	$xml[] = '											<image color="#FFFFFF" />';
+	$xml[] = '										</effect>';
+	$xml[] = '									</sequence>';
+	$xml[] = '								</overlay>';
+	$xml[] = '							</filter>';
+	$xml[] = '							<overlay top="'.($infos_agence_top_background+0.09).'" left="0.55" width="0.035" height="0.06">';
+	$xml[] = '								<image filename="'.$url_picto_adresse.'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<stack>';
+	$xml[] = '								<text type="advanced" fontcolor="#FFFFFF" '.$fontname.' stretch="condensed" vector="true" '.$font_limit_agence_infos.' duration="'.$infos_agence_duration.'"><![CDATA['.$infos['ADRESSE'].']]>';
+	$xml[] = '									<animator type="custom">';
+	$xml[] = '										<key scale="1,1,1" pos="0.4,'.$infos_agence_position_text.',0" time="0" />';
+	$xml[] = '									</animator>';
+	$xml[] = '								</text>';
+	$xml[] = '								<text type="advanced" fontcolor="#FFFFFF" '.$fontname.' stretch="condensed" vector="true" '.$font_limit_agence_infos.' ><![CDATA['.$infos['CODE_POSTAL_VILLE'].']]>';
+	$xml[] = '									<animator type="custom">';
+	$xml[] = '										<key scale="1,1,1" pos="0.4,'.($infos_agence_position_text-0.125).',0" time="0" />';
+	$xml[] = '									</animator>';
+	$xml[] = '								</text>';
+	$xml[] = '							</stack>';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key scale="0.7,0.7,0.7" pos="0.15,0,0" time="0" />';
+	$xml[] = '								<key scale="0.7,0.7,0.7" pos="0.15,0,0" time="'.($infos_agence_start_animation-0.2).'" />';
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_animation).'" />';
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_zoom).'" />';
+	$xml[] = '								<key scale="1.07,1.07,1.07" pos="-0.05,0,0" time="'.($infos_agence_start_zoom+0.25).'" />';
+	$xml[] = '								<key scale="1.07,1.07,1.07" pos="-0.05,0,0" time="'.($infos_agence_start_zoom+0.50).'" />';
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_zoom+0.75).'" />';
+	$xml[] = '							</animator>';
+	//fix bug pour démo
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="-0.1,0,0" time="0" />';
+	$xml[] = '							</animator>';
+	$xml[] = '						</stack>';
+	$infos_agence_start_animation +=  $infos_agence_ecart;
+	$infos_agence_start_zoom += $infos_agence_ecart + $infos_agence_ecart_zoom;
+	$xml[] = '						<stack>';
+	$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '								<overlay top="'.($infos_agence_top_background+0.29).'" left="0.51" width="0.45" height="0.20">';
+	$xml[] = '									<sequence> ';
+	$xml[] = '										<effect type="none" duration="'.$infos_agence_start_animation.'">';
+	$xml[] = '											<image color="#000000" />';
+	$xml[] = '										</effect>';
+	$xml[] = '										<transition type="crossfade" duration="0.3" />';
+	$xml[] = '										<effect type="none" duration="'.$infos_agence_duration.'">';
+	$xml[] = '											<image color="#FFFFFF" />';
+	$xml[] = '										</effect>';
+	$xml[] = '									</sequence>';
+	$xml[] = '								</overlay>';
+	$xml[] = '							</filter>';
+	$xml[] = '							<overlay top="'.($infos_agence_top_background+0.30).'" left="0.56" width="0.02" height="0.06">';
+	$xml[] = '								<image filename="'.$url_picto_phone.'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<text type="advanced" fontcolor="#FFFFFF" '.$fontname.' stretch="condensed" vector="true" '.$font_limit_agence_infos.' duration="'.$infos_agence_duration.'"><![CDATA['.$infos['TELEPHONE'].']]>';
+	$xml[] = '								<animator type="custom">';
+	$xml[] = '									<key scale="1,1,1" pos="0.4,'.($infos_agence_position_text-0.425).',0" time="0" />';
+	$xml[] = '								</animator>';
+	$xml[] = '							</text>';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key scale="0.7,0.7,0.7" pos="0.15,0,0" time="0" />';
+	$xml[] = '								<key scale="0.7,0.7,0.7" pos="0.15,0,0" time="'.($infos_agence_start_animation-0.2).'" />';
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_animation).'" />';	
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_zoom).'" />';
+	$xml[] = '								<key scale="1.07,1.07,1.07" pos="-0.05,0.02,0" time="'.($infos_agence_start_zoom+0.25).'" />';
+	$xml[] = '								<key scale="1.07,1.07,1.07" pos="-0.05,0.02,0" time="'.($infos_agence_start_zoom+0.50).'" />';
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_zoom+0.75).'" />';
+	$xml[] = '							</animator>';
+	//fix bug pour démo
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="-0.1,0,0" time="0" />';
+	$xml[] = '							</animator>';
+	$xml[] = '						</stack>';
+	$infos_agence_start_animation +=  $infos_agence_ecart;
+	$infos_agence_start_zoom += $infos_agence_ecart + $infos_agence_ecart_zoom;
+	$xml[] = '						<stack>';
+	$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '								<overlay top="'.($infos_agence_top_background+0.46).'" left="0.51" width="0.45" height="0.20">';
+	$xml[] = '									<sequence> ';
+	$xml[] = '										<effect type="none" duration="'.$infos_agence_start_animation.'">';
+	$xml[] = '											<image color="#000000" />';
+	$xml[] = '										</effect>';
+	$xml[] = '										<transition type="crossfade" duration="0.3" />';
+	$xml[] = '										<effect type="none" duration="'.$infos_agence_duration.'">';
+	$xml[] = '											<image color="#FFFFFF" />';
+	$xml[] = '										</effect>';
+	$xml[] = '									</sequence>';
+	$xml[] = '								</overlay>';
+	$xml[] = '							</filter>';
+	$xml[] = '							<overlay top="'.($infos_agence_top_background+0.47).'" left="0.555" width="0.035" height="0.035">';
+	$xml[] = '								<image filename="'.$url_picto_mail.'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<text type="advanced" fontcolor="#FFFFFF" '.$fontname.' stretch="condensed" vector="true" '.$font_limit_agence_infos.' duration="'.$infos_agence_duration.'"><![CDATA['.$infos['EMAIL'].']]>';
+	$xml[] = '								<animator type="custom">';
+	$xml[] = '									<key scale="1,1,1" pos="0.4,'.($infos_agence_position_text-0.735).',0" time="0" />';
+	$xml[] = '								</animator>';
+	$xml[] = '							</text>';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key scale="0.7,0.7,0.7" pos="0.15,0,0" time="0" />';
+	$xml[] = '								<key scale="0.7,0.7,0.7" pos="0.15,0,0" time="'.($infos_agence_start_animation-0.2).'" />';
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_animation).'" />';	
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_zoom).'" />';
+	$xml[] = '								<key scale="1.07,1.07,1.07" pos="-0.05,0.04,0" time="'.($infos_agence_start_zoom+0.25).'" />';
+	$xml[] = '								<key scale="1.07,1.07,1.07" pos="-0.05,0.04,0" time="'.($infos_agence_start_zoom+0.50).'" />';
+	$xml[] = '								<key scale="1,1,1" pos="0,0,0" time="'.($infos_agence_start_zoom+0.75).'" />';
+	$xml[] = '							</animator>';
+	//fix bug pour démo
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="-0.1,0,0" time="0" />';
+	$xml[] = '							</animator>';
+	$xml[] = '						</stack>';
+	$xml[] = '					</stack>';
+	$infos_agence_start_zoom += $infos_agence_ecart + $infos_agence_ecart_zoom;
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key pos="0,0,0" time="0" />';
+	$xml[] = '						<key pos="0,0,0" time="'.($infos_agence_start_zoom+0.80).'" />';
+	$xml[] = '						<key pos="0,-5,0" time="'.($infos_agence_start_zoom+1.05).'" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</stack>';
+	$xml[] = '				<stack>';
+	$xml[] = '					<text type="advanced" weight="bold" fontcolor="#FFFFFF" '.$fontname_title.' stretch="condensed" vector="true" fontsize="50" duration="'.$infos_agence_duration.'">AGENCE';
+	$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="1.5" />';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1,1,1" pos="-5,0,0" time="0" />';
+	$xml[] = '							<key scale="1,1,1" pos="-1.8,0,0" time="1.0" />';
+	$xml[] = '							<key scale="1,1,1" pos="-1.4,0,0" time="1.5" />';
+	$xml[] = '							<key scale="1,1,1" pos="-1.4,0,0" time="1.65" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="-1,0.80,0" time="1.95" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="-1,0.80,0" time="'.($infos_agence_start_zoom+0.70).'" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="-5,0.80,0" time="'.($infos_agence_start_zoom+0.95).'" />';
+	$xml[] = '						</animator>';
+	$xml[] = '					</text>';
+	$xml[] = '					<text type="advanced" weight="bold" fontcolor="#FFFFFF" '.$fontname_title.' stretch="condensed" vector="true" '.$font_limit_agence_name.'><![CDATA['.$infos['NOM_AGENCE'].']]>';
+	$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="1.6" />';
+	$pos_agence_name = -0.8;
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1,1,1" pos="5,-0.35,0" time="0" />';
+	$xml[] = '							<key scale="1,1,1" pos="5,-0.35,0" time="0.1" />';
+	$xml[] = '							<key scale="1,1,1" pos="'.($pos_agence_name+0.4).',-0.35,0" time="1.1" />';
+	$xml[] = '							<key scale="1,1,1" pos="'.($pos_agence_name).',-0.35,0" time="1.6" />';
+	$xml[] = '							<key scale="1,1,1" pos="'.($pos_agence_name).',-0.35,0" time="1.70" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="'.($pos_agence_name+0.1).',0.45,0" time="2" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="'.($pos_agence_name+0.1).',0.45,0" time="2" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="'.($pos_agence_name+0.1).',0.45,0" time="'.($infos_agence_start_zoom+0.75).'" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="5,0.45,0" time="'.($infos_agence_start_zoom+1).'" />';
+	$xml[] = '						</animator>';
+	$xml[] = '					</text>';
+	$xml[] = '				</stack>';
+	$xml[] = '			</stack>';
+	$xml[] = '			<!-- agence infos end -->';
+	//agence end
+	//description
+	$xml[] = '			<!-- zone description start -->';
+	$xml[] = '			<stack>';
+	$xml[] = '				<sequence>';
+	$xml[] = '					<overlay duration="0.25">';
+	$xml[] = '						<image filename="'.fix_xml($infos['MAPS'][2]).'" />';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1.3,1.3,1.3" pos="0.0,0.0,0.0" time="0"/>';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="0.75"/>';
+	$xml[] = '						</animator>';
+	$xml[] = '					</overlay>';
+	$xml[] = '					<transition	type="crossfade" duration="0.25" />';
+	$xml[] = '					<overlay duration="'.($description_start+2.5*$description_duration_zoom+$description_duration+2).'">';
+	$xml[] = '						<image filename="'.fix_xml($infos['MAPS'][3]).'" />';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="2.6,2.6,2.6" pos="0.0,0.0,0.0" time="0"/>';
+	$xml[] = '							<key scale="1.3,1.3,1.3" pos="0.0,0.0,0.0" time="1.0"/>';
+	$xml[] = '						</animator>';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key pos="0,0,0" time="0.1"/>';
+	$xml[] = '							<key pos="-0.4,0,0" time="1.0"/>';
+	$xml[] = '						</animator>';
+	$xml[] = '					</overlay>';
+	$xml[] = '				</sequence>';
+	$xml[] = '				<sequence>';
+	$xml[] = '					<text type="zone" duration="1.3"></text>';
+	$xml[] = '					<stack>';
+	$xml[] = '						<sequence>';
+	$xml[] = '							<effect type="none" duration="'.($description_start+2.0*$description_duration_zoom+$description_duration).'">';
+	$xml[] = '								<image color="#000000">';
+	$xml[] = '									<filter type="alpha" alphaStart="0" alphaEnd="0.65" duration="0.5" />';
+	$xml[] = '								</image>';
+	$xml[] = '							</effect>';	
+	$xml[] = '							<effect type="none" duration="0.5">';
+	$xml[] = '								<image color="#000000">';
+	$xml[] = '									<filter type="alpha" alphaStart="0.65" alphaEnd="0" duration="0.5" />';
+	$xml[] = '								</image>';
+	$xml[] = '							</effect>';
+	$xml[] = '						</sequence>';
+	$xml[] = '						<stack>';
+	$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '								<stack>';
+	$xml[] = '									<effect type="none" duration="10">';
+	$xml[] = '										<image color="#FFFFFF" />';
+	$xml[] = '									</effect>';
+	$xml[] = '									<overlay top="0.35" left="0.3" width="0.6" height="0.3">';
+	$xml[] = '										<sequence> ';
+	$xml[] = '											<effect type="none" duration="1.0">';
+	$xml[] = '												<image color="#000000" />';
+	$xml[] = '											</effect>';
+	$xml[] = '											<transition type="crossfade" duration="0.5" />';
+	$xml[] = '											<text type="zone" duration="2"></text>';
+	$xml[] = '										</sequence> ';
+	$xml[] = '									</overlay>';
+	$xml[] = '								</stack>';
+	$xml[] = '							</filter>';
+	$xml[] = '							<overlay top="0.4" left="0.35" width="0.15" height="0.25" duration="'.($description_start+$description_duration_zoom*2.5+$description_duration).'">';
+	$xml[] = '								<image filename="'.$url_guillemets.'" />';
+	$xml[] = '								<animator type="custom">';
+	$xml[] = '									<key orient="180,180,0" pos="0,0,0" time="'.$description_start.'"/>';
+	$xml[] = '									<key orient="180,180,0" pos="-0.95,0.65,0" time="'.($description_start+$description_duration_zoom).'"/>';
+	$xml[] = '									<key orient="180,180,0" pos="-0.9,0.6,0" time="'.($description_start+$description_duration_zoom*1.5).'"/>';
+	$xml[] = '									<key orient="180,180,0" pos="-0.9,0.6,0" time="'.($description_start+$description_duration_zoom*1.5+$description_duration).'"/>';
+	$xml[] = '									<key orient="180,180,0" pos="0,0,0" time="'.($description_start+$description_duration_zoom*2.5+$description_duration).'"/>';
+	$xml[] = '								</animator>';
+	$xml[] = '							</overlay>';	
+	$xml[] = '							<overlay top="0.40" right="0.35" width="0.15" height="0.25" duration="..">';
+	$xml[] = '								<image filename="'.$url_guillemets.'" />';
+	$xml[] = '								<animator type="custom">';
+	$xml[] = '									<key pos="0,0,0" time="'.($description_start).'"/>';
+	$xml[] = '									<key pos="0.95,-0.65,0" time="'.($description_start+$description_duration_zoom).'"/>';
+	$xml[] = '									<key pos="0.9,-0.6,0" time="'.($description_start+$description_duration_zoom*1.5).'"/>';
+	$xml[] = '									<key pos="0.9,-0.6,0" time="'.($description_start+$description_duration_zoom*1.5+$description_duration).'"/>';
+	$xml[] = '									<key pos="0,0,0" time="'.($description_start+$description_duration_zoom*2.5+$description_duration).'"/>';
+	$xml[] = '								</animator>';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<text type="advanced" fontcolor="#FFFFFF" '.$fontname.' stretch="condensed" vector="true" fontsize="13" align="left" duration="'.($description_start+$description_duration_zoom*2.5+$description_duration).'"  reference="AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAAAAAAAAAAAAAA"><![CDATA['.$infos['DESCRIPTION'].']]>';
+	$xml[] = '								<animator type="custom">';
+	$xml[] = '									<key scale="0,0,0" pos="-0.975,0.45,0" time="'.($description_start).'"/>';
+	$xml[] = '									<key scale="1.1,1.1,1.1" pos="-0.975,0.45,0" time="'.($description_start+$description_duration_zoom).'"/>';
+	$xml[] = '									<key scale="1,1,1" pos="-0.975,0.45,0" time="'.($description_start+$description_duration_zoom*1.5).'"/>';
+	$xml[] = '									<key scale="1,1,1" pos="-0.975,0.45,0" time="'.($description_start+$description_duration_zoom*1.5+$description_duration).'"/>';
+	$xml[] = '									<key scale="0,0,0" pos="-0.975,0.45,0" time="'.($description_start+$description_duration_zoom*2.5+$description_duration).'"/>';
+	$xml[] = '								</animator>';
+	$xml[] = '							</text>';
+	$xml[] = '						</stack>';
+	$xml[] = '					</stack>';
+	$xml[] = '				</sequence>';
+	$xml[] = '			</stack>';
+	$xml[] = '			<!-- description end-->';
+	//description end
+	$xml[] = '			<transition	type="crossfade" duration="0.75" />';
+	$xml[] = '			<!-- zone geographique start-->';
+	$xml[] = '			<stack>';
+	$xml[] = '				<overlay>';
+	$xml[] = '					<image filename="'.fix_xml($infos['MAPS'][4]).'" duration="'.$zone_duration.'"/>';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="1.3,1.3,1.3" pos="-0.4,0,0" time="0"/>';
+	$xml[] = '						<key scale="1.3,1.3,1.3" pos="-0.4,0,0" time="'.($zone_start_nuage_animation+1).'"/>';
+	$xml[] = '						<key scale="1.2,1.2,1.2" pos="-0,0.1,0" time="'.$zone_duration.'"/>';
+	$xml[] = '					</animator>';
+	$xml[] = '				</overlay>';
+	//cercles
+	$xml[] = '				<overlay top="-0.25" left="-0.20" width="1" height="1.6" >';
+	$xml[] = '					<stack>';
+	$xml[] = '						<sequence>';
+	$xml[] = '							<overlay top="0" left="0" width="1" height="1" duration="1.25">';
+	$xml[] = '								<image filename="'.fix_xml($url_onde).'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<transition type="crossfade" duration="0.25" />';
+	$xml[] = '							<text type="advanced" duration="0.10"></text>';
+	$xml[] = '							<overlay top="0" left="0" width="1" height="1" duration="1.10">';
+	$xml[] = '								<image filename="'.fix_xml($url_onde).'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<transition type="crossfade" duration="0.25" />';
+	$xml[] = '							<text type="advanced" duration="0.4"></text>';
+	$xml[] = '							<overlay top="0" left="0" width="1" height="1" duration="0.75">';
+	$xml[] = '								<image filename="'.fix_xml($url_onde).'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<transition type="crossfade" duration="0.25" />';
+	$xml[] = '							<text type="advanced" duration="0.4"></text>';
+	$xml[] = '							<overlay top="0" left="0" width="1" height="1" duration="0.75">';
+	$xml[] = '								<image filename="'.fix_xml($url_onde).'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '							<transition type="crossfade" duration="0.25" />';
+	$xml[] = '							<text type="advanced" duration="0.10"></text>';
+	$xml[] = '						</sequence>';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="0,0,0" pos="0.0,0.0,0.0" time="0.5"/>';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="1.25"/>';
+	$xml[] = '							<key scale="0,0,0" pos="0.0,0.0,0.0" time="1.251"/>';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="2.5"/>';
+	$xml[] = '							<key scale="0,0,0" pos="0.0,0.0,0.0" time="2.51"/>';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="3.25"/>';
+	$xml[] = '							<key scale="0,0,0" pos="0.0,0.0,0.0" time="3.251"/>';
+	$xml[] = '							<key scale="1,1,1" pos="0.0,0.0,0.0" time="4.5"/>';
+	$xml[] = '							<key scale="0,0,0" pos="0.0,0.0,0.0" time="4.51"/>';
+	$xml[] = '						</animator>';
+	$xml[] = '						<filter type="alpha" alphaStart="0.65" alphaEnd="0.65" />';
+	$xml[] = '					</stack>';
+	$xml[] = '				</overlay>';
+	//fin cercles
+	$xml[] = '				<stack>';	
+	$xml[] = '					<sequence>';
+	$xml[] = '						<text type="zone" duration="1.90"></text>';
+	$xml[] = '						<transition type="over" direction="up" duration="0.5"/>';
+	$xml[] = '						<stack>';	
+	$xml[] = '							<overlay top="0.32" right="0.03" width="0.40" height="0.63" duration="'.($zone_duration-1.90).'">';
+	$xml[] = '								<effect type="none">';
+	$xml[] = '									<image color="'.$zone_bgcolor_text.'">';
+	$xml[] = '										<filter type="alpha" alphaStart="0.65" alphaEnd="0.65" duration="1.0" />';
+	$xml[] = '									</image>';
+	$xml[] = '								</effect>';
+	$xml[] = '							</overlay>';
+
+	if(count($infos['ZONE']) > 0){
+		$text_reference = "";
+		foreach($infos['ZONE'] as $v){
+			if(strlen($v) > strlen($text_reference)){ $text_reference = $v;}
+		}
+		$font_limit_zone = getAdvancedTextFontSize(225, $text_reference, 15, true);
+		foreach($infos['ZONE'] as $v){
+//			$font_limit_zone = getAdvancedTextFontSize(225, $v, 15);
+			$xml[] = '							<stack>';
+			$xml[] = '								<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+			$xml[] = '									<stack>';
+			$xml[] = '										<effect type="none" duration="'.($zone_duration-1.90).'">';
+			$xml[] = '											<image color="#FFFFFF" />';
+			$xml[] = '										</effect>';
+			$xml[] = '											<sequence>';
+			$xml[] = '												<effect type="none" duration="'.($zone_animation_start+$zone_animation_duration+0.05).'">';
+			$xml[] = '													<image color="#000000" />';
+			$xml[] = '												</effect>';
+			$xml[] = '												<transition type="crossfade" duration="'.$zone_animation_duration.'" />';
+			$xml[] = '												<text type="zone" duration="1"></text>';
+			$xml[] = '											</sequence>';
+			$xml[] = '										</stack>';
+			$xml[] = '									</filter>';
+			$xml[] = '									<text type="advanced" weight="bold" fontcolor="#010133" '.$fontname.' stretch="condensed" vector="true" '.$font_limit_zone.' duration="'.($zone_duration-1.90).'"><![CDATA[ - '.$v.']]>';
+			$xml[] = '									<animator type="custom">';
+			$xml[] = '										<key scale="0,0,0" pos="1.2,'.$zone_pos_start.',0" time="'.$zone_animation_start.'" />';
+			$xml[] = '										<key scale="1,1,1" pos="0.4,'.$zone_pos_start.',0" time="'.($zone_animation_start+$zone_animation_duration).'" />';
+			$xml[] = '										<key scale="1,1,1" pos="0.4,'.$zone_pos_start.',0" time="'.$zone_animation_start_zoom.'" />';
+			$xml[] = '										<key scale="1.05,1.05,1.05" pos="0.35,'.$zone_pos_start.',0" time="'.($zone_animation_start_zoom+$zone_animation_duration).'" />';	
+			$xml[] = '										<key scale="1.05,1.05,1.05" pos="0.35,'.$zone_pos_start.',0" time="'.($zone_animation_start_zoom+$zone_animation_duration*2).'" />';
+			$xml[] = '										<key scale="1,1,1" pos="0.4,'.$zone_pos_start.',0" time="'.($zone_animation_start_zoom+$zone_animation_duration*3).'" />';
+			$xml[] = '									</animator>';
+			$xml[] = '								</text>';
+			$xml[] = '							</stack>';
+			$zone_pos_start -= 0.27;
+			$zone_animation_start += $zone_animation_space_between;
+			$zone_animation_start_zoom += $zone_animation_duration*2;
+		}
+	}
+	$zone_animation_start_zoom += 2; 
+	$xml[] = '						</stack>';	
+	$xml[] = '					</sequence>';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key pos="0,0,0" time="'.($zone_animation_start_zoom+0.25).'" />';
+	$xml[] = '						<key pos="0,5,0" time="'.($zone_animation_start_zoom+0.25+$zone_animation_out).'" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</stack>';
+	$xml[] = '				<stack>';
+	$xml[] = '					<text type="advanced" weight="bold" fontcolor="#010133" '.$fontname_title.' stretch="condensed" vector="true" fontsize="50" duration="'.$zone_duration.'">ZONE';
+	$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="1.5" />';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1,1,1" pos="-5,0,0" time="0" />';
+	$xml[] = '							<key scale="1,1,1" pos="-0.5,0,0" time="0.5" />';
+	$xml[] = '							<key scale="1,1,1" pos="0,0,0" time="1.55" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="0.35,0.80,0" time="1.65" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="0.35,0.80,0" time="'.$zone_animation_start_zoom.'" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="5,0.80,0" time="'.($zone_animation_start_zoom+$zone_animation_out).'" />';
+	$xml[] = '						</animator>';
+	$xml[] = '					</text>';
+	$xml[] = '					<text type="advanced" weight="bold" fontcolor="#010133" '.$fontname_title.' stretch="condensed" vector="true" fontsize="50">COUVERTE';
+	$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="1.6" />';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1,1,1" pos="5,-0.30,0" time="0" />';
+	$xml[] = '							<key scale="1,1,1" pos="5,-0.30,0" time="0.1" />';
+	$xml[] = '							<key scale="1,1,1" pos="-0.6,-0.30,0" time="0.7" />';
+	$xml[] = '							<key scale="1,1,1" pos="-1,-0.30,0" time="1.57" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="-0.8,0.50,0" time="1.67" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="-0.8,0.50,0" time="'.($zone_animation_start_zoom+0.125).'" />';
+	$xml[] = '							<key scale="0.8,0.8,0.8" pos="-5,0.50,0" time="'.($zone_animation_start_zoom+0.125+$zone_animation_out).'" />';
+	$xml[] = '						</animator>';
+	$xml[] = '					</text>';
+	$xml[] = '				</stack>';
+	$xml[] = '				<stack>';
+	$xml[] = '					<sequence>';
+	$xml[] = '						<text type="zone" duration="'.$zone_start_nuage_animation.'"></text>';
+	$xml[] = '						<overlay top="0" left="0" width="1" height="1" duration="2">';
+	$xml[] = '							<image filename="'.$url_nuage.'">';
+	$xml[] = '								<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.5" />';
+	$xml[] = '							</image>';
+	$xml[] = '						</overlay>';
+	$xml[] = '						<transition type="crossfade" duration="0.5" />';
+	$xml[] = '						<effect type="none" duration="2">';
+	$xml[] = '							<image color="#FFFFFF" />';
+	$xml[] = '						</effect>';
+	$xml[] = '					</sequence>';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="4,4,4" pos="-2,-2,0" orient="0,0,-17" time="0" />';
+	$xml[] = '						<key scale="4,4,4" pos="-2,-2,0" orient="0,0,-17" time="'.$zone_start_nuage_animation.'" />';
+	$xml[] = '						<key scale="4,4,4" pos="0.1,-0.1,0" orient="0,0,17.5" time="'.($zone_start_nuage_animation+1.6).'" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</stack>';
+	$xml[] = '			</stack>';
+	$xml[] = '			<!-- zone geographique end -->';
+	$xml[] = '			<transition type="crossfade" duration="1" />';
+
+	if(count($infos['AGENTS']) > 0){
+		$xml[] = '			<!-- infos agence start -->';
+		$xml[] = '			<stack>';
+		$xml[] = '		  		<effect type="none" duration="'.$agence_infos_duration.'">';
+		$xml[] = '					<image color="#799ab8"/>';
+		$xml[] = '				</effect>';	
+		$xml[] = '				<stack>';
+		foreach($nuages as $nuage){
+			$xml[] = '		  			<overlay duration="'.$agence_infos_duration.'">';
+			$xml[] = '						<image filename="'.$url_nuage.'">';
+			if($nuage['alpha'] < 1){
+				$xml[] = '							<filter type="alpha" alphaStart="'.$nuage['alpha'].'" alphaEnd="'.$nuage['alpha'].'" duration=".." />';
+			}
+			$xml[] = '						</image>';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key scale="'.$nuage['start']['scale'].'" pos="'.$nuage['start']['pos'].'" orient="'.$nuage['start']['orient'].'" time="0" />';
+			$xml[] = '							<key scale="'.$nuage['end']['scale'].'" pos="'.$nuage['end']['pos'].'" orient="'.$nuage['end']['orient'].'" time="'.$agence_infos_duration.'" />';	
+			$xml[] = '						</animator>';
+			$xml[] = '					</overlay>';	
+		}
+		$xml[] = '				</stack>';
+		$xml[] = '				<stack>';
+		if(count($infos['LOGOS']) > 0){
+			$xml[] = '					<sequence>';
+			$logo_agence_infos_duration_totale = $logo_agence_infos_duration;
+			foreach($infos['LOGOS'] as $k=>$v){
+				$continue = ($k < count($infos['LOGOS'])-1);
+				$logo_agence_infos_duration_totale += $logo_agence_infos_duration - $logo_agence_infos_duration_transition;
+				if($continue){
+					if($logo_agence_infos_duration_totale >= $agence_infos_duration){
+						$continue = false;
+					}
+				}
+				if(!$continue){ 
+					$logo_agence_infos_duration += $agence_infos_duration-($logo_agence_infos_duration_totale-($logo_agence_infos_duration-$logo_agence_infos_duration_transition));
+				}
+				file_put_contents($tmp_img, file_get_contents($v));
+				$img_src = @imagecreatefromjpeg($tmp_img);
+				list($width, $height) = getimagesize($tmp_img);
+				@unlink($tmp_img);
+				$logo_agence_position = get_image_position(array(	
+					'x' => 0.05, 'y' => 0.1,
+					'width' => $width,  'height' => $height, 
+					'width_max' => 0.35, 'height_max' => 0.6,
+					'width_min' => 0.35, 'height_min' => 0.4,
+					'image_width' => $infos['PROFIL_SIZE']['WIDTH'], 'image_height' => $infos['PROFIL_SIZE']['HEIGHT'],
+				));
+				
+				$xml[] = '						<stack>';
+				$xml[] = '							<overlay top="'.($logo_agence_position['y']-0.01).'" left="'.($logo_agence_position['x']-0.005).'" width="'.($logo_agence_position['width']+0.01).'" height="'.($logo_agence_position['height']+0.018).'" duration="'.$logo_agence_infos_duration.'">';
+				$xml[] = '								<effect type="none">';
+				$xml[] = '									<image color="#FFFFFF" />';
+				$xml[] = '								</effect>';
+				$xml[] = '							</overlay>';
+				$xml[] = '							<overlay top="'.$logo_agence_position['y'].'" left="'.$logo_agence_position['x'].'" width="'.$logo_agence_position['width'].'" height="'.$logo_agence_position['height'].'" duration="'.$logo_agence_infos_duration.'">';
+				$xml[] = '								<image filename="'.fix_xml($v).'" />';
+				$xml[] = '							</overlay>';
+				$xml[] = '						</stack>';
+				if($continue){
+					$xml[] = '						<transition type="crossfade" duration="'.$logo_agence_infos_duration_transition.'" />';
+				}else{
+					break;
+				}
+			}
+			$xml[] = '					</sequence>';
+		}
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="-2,1,0" orient="0,0,30" time="0" />';		
+		$xml[] = '							<key pos="-0.2,0.1,0" orient="0,0,5" time="'.($agent_name_start-0.4).'"/>';
+		$xml[] = '							<key pos="0,0,0" orient="0,0,0" time="'.($agent_name_start-0.3).'" />';
+		$xml[] = '						</animator>';
+		$xml[] = '				</stack>';
+		$xml[] = '				<stack>';
+		foreach($infos['AGENTS'] as $k=>$agent){
+			$xml[] = '					<sequence>';
+			$xml[] = '						<text type="zone" duration="'.$agent_name_start.'"></text>';
+			$xml[] = '						<transition type="crossfade" duration="0.2"/>';
+			$agent_font_limit = getAdvancedTextFontSize(320, $agent['NAME'],21, true);
+			$xml[] = '						<stack>';
+			$xml[] = '							<text type="advanced" weight="bold" align="left" stretch="condensed" '.$fontname_title.$agent_font_limit.' duration="'.$agent_name_duration.'"><![CDATA['.$agent['NAME'].']]>';
+			$xml[] = '								<animator type="custom">';
+			$xml[] = '									<key pos="-0.15,0.25,0" time="0"/>';
+			$xml[] = '								</animator>';
+			$xml[] = '							</text>';
+			$agent_font_limit = getAdvancedTextFontSize(320, $agent['TITLE'],'18', true);
+			$xml[] = '							<text type="advanced" align="left" '.$fontname.$agent_font_limit.' duration=".."><![CDATA['.$agent['TITLE'].']]>';
+			$xml[] = '								<animator type="custom">';
+			$xml[] = '									<key pos="-0.15,0.10,0" time="0"/>';
+			$xml[] = '								</animator>';
+			$xml[] = '							</text>';
+			$xml[] = '						</stack>';
+			$xml[] = '						<transition type="crossfade" duration="0.2"/>';
+			$xml[] = '						<text type="zone" duration="0.5"></text>';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key pos="0,-0.5,0" time="'.($agent_name_start-0.17).'"/>'; 
+			$xml[] = '							<key pos="0,0,0" time="'.($agent_name_start-0.07).'"/>';
+			$agent_name_start += ($agent_name_duration-0.27);
+			$xml[] = '							<key pos="0,0,0" time="'.($agent_name_start).'"/>';
+			$xml[] = '							<key pos="0,0.5,0" time="'.($agent_name_start+0.1).'"/>';
+			$agent_name_start += 0.1;
+			$xml[] = '						</animator>';
+			$xml[] = '					</sequence>';
+		}		
+		$xml[] = '				</stack>';
+		$xml[] = '			</stack>';
+		$xml[] = '			<!-- infos agence end -->';	
+		$xml[] = '			<transition type="crossfade" duration="1"/>';
+	}
+	$xml[] = '			<!-- diffusion start -->';	
+	if(count($infos['DIFFUSIONS']) > 0){
+		$xml[] = '			<!-- diffusion intro start -->';	
+		$xml[] = '			<stack>';
+		$xml[] = '				<sequence>';
+		$xml[] = '					<effect type="none" duration="'.$diffusion_duration_intro.'">';
+		$xml[] = '						<image color="#FFFFFF" />';
+		$xml[] = '					</effect>';
+		$xml[] = '					<transition type="crossfade" duration="1" />';
+		$xml[] = '					<effect type="none" duration="1.1">';
+		$xml[] = '						<image color="#3b5998" />';
+		$xml[] = '					</effect>';
+		$xml[] = '				</sequence>';
+		$xml[] = '				<sequence>';
+		$xml[] = '					<text type="zone" duration="'.($diffusion_animation_logo_start).'"></text>';
+		$xml[] = '					<overlay bottom="0.43" left="0.68" width="0.12" height="0.13" duration="'.($diffusion_duration_intro-$diffusion_animation_logo_start-1).'">';
+		$xml[] = '						<image filename="'.fix_xml($url_picto_twitter).'" />';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key scale="0,0,0" time="0" />';
+		$xml[] = '							<key scale="1,1,1" time="0.2" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="0,0,0" time="0" />';
+		$xml[] = '							<key pos="0.21,0.15,0" time="0.1" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.4" />';
+		$xml[] = '					</overlay>';	
+		$xml[] = '					<overlay bottom="0.43" left="0.68" width="0.12" height="0.13" duration="1">';
+		$xml[] = '						<image filename="'.fix_xml($url_picto_twitter).'" />';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key scale="1,1,1" time="0" />';
+		$xml[] = '							<key scale="1.2,1.2,1.2" time="0.4" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="0.21,0.15,0" time="0" />';
+		$xml[] = '							<key pos="0.31,0.20,0" time="0.3" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<filter type="alpha" alphaStart="1" alphaEnd="0" duration="0.4" />';
+		$xml[] = '					</overlay>';
+		$xml[] = '				</sequence>';
+		$xml[] = '				<sequence>';
+		$xml[] = '					<text type="zone" duration="'.($diffusion_animation_logo_start+0.1).'"></text>';
+		$xml[] = '					<overlay bottom="0.45" right="0.67"  width="0.13" height="0.28" duration="'.($diffusion_duration_intro-$diffusion_animation_logo_start+0.1-1).'">';
+		$xml[] = '						<image filename="'.fix_xml($url_picto_facebook).'?r=21" />';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key orient="0,0,-25" scale="0,0,0" time="0" />';
+		$xml[] = '							<key orient="0,0,-25" scale="1,1,1" time="0.2" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="0,0,0" time="0" />';
+		$xml[] = '							<key pos="-0.05,0.30,0" time="0.1" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.4" />';
+		$xml[] = '					</overlay>';
+		$xml[] = '					<overlay bottom="0.45" right="0.67"  width="0.13" height="0.28" duration="0.9">';
+		$xml[] = '						<image filename="'.fix_xml($url_picto_facebook).'?r=21" />';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key orient="0,0,-25" scale="1,1,1" time="0" />';
+		$xml[] = '							<key orient="0,0,-25" scale="1.2,1.2,1.2" time="0.4" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="-0.05,0.30,0" time="0" />';
+		$xml[] = '							<key pos="-0.20,0.50,0" time="0.3" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<filter type="alpha" alphaStart="1" alphaEnd="0" duration="0.4" />';
+		$xml[] = '					</overlay>';
+		$xml[] = '				</sequence>';
+		$xml[] = '				<sequence>';
+		$xml[] = '					<text type="zone" duration="'.($diffusion_animation_logo_start+0.05).'"></text>';
+		$xml[] = '					<overlay bottom="0.30" right="0.75" width="0.094" height="0.20" duration="'.($diffusion_duration_intro-$diffusion_animation_logo_start+0.05-1).'">';
+		$xml[] = '						<image filename="'.fix_xml($url_picto_video).'" />';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key orient="0,0,-15" scale="0,0,0" time="0" />';
+		$xml[] = '							<key orient="0,0,-15" scale="1,1,1" time="0.2" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="0,0,0" time="0" />';
+		$xml[] = '							<key pos="-0.30,-0.11,0" time="0.1" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.4" />';
+		$xml[] = '					</overlay>';
+		$xml[] = '					<overlay bottom="0.30" right="0.75" width="0.094" height="0.20" duration="0.95">';
+		$xml[] = '						<image filename="'.fix_xml($url_picto_video).'" />';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key orient="0,0,-15" scale="1,1,1" time="0" />';
+		$xml[] = '							<key orient="0,0,-15" scale="1.2,1.2,1.2" time="0.4" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="-0.30,-0.11,0" time="0" />';
+		$xml[] = '							<key pos="-0.40,-0.21,0" time="0.3" />';
+		$xml[] = '						</animator>';
+		$xml[] = '						<filter type="alpha" alphaStart="1" alphaEnd="0" duration="0.4" />';
+		$xml[] = '					</overlay>';
+		$xml[] = '				</sequence>';
+		$xml[] = '				<stack>';
+		$xml[] = '					<sequence>';
+		$xml[] = '						<stack>';
+		$xml[] = '							<sequence>';
+		$xml[] = '								<text type="zone" duration="'.$diffusion_animation_text_start.'"></text>';
+		$xml[] = '								<text type="advanced" align="left" '.$fontname.' fontsize="20" fontcolor="#323232" duration="'.($diffusion_duration_intro-$diffusion_animation_text_start+0.1).'"><![CDATA[PRÉSENCE]]>';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="-0.55,0.20,0" time="0"/>';
+		$xml[] = '										<key pos="-0.55,0.35,0" time="0.2"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '									<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.3" />';
+		$xml[] = '								</text>';	
+		$xml[] = '							</sequence>';
+		$diffusion_animation_text_start += $diffusion_animation_text_space;
+		$xml[] = '							<sequence>';
+		$xml[] = '								<text type="zone" duration="'.$diffusion_animation_text_start.'"></text>';
+		$xml[] = '								<text type="advanced" align="left" '.$fontname.' fontsize="20" fontcolor="#323232" duration="'.($diffusion_duration_intro-$diffusion_animation_text_start+0.1).'">SUR LES';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="0.4,0.20,0" time="0"/>';
+		$xml[] = '										<key pos="0.4,0.35,0" time="0.2"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '									<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.3" />';
+		$xml[] = '								</text>';	
+		$xml[] = '							</sequence>';
+		$diffusion_animation_text_start += $diffusion_animation_text_space;
+		$xml[] = '							<sequence>';
+		$xml[] = '								<text type="zone" duration="'.$diffusion_animation_text_start.'"></text>';
+		$xml[] = '								<text type="advanced" weight="bold" align="left" '.$fontname_title.' fontsize="60" fontcolor="#323232" duration="'.($diffusion_duration_intro-$diffusion_animation_text_start+0.1).'">MÉDIAS';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="-1.3,-0.20,0" time="0"/>';
+		$xml[] = '										<key pos="-1.3,-0.05,0" time="0.2"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '									<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.3" />';
+		$xml[] = '								</text>';
+		$xml[] = '							</sequence>';
+		$diffusion_animation_text_start += $diffusion_animation_text_space;
+		$xml[] = '							<sequence>';
+		$xml[] = '								<text type="zone" duration="'.$diffusion_animation_text_start.'"></text>';
+		$xml[] = '								<text type="advanced" weight="bold" align="left" '.$fontname_title.' fontsize="60" fontcolor="#323232" duration="'.($diffusion_duration_intro-$diffusion_animation_text_start+0.1).'">SOCIAUX';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="-1.2,-0.60,0" time="0"/>';
+		$xml[] = '										<key pos="-1.2,-0.45,0" time="0.2"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '									<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.3" />';
+		$xml[] = '								</text>';
+		$xml[] = '							</sequence>';
+		$xml[] = '						</stack>';
+		$xml[] = '						<transition type="crossfade" duration="1.0"/>';
+		$xml[] = '						<stack>';
+		$xml[] = '							<stack>';
+		$xml[] = '								<text type="advanced" align="left" '.$fontname_subtitle.' fontsize="20" fontcolor="#FFFFFF" duration="1">PRÉSENCE';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="-0.55,0.35,0" time="0"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '								</text>';	
+		$xml[] = '							</stack>';
+		$xml[] = '							<stack>';
+		$xml[] = '								<text type="advanced" align="left" '.$fontname_subtitle.' fontsize="20" fontcolor="#FFFFFF" duration="1">SUR LES';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="0.4,0.35,0" time="0"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '								</text>';	
+		$xml[] = '							</stack>';
+		$xml[] = '							<stack>';
+		$xml[] = '								<text type="advanced" weight="bold" align="left" '.$fontname_title.' fontsize="60" fontcolor="#FFFFFF" duration="1">MÉDIAS';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="-1.3,-0.05,0" time="0"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '								</text>';
+		$xml[] = '							</stack>';
+		$xml[] = '							<stack>';
+		$xml[] = '								<text type="advanced" weight="bold" align="left" '.$fontname_title.' fontsize="60" fontcolor="#FFFFFF" duration="1">SOCIAUX';
+		$xml[] = '									<animator type="custom">';
+		$xml[] = '										<key pos="-1.2,-0.45,0" time="0"/>';
+		$xml[] = '									</animator>';
+		$xml[] = '								</text>';
+		$xml[] = '							</stack>';
+		$xml[] = '						</stack>';
+		$xml[] = '					</sequence>';
+		$xml[] = '					<animator type="custom">';
+		$xml[] = '						<key pos="0,0,0" time="'.($diffusion_duration_intro-1).'" />';
+		$xml[] = '						<key pos="0.4,0.2,0" time="'.($diffusion_duration_intro).'" />';
+		$xml[] = '					</animator>';
+		$xml[] = '				</stack>';
+		$xml[] = '			</stack>';
+		$xml[] = '			<!-- diffusion intro end -->';	
+		foreach($infos['DIFFUSIONS'] as $k=>$v){
+			$font_limit_diffusion_size = 16;
+			$font_limit_diffusion_width = $diffusion_background[strtolower($k)]['font_limit_width'];//525;
+			$xml[] = '			<stack>';
+			$xml[] = '				<overlay top="0" left="0" width="1" height="1" duration="'.$diffusion_duration_intro.'">';
+			$xml[] = '					<image color="'.$diffusion_background[strtolower($k)]['bgcolor'].'" />';
+			$xml[] = '				</overlay>';
+			$xml[] = '				<stack>';
+			$xml[] = '					<stack>';
+			$xml[] = '						<text type="advanced" align="left" '.$fontname_subtitle.' fontsize="20" fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration="'.($diffusion_duration_intro).'">PRÉSENCE';
+			$xml[] = '							<animator type="custom">';
+			$xml[] = '								<key pos="-0.55,0.35,0" time="0"/>';
+			$xml[] = '							</animator>';
+			$xml[] = '						</text>';	
+			$xml[] = '					</stack>';
+			$xml[] = '					<stack>';
+			$xml[] = '						<text type="advanced" align="left" '.$fontname_subtitle.' fontsize="20" fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration="'.($diffusion_duration_intro).'">SUR LES';
+			$xml[] = '							<animator type="custom">';
+			$xml[] = '								<key pos="0.4,0.35,0" time="0"/>';
+			$xml[] = '							</animator>';
+			$xml[] = '						</text>';	
+			$xml[] = '					</stack>';
+			$xml[] = '					<stack>';
+			$xml[] = '						<text type="advanced" weight="bold" align="left" '.$fontname_title.' fontsize="60" fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration="'.($diffusion_duration_intro).'">MÉDIAS';
+			$xml[] = '							<animator type="custom">';
+			$xml[] = '								<key pos="-1.3,-0.05,0" time="0"/>';
+			$xml[] = '							</animator>';
+			$xml[] = '						</text>';
+			$xml[] = '					</stack>';
+			$xml[] = '					<stack>';
+			$xml[] = '						<text type="advanced" weight="bold" align="left" '.$fontname_title.' fontsize="60" fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration="'.($diffusion_duration_intro).'">SOCIAUX';
+			$xml[] = '							<animator type="custom">';
+			$xml[] = '								<key pos="-1.2,-0.45,0" time="0"/>';
+			$xml[] = '							</animator>';
+			$xml[] = '						</text>';
+			$xml[] = '					</stack>';
+			$xml[] = '					<animator type="custom">';
+			$xml[] = '						<key pos="0.4,0.2,0" time="0" />';
+			$xml[] = '					</animator>';
+			$xml[] = '				</stack>';
+			$xml[] = '				<stack>';
+			$xml[] = '					<sequence>';
+			$xml[] = '						<text type="zone" duration="0.05"></text>';
+			$xml[] = '						<overlay top="0.74" left="0" right="0" height="'.(!is_array($v) ? "0.09" : "0.18").'">';
+			$xml[] = '							<stack>';
+			$xml[] = '								<overlay top="0" left="0" height="1" width="1">';
+			$xml[] = '									<image color="#FFFFFF">';
+			$xml[] = '										<filter type="alpha" alphaStart="0" alphaEnd="'.$diffusion_background[strtolower($k)]['alpha'].'" duration="0.3" />';
+			$xml[] = '									</image>';
+			$xml[] = '								</overlay>';
+			$xml[] = '							</stack>';
+			$xml[] = '						</overlay>';
+			$xml[] = '					</sequence>';
+			$xml[] = '					<sequence>';
+			$xml[] = '						<text type="zone" duration="0.5"></text>';
+			$font_limit_diffusion = getAdvancedTextFontSize($font_limit_diffusion_width, fix_xml(!is_array($v) ? $v : $v[0]),$font_limit_diffusion_size, true);
+			$xml[] = '						<stack>';
+			$xml[] = '							<text type="advanced" align="right" '.$fontname.' '.$font_limit_diffusion.' fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration="'.($diffusion_duration_intro-0.8).'"><![CDATA['.(!is_array($v) ? $v : $v[0]).']]>';
+			$xml[] = '								<animator type="custom">';
+			$xml[] = '									<key pos="1.7,-0.62,0" time="0" />';
+			$xml[] = '								</animator>';
+			$xml[] = '							</text>';
+			if(is_array($v)){
+				$font_limit_diffusion = getAdvancedTextFontSize($font_limit_diffusion_width, fix_xml($v[1]),$font_limit_diffusion_size, true);
+				$xml[] = '							<text type="advanced" align="right" '.$fontname.' '.$font_limit_diffusion.' fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration=".."><![CDATA['.$v[1].']]>';
+				$xml[] = '								<animator type="custom">';
+				$xml[] = '									<key pos="1.7,-0.77,0" time="0" />';
+				$xml[] = '								</animator>';
+				$xml[] = '							</text>';
+			}
+			$xml[] = '							<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.3" />';
+			$xml[] = '						</stack>';
+			$xml[] = '						<stack>';
+			$font_limit_diffusion = getAdvancedTextFontSize($font_limit_diffusion_width, fix_xml(!is_array($v) ? $v : $v[0]),$font_limit_diffusion_size, true);
+			$xml[] = '							<text type="advanced" align="right" '.$fontname.' '.$font_limit_diffusion.' fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration="0.3"><![CDATA['.(!is_array($v) ? $v : $v[0]).']]>';
+			$xml[] = '								<animator type="custom">';
+			$xml[] = '									<key pos="1.7,-0.62,0" time="0" />';
+			$xml[] = '								</animator>';
+			$xml[] = '							</text>';
+			if(is_array($v)){
+				$font_limit_diffusion = getAdvancedTextFontSize($font_limit_diffusion_width, fix_xml($v[1]),$font_limit_diffusion_size, true);
+				$xml[] = '							<text type="advanced" align="right" '.$fontname.' '.$font_limit_diffusion.' fontcolor="'.$diffusion_background[strtolower($k)]['textcolor'].'" duration=".."><![CDATA['.$v[1].']]>';
+				$xml[] = '								<animator type="custom">';
+				$xml[] = '									<key pos="1.7,-0.77,0" time="0" />';
+				$xml[] = '								</animator>';
+				$xml[] = '							</text>';
+			}
+			$xml[] = '							<filter type="alpha" alphaStart="1" alphaEnd="0" duration="0.3" />';
+			$xml[] = '						</stack>';
+			$xml[] = '					</sequence>';
+			$xml[] = '				</stack>';
+			$xml[] = '				<sequence>';
+			$xml[] = '					<text type="zone" duration="0.3"></text>';
+			$xml[] = '					<overlay '.$diffusion_background[strtolower($k)]['logo_overlay'].' duration="'.($diffusion_duration_intro-0.6).'">';
+			$xml[] = '						<image filename="'.$diffusion_background[strtolower($k)]['logo'].'" />';
+			$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.6" />';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key pos="0,-0.3,0" time="0" />';
+			$xml[] = '							<key pos="0,0,0" time="0.2" />';
+			$xml[] = '						</animator>';
+			$xml[] = '					</overlay>';
+			$xml[] = '					<overlay '.$diffusion_background[strtolower($k)]['logo_overlay'].' duration="0.3">';
+			$xml[] = '						<image filename="'.$diffusion_background[strtolower($k)]['logo'].'" />';
+			$xml[] = '						<filter type="alpha" alphaStart="1" alphaEnd="0" duration="0.3" />';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key pos="0,0,0" time="0" />';
+			$xml[] = '							<key pos="0,0.3,0" time="0.2" />';
+			$xml[] = '						</animator>';
+			$xml[] = '					</overlay>';
+			$xml[] = '				</sequence>';
+			$xml[] = '			</stack>';
+			$xml[] = '			<transition type="crossfade" duration="0.5" />';
+		}
+	}
+	$xml[] = '			<!-- diffusion end -->';
+	$xml[] = '			<!-- logo final start -->';	
+	$xml[] = '		  	<stack>';
+	$xml[] = '		  		<overlay duration="'.$duration_logo_end.'">';
+	$xml[] = '				  <video filename="'.fix_xml($url_intro_video).'" speed="1.0" skip="0.0" audio="true" volume="0.3"/>';
+	$xml[] = '				</overlay>';
+	$xml[] = '		  		<sequence>';
+	$xml[] = '				  	<stack>';
+	$xml[] = '				  		<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '							<sequence>';
+	$xml[] = '								<effect type="none" duration="2.5">';
+	$xml[] = '									<image color="#000000" />';
+	$xml[] = '								</effect>';
+	$xml[] = '								<transition type="crossfade" duration="2.0" />';
+	$xml[] = '								<effect type="none" duration="7">';
+	$xml[] = '									<image color="#FFFFFF" />';
+	$xml[] = '								</effect>';
+	$xml[] = '							</sequence>';
+	$xml[] = '						</filter>';
+	$xml[] = '				  		<overlay top="'.($logo_position['y']-0.005).'" left="'.($logo_position['x']-0.0025).'" width="'.($logo_position['width']+0.005).'" height="'.($logo_position['height']+0.01).'" duration="'.$duration_logo_end.'">';
+	$xml[] = '							<image color="#FFFFFF" />';
+	$xml[] = '						</overlay>';
+//	$xml[] = '				  		<overlay top="0.3" left="0.35" width="0.3" height="0.4" duration="..">';
+	$xml[] = '				  		<overlay top="'.$logo_position['y'].'" left="'.$logo_position['x'].'" width="'.$logo_position['width'].'" height="'.$logo_position['height'].'" duration="..">';
+	$xml[] = '							<image filename="'.fix_xml($infos['URL_LOGO']).'" />';
+	$xml[] = '						</overlay>';
+	$xml[] = '					</stack>';
+	$xml[] = '				</sequence>';
+	$xml[] = '				<stack>';
+	$xml[] = '					<sequence>';
+	$xml[] = '						<effect type="none" duration="1">';
+	$xml[] = '							<image color="#FFFFFF" />';
+	$xml[] = '						</effect>';
+	$xml[] = '						<transition type="crossfade" duration="0.5" />';
+	$xml[] = '						<overlay duration="1.4">';
+	$xml[] = '							<image filename="'.$url_nuage.'">';
+	$xml[] = '								<filter type="alpha" alphaStart="1" alphaEnd="0" duration="1.4" />';
+	$xml[] = '							</image>';
+	$xml[] = '						</overlay>';
+	$xml[] = '					</sequence>';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="4,4,4" pos="0.1,-0.1,0" orient="0,0,-17.5" time="0.5" />';
+	$xml[] = '						<key scale="4,4,4" pos="0.0,-2,0" orient="0,0,0" time="2" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</stack>';
+	$xml[] = '			</stack>';
+	$xml[] = '			<!-- logo final end -->';
+
+	$xml[] = '		</sequence>';
+	$volume_sound = "1.0";
+	$duration_totale = $duration_intro+$infos_agence_duration+$zone_duration+$description_duration+$agence_infos_duration+($diffusion_duration_intro*count($infos['DIFFUSIONS']))+$duration_logo_end+5;
+	
+//	echo $duration_totale;exit;
+	if($infos['MUSIC'] != ""){		
+		$xml[] = ChooseSoundDuration($duration_totale-1, $volume_sound, $infos['MUSIC']);
+	}
+	$xml[] = '	</stack>';
+
+	return array('profile'=> $profile, 'xml'=>implode("\n",$xml));
+}
+?>

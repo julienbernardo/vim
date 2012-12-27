@@ -1,0 +1,344 @@
+<?php
+require_once 'Zend/Loader.php';
+
+class PHPYouTubeAPI{
+	var $api_keys = array(
+		array(
+			'DEVELOPER_KEY' => 'AI39si5Ga3SshNoiJF8579mPT2IYNOESYmkzchcru-QoEsiHL4OEbJ5q4Hw8adxlrdReENXqT9dO3oKzvEkPAxdTlYfFBb5jPA',
+			'APPLICATION_ID'=> 'Virtual tour post',
+			'CLIENT_ID'=> 'ytapi-adresseachier-Virtualtourpost-uh3arr83-0'
+		),
+		array(
+			'DEVELOPER_KEY' => 'AI39si5qLO1fLgbjpvgUxNJ5h-6q2WXIQ8rqCcjvywroAgOTxhIL8PvS36jF4Xq5RuPjDrwzLX02OEtEkb_QgUAChiq5yqzqjA',
+			'APPLICATION_ID'=> 'VirtualTour century21',
+			'CLIENT_ID'=> ''
+		),
+		array(
+			'DEVELOPER_KEY' => 'AI39si7Fx4mmu10M4FH5Yc0SRAvj8ECGWUyD10UtzbRg8ErhX6SRKhWVaGdrK0tfKgLYZdrR34T3JEpSWNWM7wHTZ2Omc9r9VA',
+			'APPLICATION_ID'=> 'VirtualTour CitiHabitats',
+			'CLIENT_ID'=> ''
+		),
+		array(
+			'DEVELOPER_KEY' => 'AI39si5Duqk2c5P3GwgtMHAeYWDQkYWwxkUSXMRfiC8rJrD2aogX_QIrSnnWTD9sActmRRH-8jRpXE00Cup55B64kt1lAgUgEg',
+			'APPLICATION_ID'=> 'Blot Immo virtual tour',
+			'CLIENT_ID'=> ''
+		)
+	);
+	var $connexion = "";
+	var $username = "";
+	var $password = "";
+	var $error = "";
+	var $url = "";
+	var $videoId = ""; 
+	var $key = "";
+	var $debug = false;
+	var $getId = "/.*\?v=([^&]+)/i";
+	var $url_final = "http://www.youtube.com/watch?v=";
+	var $default_category = "Howto";
+	
+	function PHPYoutubeAPI($username = "", $password = "", $debug = false){
+		$this->username = $username;
+		$this->password = $password;
+		$this->key = $this->api_keys[rand(0,count($this->api_keys)-1)];
+		$this->debug = $debug;
+	}
+
+	function getUrlFormat(){
+		return $this->url_final."#ID#";
+	}
+
+	function connexion(){
+		if($this->connexion == ""){
+			Zend_Loader::loadClass('Zend_Gdata_AuthSub');
+			Zend_Loader::loadClass('Zend_Gdata_ClientLogin'); 
+		
+			$authenticationURL= 'https://www.google.com/youtube/accounts/ClientLogin';
+			$httpClient = Zend_Gdata_ClientLogin::getHttpClient(
+											$username = $this->username,
+											$password = $this->password,
+											$service = 'youtube',              
+											$client = null,              
+											$source = 'virtualtour', // a short string identifying your application              
+											$loginToken = null,
+											$loginCaptcha = null,
+											$authenticationURL);
+
+			Zend_Loader::loadClass('Zend_Gdata_YouTube');		
+			$this->connexion = new Zend_Gdata_YouTube($httpClient, $this->key['APPLICATION_ID'], $this->key['CLIENT_ID'], $this->key['DEVELOPER_KEY']);
+			if(preg_match('/@/i', $this->username) > 0){
+				$userProfileEntry = $this->connexion->getUserProfile('default');
+				$this->username = $userProfileEntry->getUsername();
+			}
+		
+			// Note that this example creates an unversioned service object.
+			// You do not need to specify a version number to upload content
+			// since the upload behavior is the same for all API versions.
+			//$yt = new Zend_Gdata_YouTube($httpClient);
+		}
+		return $this->connexion;
+	}
+	
+	function deleteVideo($idYoutube){
+		try {
+			$yt = $this->connexion();
+			$playlistListFeed = $yt->getPlaylistListFeed($this->username);
+			foreach ($playlistListFeed as $playlistListEntry){
+				$playlistVideoFeedUrl = $playlistListEntry->getPlaylistVideoFeedUrl();
+				if($playlistVideoFeedUrl != ""){
+					$playlistVideoFeed = $yt->getPlaylistVideoFeed($playlistVideoFeedUrl);
+					foreach ($playlistVideoFeed as $playlistVideoEntry){
+						if(preg_match($this->getId, $playlistVideoEntry->getVideoWatchPageUrl(), $result) > 0 && $result[1] == $idYoutube){
+							$playlistVideoEntry->delete();
+						}
+					}
+				}
+			}
+			$myVideoEntry = $yt->getFullVideoEntry($idYoutube);
+			$yt->delete($myVideoEntry);
+			return true;
+		} catch (Zend_Gdata_App_HttpException $httpException) {  
+			$this->error = $httpException->getMessage();
+		} catch (Zend_Gdata_App_Exception $e) {
+			$this->error = $e->getMessage();
+		}
+		return false;
+	}
+	
+	function uploadFile($file = "",$title = "",$tags = "",$description = "", $category = ""){
+		if($category ==""){ $category = $this->default_category;}
+		if($this->username != "" && $this->password != ""){
+			if(file_exists($file)){
+				try {  
+					$yt = $this->connexion();
+					// create a new VideoEntry object
+					$myVideoEntry = new Zend_Gdata_YouTube_VideoEntry();
+
+					// create a new Zend_Gdata_App_MediaFileSource object
+					$filesource = $yt->newMediaFileSource($file);
+					$filesource->setContentType('application/octet-stream');
+					// set slug header
+					$filesource->setSlug(basename($file));
+					// add the filesource to the video entry
+					$myVideoEntry->setMediaSource($filesource);
+					$myVideoEntry->setVideoTitle($title);
+					$myVideoEntry->setVideoDescription($description);
+
+					// The category must be a valid YouTube category!
+					$myVideoEntry->setVideoCategory($category);
+	
+					$myVideoEntry->SetVideoTags($tags);
+//					$myVideoEntry->setVideoDeveloperTags(array('mydevtag', 'anotherdevtag'));
+
+					// upload URI for the currently authenticated userr              
+					$uploadUrl = 'http://uploads.gdata.youtube.com/feeds/api/users/default/uploads';
+					
+					// try to upload the video, catching a Zend_Gdata_App_HttpException, 
+					// if available, or just a regular Zend_Gdata_App_Exception otherwise
+					$newEntry = $yt->insertEntry($myVideoEntry, $uploadUrl, 'Zend_Gdata_YouTube_VideoEntry');
+					
+					$putUrl = $newEntry->getEditLink()->getHref();
+					$newEntry->setVideoTitle($title);
+					$newEntry->setVideoDescription($description);
+					$newEntry->SetVideoTags($tags);
+					$newEntry->SetVideoPublic();
+					$yt->updateEntry($newEntry, $putUrl);
+					
+					$this->videoId = $newEntry->getVideoId();
+					
+					if($this->videoId != ""){
+						$this->url = $this->url_final.$this->videoId;
+						return true;
+					}else{ $this->error = "Youtube Video Id not found";}
+				} catch (Zend_Gdata_App_HttpException $httpException) {  
+					$this->error = $httpException->getMessage();
+				} catch (Zend_Gdata_App_Exception $e) {
+					$this->error = $e->getMessage();
+				}
+			}else{ $this->error = "File not found";}
+		}else{ $this->error = "Missing login or password";}
+		return false;
+	}
+	
+	function diffuseOnPlaylist($playlist = array()){
+		$return = array();
+		$playlist = array_map('strtolower', $playlist);
+		//print_r($playlist);
+		if($this->videoId != ""){
+			try{
+				$yt = $this->connexion();
+				$playlistListFeed = $yt->retrieveAllEntriesForFeed($yt->getPlaylistListFeed($this->username));
+				foreach ($playlistListFeed as $playlistListEntry) {
+					//echo $playlistListEntry->title->text."\n";
+					if(in_array( strtolower($playlistListEntry->title->text), $playlist)){
+						$playlistVideoFeedUrl = $playlistListEntry->getPlaylistVideoFeedUrl();
+						if($playlistVideoFeedUrl != ""){
+							$playlistVideoFeed = $yt->getPlaylistVideoFeed($playlistVideoFeedUrl);
+							$videoAlreadyFound = false;
+							foreach ($playlistVideoFeed as $playlistVideoEntry){
+								if(preg_match($this->getId, $playlistVideoEntry->getVideoWatchPageUrl(), $result) > 0 && $result[1] == $this->videoId){
+									$return[] = $playlistListEntry->title->text.":Done";	
+									$videoAlreadyFound = true;
+									break;
+								}
+							}
+							if($videoAlreadyFound){ continue;}
+						}
+						try{		
+							$postUrl = $playlistListEntry->getPlaylistVideoFeedUrl();
+							// video entry to be added
+							$videoEntryToAdd = $yt->getVideoEntry($this->videoId);
+
+							// create a new Zend_Gdata_PlaylistListEntry, passing in the underling DOMElement of the VideoEntry
+							$newPlaylistListEntry = $yt->newPlaylistListEntry($videoEntryToAdd->getDOM());
+
+							// post
+							$yt->insertEntry($newPlaylistListEntry, $postUrl);
+							$return[] = $playlistListEntry->title->text.":OK";
+						} catch (Zend_Gdata_App_HttpException $httpException) {  
+							$return[] = $playlistListEntry->title->text.":".$httpException->getMessage();
+						} catch (Zend_Gdata_App_Exception $e) {
+							$return[] = $playlistListEntry->title->text.":".$e->getMessage();
+						}
+					}
+				}
+			} catch (Zend_Gdata_App_HttpException $httpException) {  
+				$return[] = "Error->GetPlaylist:".$httpException->getMessage();
+			} catch (Zend_Gdata_App_Exception $e) {
+				$return[] = "Error->GetPlaylist:".$e->getMessage();
+			}
+		}
+		return (count($return) == 0 ? false : implode(", ",$return));
+	}
+	
+	function edit($idYoutube, $title, $tags, $description, $category =""){
+		$return = false;
+		if($category ==""){ $category = $this->default_category;}
+		try {
+			$yt = $this->connexion();
+			$myVideoEntry = $yt->getFullVideoEntry($idYoutube);
+			if($myVideoEntry->getEditLink() !== null){
+				$this->videoId = $idYoutube;
+				$putUrl = $myVideoEntry->getEditLink()->getHref();
+				$myVideoEntry->setVideoTitle($title);
+				$myVideoEntry->setVideoDescription($description);
+				$myVideoEntry->SetVideoTags($tags);
+				$myVideoEntry->SetVideoPublic();
+				$yt->updateEntry($myVideoEntry, $putUrl);
+				$this->url = $this->url_final.$idYoutube;
+				return true;
+			}else{ 
+				$return = "Video isn't editable";
+			}
+		} catch (Zend_Gdata_App_HttpException $httpException) {  
+			$return = $httpException->getMessage();
+		} catch (Zend_Gdata_App_Exception $e) {
+			$return = $e->getMessage();
+		}
+		return $return;
+	}
+
+	function findOriginalVideo($idYoutube, $title = "", $description = ""){
+		$return = true;
+		try {
+			$yt = $this->connexion();
+			$this->videoId = $idYoutube;
+			$myVideoEntry = $yt->getFullVideoEntry($idYoutube);
+			$state = $myVideoEntry->getVideoState();
+			if($state != null){
+				if($state->getName() == "rejected" && $state->getReasonCode() == "duplicate"){
+					$videoFeed = $yt->getuserUploads('default');
+					$query = $yt->newVideoQuery();
+
+					//if($title == "") $title = $myVideoEntry->getVideoTitle();
+					$title = $myVideoEntry->getVideoTitle();
+					$query->setVideoQuery($title);
+					$videoFeed = $yt->getVideoFeed($query->getQueryUrl(2));
+					if(count($videoFeed) == 0) $return = "Video source not found";
+					else if(count($videoFeed) == 1){
+						if($videoFeed[0]->getVideoId() != ""){
+							$this->videoId = $videoFeed[0]->getVideoId();
+							$return = true;
+						}else $return = "Video ID not found";
+					}else $return = "Too much video found";
+				}
+			}
+			$this->url = $this->url_final.$this->videoId;
+		} catch (Zend_Gdata_App_HttpException $httpException) {  
+			$return = $httpException->getMessage();
+		} catch (Zend_Gdata_App_Exception $e) {
+			$return = $e->getMessage();
+		}
+		return $return;
+	}
+
+	function checkVideo($idYoutube){
+		$return = false;
+		try {
+			$yt = $this->connexion();
+			$myVideoEntry = $yt->getFullVideoEntry($idYoutube);
+			$isPrivate = $myVideoEntry->isVideoPrivate();
+			echo ($isPrivate ? "true" : "false");
+			$state = $myVideoEntry->getVideoState();
+			if($state != null){
+				$return = $state->getName();
+				if($return == "ready"){ 
+					$return = true;
+				}else if($return == "rejected" && $state->getReasonCode() != "" ){
+					$return = $state->getReasonCode();
+				}
+			}else{
+				if($myVideoEntry->getVideoWatchPageUrl() != "") $return = true;
+				$return = "Video not found on youtube.";
+			} 
+		} catch (Zend_Gdata_App_HttpException $httpException) {  
+			$return = $httpException->getMessage();
+		} catch (Zend_Gdata_App_Exception $e) {
+			$return = $e->getMessage();
+		}
+		if($isPrivate) $return = "private";
+		return $return;
+	}
+	function getAllVideos($nolimit = false){
+		$return = array();
+		try {
+			$yt = $this->connexion();
+			// set the version to 2 to receive a version 2 feed of entries
+			$limit = 50;
+			$page = 0;
+			$too_recent = true;
+			$url_feeds = "https://gdata.youtube.com/feeds/api/users/default/uploads?max-results=#LIMIT#&start-index=#PAGE#";
+			do{
+				$replace = array(
+					'search' => array('#LIMIT#', '#PAGE#'),
+					'replace' => array($limit, 1+$limit*$page++),
+				);
+				$url = str_replace($replace['search'], $replace['replace'], $url_feeds);
+		 		$videoFeed = $yt->getVideoFeed($url);
+		 		if(count($videoFeed) >0){
+		 			foreach ($videoFeed as $videoEntry) {
+		 				if(!$nolimit && preg_match('/(\d{4}-\d{2}-\d{2})[^0-9]*(\d{2}:\d{2}:\d{2})/i', $videoEntry->getUpdated(), $result) > 0){
+		 					$too_recent = (date('Y-m-d H:i:s', mktime()-60*60) < $result[1].' '.$result[2]);
+		 					if($too_recent){ continue;}	
+		 				}
+						$return[] = $this->url_final.$videoEntry->getVideoId();
+			  		}
+		 		}
+			}while(count($videoFeed) >0);
+		} catch (Zend_Gdata_App_HttpException $httpException) {  
+			$return = $httpException->getMessage();
+		} catch (Zend_Gdata_App_Exception $e) {
+			$return = $e->getMessage();
+		}
+		return $return;
+	}
+	
+	function getIdVideo($url = ""){
+		$return = $url;
+		if($url == ""){ $url = $this->url;}
+		if($url != "" && preg_match($this->getId, $url, $result) > 0){
+			$return = $result[1];
+		}
+		return $return;
+	} 
+}
+?>

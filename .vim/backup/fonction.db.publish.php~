@@ -1,0 +1,1082 @@
+<?php
+
+function post_twitter_message($url_twitter, $log, $pwd, $message) {
+	require_once 'HTTP/Request.php';
+	$result = false;
+	$http = new HTTP_Request($url_twitter);
+	if(!PEAR::isError($http)) {
+		$http->setMethod(HTTP_REQUEST_METHOD_POST);
+		$http->setBasicAuth($log, $pwd);
+		$http->addPostData("status", $message);
+		$response = $http->sendRequest();
+		if(!PEAR::isError($response) && (int)$http->getResponseCode() === 200) {
+			try {
+				$xml	= new SimpleXMLElement($http->getResponseBody());
+				$result = (string)$xml->id;
+			} catch(Exception $ex) {
+				$result = false;
+			}
+		}
+	}
+	return $result;
+}
+
+function get_user_company($user) {
+	global $db;
+	$result = '';
+	if(is_guid($user)) {
+		$sql = "SELECT ID_SOCIETE FROM UTILISATEUR WHERE ID_UTILISATEUR=?";
+		$result = $db->getOne($sql, array($user));
+	}
+	return $result;
+}
+
+function unpublish_tours_overquota($partner, $tour) {
+	global $db;
+	$sql = <<<SQL
+SELECT
+	V.ID_UTILISATEUR, CP.PREFIXE_PORTAIL, CP.LIMITE_DIFFUSION, CP.ORDRE_DIFFUSION, s.ID_TEMPLATE
+FROM
+	VISITE v
+	INNER JOIN SOCIETE s ON v.ID_SOCIETE=s.ID_SOCIETE
+	INNER JOIN CLIENT_PORTAIL cp ON cp.ID_PORTAIL=? AND v.ID_UTILISATEUR=cp.ID_UTILISATEUR
+WHERE
+	v.ID_VISITE=?	
+SQL;
+	$result = $db->getRow($sql, array($partner, $tour), DB_FETCHMODE_ASSOC);
+
+	$user = $result['ID_UTILISATEUR'];
+	$usercode = $result['PREFIXE_PORTAIL'];
+	$limit = (int)$result['LIMITE_DIFFUSION'];
+	$criteria = $result['ORDRE_DIFFUSION'];
+	$tpl = (int)$result['ID_TEMPLATE'];
+
+	$tab_unpublished = array();
+
+
+	if($limit>0) {
+		$order = stripos($criteria, '_ASC')!==false ? 'ASC' : 'DESC';
+
+		if(stripos($criteria, 'PRIX_')!==false) {
+			$order_field = 'v1.PRIX_BIEN';
+		} else if(stripos($criteria, 'SALES_FIRST')!==false) {
+			// Metre les ventes a 1, le reste a 0 et forcer le tri DESC pour avoir les ventes en 1er
+			if(21==$tpl) {
+				$order_field = 'CASE vtu.ID_TYPE_TRANSACTION WHEN 1 THEN 1 ELSE 0 END';
+			} else {
+				$order_field = 'CASE vte.ID_TYPE_TRANSACTION WHEN 1 THEN 1 ELSE 0 END';
+			}
+			$order = 'DESC';
+		} else {
+			$order_field = 'v1.DATE_CREATION_VISITE';
+		}
+
+		// oblige de mettre un alias sur les colonnes calculees...
+		if(stripos($order_field, 'CASE ')!==false) {
+			$alias_field = ' AS Field'; 
+		} else {
+			$alias_field = '';
+		}
+
+		// dev.api.previsite.com/publication/software_publish.php?tour=1FCCE1CC-2F1A-C603-F384-7785E9B98181=&partner=A3985606-3DB7-3D2C-7204-1CB66442FF6C&ref=1FCCE1CC-2F1A-C603-F384-7785E9B98181
+
+		$sql = <<<SQL
+-- Renvoyer toutes les annonces
+SELECT
+	v1.ID_VISITE, $order_field $alias_field
+FROM
+	CLIENT_PORTAIL cp
+	INNER JOIN VISITE v1 ON cp.ID_UTILISATEUR=v1.ID_UTILISATEUR AND v1.ID_STATUT_VISITE=1
+	INNER JOIN DIFFUSION_PORTAIL d1 ON d1.ID_PORTAIL=? AND d1.ID_VISITE=v1.ID_VISITE AND d1.ID_STATUT_DIFFUSION>=0
+	%PART_JOIN%
+WHERE
+	cp.ID_PORTAIL=? AND cp.PREFIXE_PORTAIL=? 
+
+EXCEPT
+
+-- Sauf celles qui ne sont pas dans les $limit
+
+SELECT *
+FROM (
+	SELECT
+		TOP $limit 
+		v1.ID_VISITE, $order_field $alias_field
+	FROM
+		CLIENT_PORTAIL cp
+		INNER JOIN VISITE v1 ON cp.ID_UTILISATEUR=v1.ID_UTILISATEUR AND v1.ID_STATUT_VISITE=1
+		INNER JOIN DIFFUSION_PORTAIL d1 ON d1.ID_PORTAIL=? AND d1.ID_VISITE=v1.ID_VISITE AND d1.ID_STATUT_DIFFUSION>=0
+		%PART_JOIN%
+	WHERE
+		cp.ID_PORTAIL=? AND cp.PREFIXE_PORTAIL=?
+	ORDER BY
+		$order_field $order
+) AS TEMPO
+
+SQL;
+
+		$pattern = '%PART_JOIN%';
+		$replace = '';
+		// Rajouter jointure si besoin
+		if(stripos(	$order_field, 'vte.')!==false) {
+			$replace .= "\nLEFT JOIN VISITE_TPL_EU vte ON v1.ID_VISITE=vte.ID_VISITE";
+		} else if(stripos(	$order_field, 'vtu.')!==false) {
+			$replace .= "\nLEFT JOIN VISITE_TPL_US vtu ON v1.ID_VISITE=vtu.ID_VISITE";
+		}
+
+		$sql = str_replace($pattern, $replace, $sql);
+
+		$params = array($partner, $partner, $usercode, $partner, $partner, $usercode);
+		$tab_res = $db->getAll($sql, $params, DB_FETCHMODE_ASSOC);
+
+		$sql_upd = 'UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=-2, DATE_DIFFUSION=GETDATE() WHERE ID_PORTAIL=? AND ID_VISITE=?';
+		
+		for($i=0; isset($tab_res[$i]); $i++) {
+			$tab_unpublished[] = $tab_res[$i]['ID_VISITE'];
+			$db->query($sql_upd, array($partner, $tab_res[$i]['ID_VISITE']));
+		}
+	}	
+	// dev.api.previsite.com/publication/software_publish.php?mode=auto&partner=19A2E13B-D292-AD02-0549-27AF56F7ACA6&user=FF316DAF-53FD-8366-0B20-759A21680385&tour=9F338CD4-37F7-867C-34B1-88B58F1DB6A3&ref=9F338CD4-37F7-867C-34B1-88B58F1DB6A3
+	
+	return $tab_unpublished;
+}
+
+function get_tour_to_publish($partner, $prefix, $filter, $tour) {
+	global $db;
+	switch($filter) {
+		default:
+			$order_by = 'v.DATE_CREATION_VISITE DESC';
+			break;
+	}
+	$sql = <<<SQL
+SELECT
+	TOP 1 v.ID_VISITE
+FROM
+	CLIENT_PORTAIL cp
+	INNER JOIN VISITE v ON cp.ID_UTILISATEUR=v.ID_UTILISATEUR AND v.ID_STATUT_VISITE=1 AND v.ID_VISITE<>?
+WHERE
+	cp.ID_PORTAIL=? AND cp.PREFIXE_PORTAIL=? AND NOT EXISTS(
+		SELECT * FROM DIFFUSION_PORTAIL dp WHERE dp.ID_PORTAIL=cp.ID_PORTAIL AND dp.ID_VISITE=v.ID_VISITE AND dp.ID_STATUT_DIFFUSION>=0
+	)
+ORDER BY
+	$order_by
+SQL;
+	$result = $db->getOne($sql, array($tour, $partner, $prefix));
+	return $result;
+}
+
+
+function check_publication_limit($partner, $tour) {
+	global $db;
+	$sql = <<<SQL
+SELECT
+	V.ID_UTILISATEUR, CP.PREFIXE_PORTAIL, CP.LIMITE_DIFFUSION, CP.ORDRE_DIFFUSION
+FROM
+	VISITE v
+	INNER JOIN CLIENT_PORTAIL cp ON cp.ID_PORTAIL=? AND v.ID_UTILISATEUR=cp.ID_UTILISATEUR
+WHERE
+	v.ID_VISITE=?
+SQL;
+
+	$result = $db->getRow($sql, array($partner, $tour), DB_FETCHMODE_ASSOC);
+
+	// dev.api.previsite.com/software/software_publish.php?partner=191F4B45-53AD-2D10-DBE2-E7479443BBE7&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&ref=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1
+	
+	if(!DB::isError($result) && !empty($result['ID_UTILISATEUR']) && $result['LIMITE_DIFFUSION']>0) {
+		$sql = <<<SQL
+-- API check_publication_limit
+SELECT
+	COUNT(*)
+FROM 
+	CLIENT_PORTAIL cp
+	INNER JOIN VISITE v ON cp.ID_UTILISATEUR=v.ID_UTILISATEUR AND v.ID_STATUT_VISITE=1 AND v.ID_VISITE<>?
+	INNER JOIN DIFFUSION_PORTAIL dp ON v.ID_VISITE=dp.ID_VISITE AND cp.ID_PORTAIL=dp.ID_PORTAIL AND dp.ID_STATUT_DIFFUSION>=0
+WHERE
+	cp.ID_PORTAIL=? AND cp.PREFIXE_PORTAIL=?
+SQL;
+		$result['NB_DIFF'] = $db->getOne($sql, array($tour, $partner, $result['PREFIXE_PORTAIL']));
+	}
+	return $result;
+}
+
+
+// dev.api.previsite.com/publication/software_unpublish.php?partner=A80B4819-204C-3D33-BB64-ECE24006118D&tour=02BD26B0-924E-490A-A761-146EDC94067E
+
+//function update_tour_date_on_publication($partner, $tour) {
+//	global $db;
+//	$sql = "SELECT VALEUR_OPTION FROM PORTAIL_OPTION WHERE ID_PORTAIL=? AND REF_OPTION='UPDATETOURDATEONPUB'";
+//	$res = $db->getOne($sql, array($partner));
+//	if(!empty($res)) {
+//		$sql = 'UPDATE VISITE SET DATE_MODIFICATION_VISITE=GETDATE() WHERE ID_VISITE=?';
+//		$res = $db->query($sql, array($tour));
+//	}
+//}
+
+function delete_publication($partner, $tour, $flag=-1) {
+	global $db;
+	$affected = 0;
+
+	if(is_guid($partner) && is_guid($tour)) {
+		// RS 2012-10-12 : Ne garder que la derniere diff et supprimer les autres
+		$sql = <<<SQL
+-- API delete_publication
+SELECT TOP 1 ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? ORDER BY DATE_CREATION DESC
+SQL;
+		$params = array($partner, $tour);
+		$diff = $db->getOne($sql, $params);
+
+		$debug = false; // Ne modifie pas la base en mode debug
+
+		$tab_sql = array();
+
+		$sql_errors = false;
+		if(is_guid($diff)) {
+			$db->autocommit(false);
+			// 2012-11-20 : Rajout de la date_diffusion
+			$sql = 'UPDATE DIFFUSION_PORTAIL SET DATE_DIFFUSION=GETDATE(), ID_STATUT_DIFFUSION=? WHERE ID_DIFFUSION_PORTAIL=?';
+			$params = array($flag, $diff);
+			$res = $db->query($sql, $params);
+			$sql_errors |= DB::isError($res);
+			$tab_sql[] = $db->last_query;
+
+			$sql = <<<SQL
+-- API delete_publication
+DELETE FROM DIFFUSION_PORTAIL_LIAISON WHERE ID_DIFFUSION_PORTAIL IN (
+	SELECT ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=?
+)
+SQL;
+			$params = array($partner, $tour);			
+			$res = $db->query($sql, $params);
+			$sql_errors |= DB::isError($res);
+			$tab_sql[] = $db->last_query;
+
+			// Supprimer les autre diff en doublons
+			$sql = <<<SQL
+-- API delete_publication
+DELETE FROM DIFFUSION_PORTAIL WHERE ID_DIFFUSION_PORTAIL<>? AND ID_VISITE=? AND ID_PORTAIL=?
+SQL;
+			$params = array($diff, $tour, $partner);
+			$res = $db->query($sql, $params);
+			$sql_errors |= DB::isError($res);
+			$tab_sql[] = $db->last_query;
+
+			if($debug || $sql_errors) {
+				$db->rollback();
+			} else {
+				$db->commit();
+			}
+			$db->autocommit(true);
+		}
+
+//		$params = array($flag, $partner, $tour);
+//		$sql = "SELECT ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=?";
+//		$result = $db->query($sql, array($partner, $tour));
+//		$id_diffs = array();
+//		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+//			$id_diffs[] = $row['ID_DIFFUSION_PORTAIL'];
+//		}
+//		if(count($id_diffs) > 0){
+//			$sql = "DELETE FROM DIFFUSION_PORTAIL_LIAISON WHERE ID_DIFFUSION_PORTAIL IN ('".implode("', '", $id_diffs)."')";
+//			$db->query($sql, $params);
+//		}
+//		$sql = "UPDATE DIFFUSION_PORTAIL SET DATE_DIFFUSION=GETDATE(), ID_STATUT_DIFFUSION=? WHERE ID_PORTAIL=? AND ID_VISITE=? -- AND ID_STATUT_DIFFUSION>=0";
+//		$db->query($sql, $params);
+
+		return !$sql_errors;
+	} else {
+		return false;
+	}
+}
+
+function count_tour_publictions($tour, $partner) {
+	global $db;
+	$found = 0;
+	if(is_guid($tour) && is_guid($partner)) {
+		$sql = 'SELECT COUNT(*) FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? AND ID_STATUT_DIFFUSION>0';
+		$found = $db->getOne($sql, array($partner, $tour));
+	}
+	return $found;
+}
+
+function update_tour_data($user,$tour,$field) {
+	global $db;
+	if(count($field) > 0 && is_guid($tour) && is_guid($user)) {
+		$sql_array = array();
+		for($i=0;$i<count($field);$i++){
+			$sql_array[] = $field[$i]['NAME']."=".$field[$i]['VALUE'];
+		}
+		$sql = "UPDATE VISITE SET ".implode(",",$sql_array).",DATE_MODIFICATION_VISITE=GETDATE()
+		WHERE ID_VISITE='".$tour."' AND ID_UTILISATEUR='".$user."'";
+		$result = $db->query($sql);
+	}
+}
+
+function get_tour_date_last_modified($tour) {
+	global $db;
+	$result = '';
+	if(is_guid($tour)) {
+		$sql = "SELECT DATE_MODIFICATION_VISITE FROM VISITE WHERE ID_VISITE=?";
+		$result = $db->getOne($sql, array($tour));
+	}
+	return $result;
+}
+
+function get_user_infos($user) {
+	global $db;
+	if(is_guid($user)) {
+		$sql =
+			"SELECT
+				u.NOM_UTILISATEUR, u.PRENOM_UTILISATEUR, u.EMAIL_UTILISATEUR, u.TELEPHONE_UTILISATEUR, 
+				s.NOM_SOCIETE, s.SITEWEB_SOCIETE, a.TELEPHONE AS TELEPHONE_SOCIETE, a.ADRESSE, a.VILLE, a.CODE_POSTAL,u.LOGIN_UTILISATEUR,u.PASSWORD_UTILISATEUR
+			FROM
+				UTILISATEUR u INNER JOIN SOCIETE s ON U.ID_SOCIETE=s.ID_SOCIETE
+				INNER JOIN ADRESSE a ON S.ID_ADRESSE_VIEWER=A.ID_ADRESSE
+			WHERE u.ID_UTILISATEUR=?";
+
+		$result = $db->query($sql, array($user));
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$data_array = $row;
+		}
+	}
+	return $data_array;
+}
+
+function get_distrib_option($distrib, $tab_options=array()) {
+	global $db;
+	$data_array = array();
+
+	if(is_guid($distrib)) {
+		$tab_params = array($distrib);
+		$sql = 'SELECT REF_OPTION, VALEUR_OPTION FROM DISTRIBUTEUR_OPTION WHERE ID_DISTRIBUTEUR=?';
+		$nb_opt = @count($tab_options);
+		if($nb_opt>0) {
+			$tab_bind = array_fill(0, $nb_opt, '?');
+			$sql .= ' AND REF_OPTION IN ('.implode(',', $tab_bind).')';
+			$tab_params = array_merge($tab_params, $tab_options);
+		}
+
+		$result = $db->query($sql, $tab_params);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$data_array[$row['REF_OPTION']] = $row['VALEUR_OPTION'];
+		}
+	}
+	return $data_array;
+}
+
+function get_user_option($user, $tab='') {
+	global $db;
+	if(is_array($tab)) $data_array = $tab;
+	else $data_array = array();
+	if(is_guid($user)){
+		$sql = "SELECT REF_OPTION,VALEUR_OPTION 
+		FROM 
+			UTILISATEUR INNER JOIN SOCIETE ON SOCIETE.ID_SOCIETE=UTILISATEUR.ID_SOCIETE 
+			INNER JOIN DISTRIBUTEUR_OPTION ON DISTRIBUTEUR_OPTION.ID_DISTRIBUTEUR=SOCIETE.ID_DISTRIBUTEUR 
+		WHERE
+			ID_UTILISATEUR=? AND REF_CATEGORIE_OPTION='OPTION_BUNDLE'";
+		$result = $db->query($sql, array($user));
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$data_array[$row['REF_OPTION']] = $row['VALEUR_OPTION'];
+		}
+
+		$sql = "SELECT REF_OPTION,VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE ID_UTILISATEUR=? AND REF_CATEGORIE_OPTION='OPTION_BUNDLE'";
+		$result = $db->query($sql, array($user));
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[$row['REF_OPTION']] = $row['VALEUR_OPTION'];
+		}
+	}
+	return $data_array;
+}
+
+function get_user_option_diffusion($user, $tab='') {
+	global $db;
+	if(is_array($tab)) $data_array = $tab;
+	else $data_array = array();
+	if(is_guid($user)){
+		$sql = "SELECT REF_OPTION,VALEUR_OPTION 
+		FROM 
+			UTILISATEUR INNER JOIN SOCIETE ON SOCIETE.ID_SOCIETE=UTILISATEUR.ID_SOCIETE 
+			INNER JOIN DISTRIBUTEUR_OPTION ON DISTRIBUTEUR_OPTION.ID_DISTRIBUTEUR=SOCIETE.ID_DISTRIBUTEUR 
+		WHERE
+			ID_UTILISATEUR=? AND REF_CATEGORIE_OPTION='OPTION_DIFFUSION'";
+		$result = $db->query($sql, array($user));
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$data_array[$row['REF_OPTION']] = $row['VALEUR_OPTION'];
+		}
+	
+		$sql = "SELECT REF_OPTION,VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE ID_UTILISATEUR=? AND REF_CATEGORIE_OPTION='OPTION_DIFFUSION'";
+		$result = $db->query($sql, array($user));
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[$row['REF_OPTION']] = $row['VALEUR_OPTION'];
+		}
+	}
+	return $data_array;
+}
+
+function get_tour_data($tour, $user = "", $must_active=true){
+	global $db;
+	$data_array = array();
+	if(is_guid($tour)){
+		if(use_old_fields()) {
+			$fields = 'vt.NOM_VISITE, v.NOM_VISITE AS NOM_VISITE_OLD,';
+		} else {
+			$fields = 'vt.NOM_VISITE,';
+		}
+		$params = array($tour);
+		$sql = <<<SQL
+SELECT
+	v.REF_VISITE, v.NUMERO_MLS, v.CODE_POSTAL, v.ADRESSE, v.VILLE, v.ID_LANGUE, v.REF_ETAT, v.ID_PAYS, v.URL_ANNONCE, $fields
+	v.ID_UTILISATEUR, v.ID_TEMPLATE, v.ID_PREMIERE_IMAGE, v.ID_PRIX_CACHE,
+	s.ID_SOCIETE, s.ID_DISTRIBUTEUR,
+	u.ID_SHORT AS ID_SHORT_USER,
+	(SELECT VALEUR_OPTION FROM DISTRIBUTEUR_OPTION do WHERE do.ID_DISTRIBUTEUR=s.ID_DISTRIBUTEUR AND do.REF_OPTION='URLVIEWER') AS URL_VIEWER,
+	(SELECT NOM_PAYS from PAYS where PAYS.ID_PAYS=v.ID_PAYS) as NOM_PAYS
+FROM
+	VISITE v 
+	INNER JOIN UTILISATEUR u ON v.ID_UTILISATEUR=u.ID_UTILISATEUR
+	INNER JOIN SOCIETE s ON u.ID_SOCIETE=s.ID_SOCIETE
+	LEFT JOIN VISITE_TEXTE vt ON v.ID_VISITE=VT.ID_VISITE AND v.ID_LANGUE COLLATE FRENCH_CI_AS = vt.ID_LANGUE COLLATE FRENCH_CI_AS
+WHERE
+	v.ID_VISITE=?
+SQL;
+
+		if($must_active) {
+			$sql .= ' AND v.ID_STATUT_VISITE=1';
+		}
+		if(is_guid($user)) {
+			$sql .= ' AND v.ID_UTILISATEUR=?';
+			$params[] = $user;
+		}
+
+		$result = $db->query($sql, $params);
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array = $row;
+			if(empty($data_array['NOM_VISITE']) && !empty($data_array['NOM_VISITE_OLD'])) {
+				$data_array['NOM_VISITE'] = $data_array['NOM_VISITE_OLD'];
+			}
+		}
+	}
+	return $data_array;
+}
+
+function get_amtt_data($tour) {
+	global $db;
+	$data_array = array();
+	$sql = <<<SQL
+SELECT
+	vta.ID_MARQUE, vta.ID_MODELE, vta.ID_VERSION, ate.NOM_TYPE_ENERGIE
+FROM
+	VISITE_TPL_AUTO vta
+	LEFT JOIN AUTO_TYPE_ENERGIE ate ON vta.ID_TYPE_ENERGIE=ate.ID_TYPE_ENERGIE
+WHERE
+	vta.ID_VISITE=?
+SQL;
+	$data_array = $db->getRow($sql, array($tour), DB_FETCHMODE_ASSOC);
+	return $data_array;
+}
+
+function use_old_fields() {
+	global $db;
+	return $db->getOne("SELECT COL_LENGTH('VISITE', 'DESCRIPTION')")>0;
+}
+
+function get_tour_detail($tour) {
+	global $db;
+	$data_array = array();
+	if(is_guid($tour)){
+		if(use_old_fields()) {
+			$fields = 'vt.DESCRIPTION, v.DESCRIPTION AS DESCRIPTION_OLD,';
+		} else {
+			$fields = 'vt.DESCRIPTION,';
+		}
+	
+		$sql = <<<SQL
+SELECT
+	$fields
+	PRIX_BIEN, v.REF_DEVISE, SYMBOLEBRUT_DEVISE, LATITUDE, LONGITUDE,s.GROUPE_SOCIETE,s.EMAIL_SOCIETE as EMAIL_SOCIETE,
+	
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.ID_PRESTIGE ELSE vte.ID_PRESTIGE END AS ID_PRESTIGE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.ID_TYPE_TRANSACTION ELSE vte.ID_TYPE_TRANSACTION END AS ID_TYPE_TRANSACTION,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.ID_TYPE_BIEN ELSE vte.ID_TYPE_BIEN END AS ID_TYPE_BIEN,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_CHAMBRE ELSE vte.NOMBRE_CHAMBRE END AS NOMBRE_CHAMBRE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_PIECE ELSE vte.NOMBRE_PIECE END AS NOMBRE_PIECE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.ESPACE_TOTAL ELSE SURFACE_TERRAIN END AS ESPACE_TOTAL,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.ESPACE_UTILE ELSE vte.SURFACE_HABITABLE END AS ESPACE_UTILE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_UNITE_SURFACE_HABITABLE END AS ESPACE_UTILE_UNITE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN null ELSE vte.NOMBRE_ETAGES END AS NOMBRE_ETAGES,
+	CASE v.ID_TEMPLATE WHEN 21 THEN null ELSE vte.NUMERO_ETAGE END AS NUMERO_ETAGE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_GARAGE ELSE vte.NOMBRE_GARAGE END AS NOMBRE_GARAGE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_PERSONNE ELSE vte.NOMBRE_PERSONNE END AS NOMBRE_PERSONNE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN vtu.ID_PERIODICITE_LOYER ELSE vte.ID_PERIODICITE_LOYER END AS ID_PERIODICITE_LOYER,
+	CASE v.ID_TEMPLATE WHEN 21 THEN null ELSE vte.DPE_LETTRE END AS DPE_LETTRE,
+	CASE v.ID_TEMPLATE WHEN 21 THEN null ELSE vte.GES_LETTRE END AS GES_LETTRE,
+	TYPE_BIEN.NOM_TYPE_BIEN,
+	TYPE_BIEN_DISTRIBUTEUR.NOM_TYPE_BIEN AS NOM_TYPE_BIEN_DISTRIB
+FROM 
+	VISITE v
+	INNER JOIN SOCIETE s ON v.ID_SOCIETE=s.ID_SOCIETE
+	LEFT JOIN DEVISE dev ON dev.REF_DEVISE=v.REF_DEVISE
+	LEFT JOIN VISITE_TPL_EU vte ON v.ID_VISITE=vte.ID_VISITE AND v.ID_TEMPLATE<>21
+	LEFT JOIN VISITE_TPL_US vtu ON v.ID_VISITE=vtu.ID_VISITE AND v.ID_TEMPLATE=21
+	LEFT JOIN TYPE_BIEN ON vte.ID_TYPE_BIEN=TYPE_BIEN.ID_TYPE_BIEN
+	LEFT JOIN TYPE_BIEN_DISTRIBUTEUR ON s.ID_DISTRIBUTEUR=TYPE_BIEN_DISTRIBUTEUR.ID_DISTRIBUTEUR AND TYPE_BIEN_DISTRIBUTEUR.ID_LANGUE COLLATE French_CI_AS=V.ID_LANGUE COLLATE French_CI_AS AND (TYPE_BIEN_DISTRIBUTEUR.ID_TYPE_BIEN=vte.ID_TYPE_BIEN OR TYPE_BIEN_DISTRIBUTEUR.ID_TYPE_BIEN=vtu.ID_TYPE_BIEN)
+	LEFT JOIN VISITE_TEXTE vt ON v.ID_VISITE=VT.ID_VISITE AND v.ID_LANGUE COLLATE FRENCH_CI_AS = vt.ID_LANGUE COLLATE FRENCH_CI_AS
+WHERE
+	v.ID_VISITE=?
+SQL;
+		$data_array = $db->getRow($sql, array($tour), DB_FETCHMODE_ASSOC);
+		if(empty($data_array['DESCRIPTION']) && !empty($data_array['DESCRIPTION_OLD'])) {
+			$data_array['DESCRIPTION'] = $data_array['DESCRIPTION_OLD'];
+		}
+	}
+	return $data_array;
+}
+
+function get_tour_images($tour) {
+	global $db;
+	$data_array = array();
+	if(is_guid($tour)){
+		$sql = "SELECT ID_IMAGE, ID_TYPE_IMAGE FROM IMAGE WHERE ID_VISITE=? AND ID_STATUT_IMAGE>0 ORDER BY ID_IMAGE_FAVORITE DESC, POIDS";
+		$data_array = $db->getAll($sql, array($tour), DB_FETCHMODE_ASSOC);
+	}
+	return $data_array;
+}
+
+function get_tour_complement($tour) {
+	global $db;
+	$data_array = array();
+	if(is_guid($tour)){
+		$sql = "SELECT NOM_CHAMP, VALEUR_CHAMP FROM VISITE_COMPLEMENT WHERE ID_VISITE=?";
+		$res = $db->getAll($sql, array($tour), DB_FETCHMODE_ASSOC);
+		if(!PEAR::isError($res) && !empty($res)) {
+			foreach($res as $row) {
+				$data_array[ $row['NOM_CHAMP'] ] = $row['VALEUR_CHAMP'];
+			}
+		}
+	}
+	return $data_array;
+}
+
+function get_tour_details_us($tour) {
+	global $db;
+	$data_array = array();
+	if(is_guid($tour)) {
+		$sql =
+			"SELECT
+				ID_TYPE_LISTING, ID_TYPE_TRANSACTION, ID_STATUT_LISTING, ID_TYPE_BIEN, ID_ADRESSE_CACHEE,
+				ID_BIEN_AMENAGE, LOCATION_ANNUELLE, ESPACE_TOTAL, ESPACE_UTILE, NOMBRE_CHAMBRE,
+				NOMBRE_SALLE_BAIN, NOMBRE_DEMI_SALLE_BAIN, EQUIPEMENTS, ANNEE_CONSTRUCTION,
+				TAILLE_LOT_ACRES, ID_EMAIL_RESTRICTION, TAXES, ID_AGENT,
+				(SELECT TOP 1 vsl.NOM_STATUT_LISTING FROM VISITE_TPL_US_STATUT_LISTING vsl WHERE vsl.ID_STATUT_LISTING=ID_STATUT_LISTING) AS NOM_STATUT_LISTING
+			FROM VISITE_TPL_US
+			WHERE ID_VISITE='".$tour."'";
+		$res = $db->query($sql);
+		$data_array = $res->fetchRow(DB_FETCHMODE_ASSOC);
+	}
+	if(empty($data_array)) {
+		$data_array = array();
+	}
+	return $data_array;
+}
+
+
+function get_partner_code($partner) {
+	global $db;
+	$code = "";
+	if(is_guid($partner)) {
+		$sql = "SELECT CODE_PORTAIL FROM PORTAIL WHERE ID_PORTAIL='".$partner."'";
+		$code = (string) $db->getOne($sql);
+	}
+	return $code;
+}
+
+function get_partner_type($partner) {
+	global $db;
+	$type = 0;
+	if(is_guid($partner)) {
+		$sql = "SELECT ID_TYPE_PORTAIL FROM PORTAIL WHERE ID_PORTAIL='".$partner."'";
+		$type = (int) $db->getOne($sql);
+	}
+	return $type;
+}
+
+function get_user_partner_infos($company, $partner = null) {
+	global $db;
+	$data_array = array();
+	if(is_guid($company)) {
+		$params = array($company);
+		$sql = <<<SQL
+SELECT
+	cp.ID_PORTAIL, cp.PREFIXE_PORTAIL, cp.PASSWORD_PORTAIL, cp.PREFIXE_DIFFUSION, cp.DSN_IMAP, p.CLE_PORTAIL
+FROM
+	CLIENT_PORTAIL cp
+	INNER JOIN PORTAIL p ON cp.ID_PORTAIL=p.ID_PORTAIL
+WHERE
+	cp.ID_SOCIETE=?
+SQL;
+		if(is_guid($partner)) {
+			$sql .= ' AND cp.ID_PORTAIL=?';
+			$params[] = $partner;
+		}
+		$res = $db->query($sql, $params);
+		while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[ $row['ID_PORTAIL'] ] = array(
+				'PREFIX'   => $row['PREFIXE_PORTAIL'],
+				'PASSWORD' => $row['PASSWORD_PORTAIL'],
+				'PREFIXE_DIFFUSION' => $row['PREFIXE_DIFFUSION'],
+				'DSN_IMAP' => $row['DSN_IMAP'],
+				'CLE_PORTAIL' => $row['CLE_PORTAIL']
+			);
+		}		
+	}
+
+	return $data_array;
+}
+
+
+function get_portail_options($partner) {
+	global $db;
+	$data_array = array();
+	if(is_guid($partner)){
+		$sql = 
+			"SELECT p.REF_OPTION,p.VALEUR_OPTION
+			FROM PORTAIL_OPTION p INNER JOIN OPTION_GLOBAL o ON p.REF_OPTION=o.REF_OPTION
+			WHERE p.ID_PORTAIL='".$partner."' AND p.VALEUR_OPTION IS NOT NULL";
+		$result = $db->query($sql);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[$row['REF_OPTION']] = $row['VALEUR_OPTION'];
+		}
+	}
+	return $data_array;
+}
+
+function check_num_active_diffusion($tour, $partner) {
+	global $db;
+	$found = 0;
+	if(is_guid($partner)&&is_guid($tour)){
+		$sql = 'SELECT COUNT(*) FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? AND ID_STATUT_DIFFUSION>=0';
+		$found = $db->getOne($sql, array($partner, $tour));
+	}
+	return $found;
+}
+
+function get_ref_portail($tour, $partner, $delete_pending=false){
+	global $db;
+	$result = '';
+	if(is_guid($partner)&&is_guid($tour)){
+		if($delete_pending) {
+			$sql = 'SELECT TOP 1 REF_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? AND ID_STATUT_DIFFUSION=-2';
+		} else {
+			$sql = 'SELECT TOP 1 REF_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? AND ID_STATUT_DIFFUSION>=0 ORDER BY DATE_DIFFUSION DESC';
+		}
+		$result = $db->getOne($sql, array($partner, $tour));
+	}
+	return $result;
+}
+
+function get_id_diffusion_portail($tour, $partner){
+	global $db;
+	$result = '';
+	if(is_guid($partner)&&is_guid($tour)){
+		$sql = 'SELECT TOP 1 ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? AND ID_STATUT_DIFFUSION>=0 ORDER BY DATE_DIFFUSION DESC';
+		$result = $db->getOne($sql, array($partner, $tour));
+	}
+	return $result;
+}
+
+function get_id_diffusion_portail_full($tour, $partner,$id_diffusion=''){
+	global $db;
+	$result = array();
+	if (!empty($id_diffusion) && is_guid($id_diffusion)) {
+		$sql = 'SELECT TOP 1 ID_DIFFUSION_PORTAIL,ID_SHORT FROM DIFFUSION_PORTAIL WHERE ID_DIFFUSION_PORTAIL=? ORDER BY DATE_DIFFUSION DESC';
+		$result = $db->getRow($sql, array($id_diffusion),DB_FETCHMODE_ASSOC);
+	} else if(is_guid($partner) && is_guid($tour)){
+		$sql = 'SELECT TOP 1 ID_DIFFUSION_PORTAIL,ID_SHORT FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? ORDER BY DATE_DIFFUSION DESC';
+		$result = $db->getRow($sql, array($partner, $tour),DB_FETCHMODE_ASSOC);
+	}
+	return $result;
+}
+
+function get_diffusion_portail_liaison($id_diff, $limit = true){
+	global $db;
+	$result = array();
+	if(is_guid($id_diff)){
+		$sql = "SELECT ID_PORTAIL FROM DIFFUSION_PORTAIL INNER JOIN DIFFUSION_PORTAIL_LIAISON ON DIFFUSION_PORTAIL.ID_DIFFUSION_PORTAIL=DIFFUSION_PORTAIL_LIAISON.ID_DIFFUSION_PORTAIL WHERE ID_DIFFUSION_PORTAIL_MAITRE='".$id_diff."' ".($limit ? " AND ID_STATUT_DIFFUSION > -1 " : "");
+		$res = $db->query($sql);
+		while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$result[] = $row;
+		}
+	}	
+	return $result;
+}
+function get_partner_tour_url($partner, $ref, $tour) {
+	global $db;
+	global $tab_default_user_code;
+
+	$url_tour = '';
+	if(is_guid($partner) && is_guid($tour)) {
+		$sql =
+			"SELECT p.URL_VIEWER, p.CODE_PORTAIL, dp.ID_DIFFUSION_PORTAIL, dp.REF_PORTAIL, cp.PREFIXE_PORTAIL
+			FROM PORTAIL p INNER JOIN DIFFUSION_PORTAIL dp ON p.ID_PORTAIL=dp.ID_PORTAIL
+			INNER JOIN VISITE v ON v.Id_visite=dp.id_visite
+			INNER JOIN CLIENT_PORTAIL cp ON v.id_societe=cp.id_societe
+			WHERE dp.ID_PORTAIL='".$partner."' AND cp.ID_PORTAIL='".$partner."' AND dp.REF_PORTAIL=N'".fix_text($ref, 50)."' AND dp.ID_VISITE='".$tour."' AND dp.ID_STATUT_DIFFUSION>0";
+		$res = $db->query($sql);
+		if($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$tab_pattern = array('#ID#', '#PUB#', '#PORTAL#', '#REF#', '#ID_MLS#', '#USER#');
+			if(isset($tab_default_user_code[$partner]) && empty($row['PREFIXE_PORTAIL'])) {
+				$tab_replace = array($tour, $row['ID_DIFFUSION_PORTAIL'], $row['CODE_PORTAIL'], $row['REF_PORTAIL'], $row['REF_PORTAIL'], $tab_default_user_code[$partner]);
+			} else {
+				$tab_replace = array($tour, $row['ID_DIFFUSION_PORTAIL'], $row['CODE_PORTAIL'], $row['REF_PORTAIL'], $row['REF_PORTAIL'], $row['PREFIXE_PORTAIL']);
+			}
+			$url_tour = str_replace($tab_pattern, $tab_replace, $row['URL_VIEWER']);
+		}
+	}
+	return $url_tour;
+}
+
+// JB 2012/05/31 ajout du param isExport pour les portail vidéos
+// Pour le mettre à 2 waiting à false et isExport à true
+
+function add_manual_publication($company, $portail, $tour, $ref, $multi_diffusion = false, $waiting = false, $isExport = false) {
+	global $db;
+	global $tab_debug;
+	$result = $allowed = false;
+	if(is_guid($portail) && strlen($ref)>0 && is_guid($tour) && is_guid($company)) {
+		$ref = fix_text($ref, 50);
+
+		$sql =
+			"SELECT p.ID_TYPE_PORTAIL, p.CODE_PORTAIL
+			FROM CLIENT_PORTAIL cp INNER JOIN PORTAIL p ON cp.ID_PORTAIL=p.ID_PORTAIL
+			WHERE cp.ID_PORTAIL=? AND cp.ID_SOCIETE=? AND p.ID_STATUT_PORTAIL>-1";
+		$res = $db->query($sql, array($portail, $company));
+		if($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$type_portail = $row['ID_TYPE_PORTAIL'];
+			$code_portail = $row['CODE_PORTAIL'];
+		}
+		$is_custom  = $type_portail==3 || $type_portail==4;
+		$allowed = !empty($type_portail);
+
+		if($allowed) {
+			// Recherche si visite existante
+			if($is_custom) {
+				// meme code portail pour les anciennes diffusions ASP (code_portail=CUSTOM) => Ref doit etre unique pour tout les portails (urls en /CUSTOM/REF)
+				$sql = "SELECT TOP 1 ID_VISITE FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL IN (
+					SELECT ID_PORTAIL FROM PORTAIL WHERE CODE_PORTAIL='".fix_text($code_portail, 50)."'
+				) AND REF_PORTAIL=N'".$ref."' AND ID_STATUT_DIFFUSION>=0";
+			} else {
+				// ref unique sur le portail
+				$sql = "SELECT TOP 1 ID_VISITE FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL='".$portail."' AND REF_PORTAIL=N'".$ref."' AND ID_STATUT_DIFFUSION>=0";
+			}
+			$id_found = $db->getOne($sql);
+
+			if(empty($id_found) || $tour == $id_found /*|| $multi_diffusion*/) {
+				// dev.api.previsite.com/publication/software_publish.php?partner=191F4B45-53AD-2D10-DBE2-E7479443BBE7&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&ref=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1
+				// dev.api.previsite.com/publication/software_publish.php?partner=191F4B45-53AD-2D10-DBE2-E7479443BBE7&tour=7DC1A0E8-0978-CF13-9617-4B2232A4F9EE&ref=7DC1A0E8-0978-CF13-9617-4B2232A4F9EE
+				// dev.api.previsite.com/publication/software_publish.php?partner=E5607DDA-327B-2432-8A43-C5E25D54432C&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&ref=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1
+
+				// RS 2012-03-09 : Ne plus generer de nouvelle diffusion si vv deja diffusee
+
+				// dev.api.previsite.com/publication/software_publish.php?partner=59C4948B-DB6D-FDAF-E15D-CD67B8347126&tour=8C8058DD-8895-889E-5126-EDDF8E13FA3B&ref=8C8058DD-8895-889E-5126-EDDF8E13FA3B&mode=auto
+				
+				if(true) {
+					$db->autoCommit(false);
+
+					$sql = 'SELECT TOP 1 ID_DIFFUSION_PORTAIL, ID_STATUT_DIFFUSION FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? ORDER BY ID_STATUT_DIFFUSION DESC, DATE_DIFFUSION DESC';
+					$params = array($portail, $tour);
+					$row = $db->getRow($sql, $params, DB_FETCHMODE_ASSOC);
+
+					$status = $waiting ? 0 : 1;
+					if($status == 1 && $isExport === true){ $status = 2;}
+
+					if(is_guid($row['ID_DIFFUSION_PORTAIL'])) {
+						// Desctivation de toutes les autres diffusions
+						$diffusion = $row['ID_DIFFUSION_PORTAIL'];
+						if($row['ID_STATUT_DIFFUSION'] > 0 && $isExport === true){
+							return array('id'=>$diffusion, 'already_done'=> true);
+						}
+
+						$sql = 'UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=-3, DATE_DIFFUSION=GETDATE() WHERE ID_DIFFUSION_PORTAIL<>? AND ID_PORTAIL=? AND ID_VISITE=? AND ID_STATUT_DIFFUSION<>-3';
+						$params = array($diffusion, $portail, $tour);
+						$db->query($sql, $params);
+
+						// Purge des anciennes diff
+						$sql = 'DELETE FROM DIFFUSION_PORTAIL WHERE ID_VISITE=? AND ID_PORTAIL=? AND ID_STATUT_DIFFUSION=-3 AND DATE_DIFFUSION < DATEADD(day, -60, GETDATE())';
+						$params = array($tour, $portail);
+						$db->query($sql, $params);
+
+						// RS 2012-09-10 : MAJ la date_creation
+						$sql = 'UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=?, REF_PORTAIL=N?, DATE_CREATION=GETDATE(), DATE_DIFFUSION=GETDATE() WHERE ID_DIFFUSION_PORTAIL=?';
+						$params = array($status, $ref, $diffusion);
+					} else {
+						$diffusion = generate_guid();
+						$sql = 'INSERT INTO DIFFUSION_PORTAIL (ID_DIFFUSION_PORTAIL,ID_PORTAIL, ID_VISITE, ID_STATUT_DIFFUSION, REF_PORTAIL) VALUES (?, ?, ?, ?, N?)';
+						$params = array($diffusion, $portail, $tour, $status, $ref);
+					}
+
+					$res = $db->query($sql, $params);
+					$affected = $db->affectedRows();
+					$result = 1==$affected;
+
+					if($result && !PEAR::isError($res)) {
+						$db->commit();
+					} else {
+						$db->rollback();
+						$result = false;
+					}
+					$db->autoCommit(true);
+
+				} else {
+					// desactivation ancienne ref si pas multi
+					if(!$multi_diffusion) {
+						$sql = "UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=-1, DATE_DIFFUSION=GETDATE() WHERE ID_PORTAIL='".$portail."' AND ID_VISITE='".$tour."' AND ID_STATUT_DIFFUSION>=0";
+						$db->query($sql);
+
+						// delete sur les vieilles supprimees de 2 mois
+						$sql = "DELETE FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL='".$portail."' AND ID_VISITE='".$tour."' AND ID_STATUT_DIFFUSION<0 AND DATE_DIFFUSION<DATEADD(month, -2, GETDATE())";
+						$db->query($sql);
+					}
+					$sql =
+						"INSERT INTO DIFFUSION_PORTAIL (ID_PORTAIL, ID_VISITE, REF_PORTAIL, DATE_DIFFUSION, ID_STATUT_DIFFUSION)
+						VALUES ('".$portail."', '".$tour."', N'".$ref."', GETDATE(), ".($waiting ? "0" : "1" ).")";
+					$db->query($sql);
+					$result = true;
+				}
+
+
+			// Tempo MAJ visite Blot
+			} else if(false && is_guid($id_found) && $portail=='609D82CA-E13D-9780-D88A-071FB513C1D6') {
+				$sql = "UPDATE DIFFUSION_PORTAIL SET ID_VISITE='".$tour."', DATE_DIFFUSION=GETDATE() WHERE ID_PORTAIL='".$portail."' AND ID_VISITE='".$id_found."' AND REF_PORTAIL=N'".$ref."' AND ID_STATUT_DIFFUSION>-1";
+				$db->query($sql);
+
+				$sql = "UPDATE VISITE SET DATE_MODIFICATION_VISITE=GETDATE(), ID_STATUT_VISITE=-5 WHERE ID_VISITE='".$id_found."'";
+				$db->query($sql);
+				$result = true;
+			} else {
+				$tab_debug[] = 'Error: Multi Diffusion : '.$id_found.' =/= '.$tour;
+			}
+		} else {
+			$tab_debug[] = 'Error: Unknown Partner';
+		}
+	} else {
+		$tab_debug[] = 'bad params';
+	}
+	if($isExport === true){ return array('id' => (is_guid($diffusion) ? $diffusion : false ), 'already_done'=> false);}
+	return $result;
+}
+
+function get_picturepath_infos($tour, $user, $mls_number, $portail="F98D6CFA-E7E4-9F63-0249-C16C38A8C477") {
+	global $db;
+	$start_time = microtime(true);
+	if(is_guid($tour) && is_guid($user) && $mls_number!=""){
+		$sql = "SELECT dp.ID_DIFFUSION_PORTAIL, dp.ID_STATUT_DIFFUSION, dpo.VALEUR_OPTION FROM DIFFUSION_PORTAIL dp
+				LEFT JOIN DIFFUSION_PORTAIL_OPTION dpo ON dpo.ID_DIFFUSION_PORTAIL=dp.ID_DIFFUSION_PORTAIL
+				WHERE dp.ID_VISITE='".$tour."' AND dp.ID_PORTAIL='".$portail."' AND dp.REF_PORTAIL='".$mls_number."' AND (dpo.REF_OPTION='ORDER_NUMBER' OR dpo.REF_OPTION IS NULL)
+				ORDER BY DATE_DIFFUSION DESC";
+		$result = $db->query($sql);
+		$data_array = array();
+		$order_exist = false;
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array = $row;
+			if($row['VALEUR_OPTION'] != NULL) break;
+		}
+		return $data_array;
+	} else return false;
+}
+
+function update_picturepath_infos($tour, $user, $Id_picturepath, $field) {
+	global $db;
+	if(count($field) > 0 && is_guid($tour) && is_guid($user) && is_guid($Id_picturepath)){
+		$sql_var = "";
+		$sql_options_name = array();
+		$sql_options_value = array();
+		for($i=0;$i<count($field);$i++){
+			if(!isset($field[$i]['TYPE']) || $field[$i]['TYPE'] == "VALUE") {
+				$sql_var .= ($sql_var==""?"":", ").$field[$i]['NAME']."=".$field[$i]['VALUE'];
+			} elseif($field[$i]['TYPE'] == "OPTION") {
+				$sql_options_name[] = "'".$field[$i]['NAME']."'";
+				$sql_options_value[] = $field[$i]['VALUE'];
+			}
+		}
+		// DIFFUSION_UNIFIEE
+		$Id_diffusion_portail = $Id_picturepath;
+		$sql = "UPDATE DIFFUSION_PORTAIL SET ".$sql_var.", DATE_DIFFUSION=GETDATE() WHERE Id_visite='".$tour."' AND Id_diffusion_portail='".$Id_diffusion_portail."'";
+		$result = $db->query($sql);
+		for($i=0; $i<count($sql_options_name); $i++) {
+			$name_option = $sql_options_name[$i];
+			$value_option = $sql_options_value[$i];
+			$sql = "SELECT COUNT(*) FROM DIFFUSION_PORTAIL_OPTION WHERE Id_diffusion_portail='".$Id_picturepath."' AND Ref_option=".$name_option."";
+			$option_exist = (int)$db->getOne($sql);
+			if($option_exist) {
+				$sql = "UPDATE DIFFUSION_PORTAIL_OPTION SET Valeur_option=".$value_option." WHERE Id_diffusion_portail='".$Id_picturepath."' AND Ref_option=".$name_option."";
+				$db->query($sql);
+			} else {
+				$sql = "INSERT INTO DIFFUSION_PORTAIL_OPTION (Id_diffusion_portail, Ref_option, Valeur_option)
+						VALUES ('".$Id_picturepath."', ".$name_option.", ".$value_option.")";
+				$db->query($sql);
+			}
+		}
+	}
+}
+
+function set_picturepath_infos($tour, $user, $field) {
+	global $db;
+	if(count($field) > 0 && is_guid($tour) && is_guid($user)){
+		$sql_name = array();
+		$sql_value = array();
+		$sql_options_var = array();
+		for($i=0;$i<count($field);$i++){
+			if(!isset($field[$i]['TYPE']) || $field[$i]['TYPE'] == "VALUE") {
+				$sql_name[] = $field[$i]['NAME'];
+				$sql_value[] = $field[$i]['VALUE'];
+			} elseif($field[$i]['TYPE'] == "OPTION") {
+				$sql_options_var[] = "'".$field[$i]['NAME']."', ".$field[$i]['VALUE']."";
+			}
+		}
+		// DIFFUSION_UNIFIEE
+		$Id_diffusion_portail = generate_guid();
+		$sql = "INSERT INTO DIFFUSION_PORTAIL (Id_diffusion_portail,Id_portail,Id_visite,".implode(",",$sql_name).")
+				VALUES('".$Id_diffusion_portail."', 'F98D6CFA-E7E4-9F63-0249-C16C38A8C477', '".$tour."',".implode(",",$sql_value).")";
+		$result = $db->query($sql);
+		foreach($sql_options_var as $option) {
+			$sql = "INSERT INTO DIFFUSION_PORTAIL_OPTION (Id_diffusion_portail, Ref_option, Valeur_option)
+					VALUES ('".$Id_diffusion_portail."', ".$option.")";
+			$db->query($sql);
+		}
+		return $Id_diffusion_portail;
+	} else return false;
+}
+
+function delete_user_partner($partner, $user) {
+	global $db;
+	$sql_error = false;
+	$deleted = 0;
+	if(is_guid($partner) && is_guid($user)) {
+		$db->autoCommit(false);
+		$sql = "DELETE FROM CLIENT_PORTAIL WHERE ID_PORTAIL=? AND ID_UTILISATEUR=?";
+		$res = $db->query($sql, array($partner, $user));
+		$sql_error |= PEAR::isError($res);
+
+		$deleted += $db->affectedRows();
+
+		if($sql_error) {
+			$db->rollback();
+		} else {
+			$db->commit();
+		}
+		
+		$db->autoCommit(true);
+	}
+	return $deleted > 0;
+}
+
+function insert_user_partner($partner, $tab_fields) {
+	global $db;
+	$sql_error = false;
+	$updated = 0;
+	$result = false;
+
+	if(is_guid($partner) && is_guid($tab_fields['ID_UTILISATEUR']) && is_guid($tab_fields['ID_SOCIETE'])) {
+		$db->autoCommit(false);
+
+		$user = $tab_fields['ID_UTILISATEUR'];
+		$company = $tab_fields['ID_SOCIETE'];
+
+		unset($tab_fields['ID_UTILISATEUR']);
+		unset($tab_fields['ID_SOCIETE']);
+
+		$tab_bind_update = array_keys($tab_fields);
+		for($i=0; isset($tab_bind_update[$i]); $i++) {
+			$tab_bind_update[$i] .= '=?';
+		}
+
+		$sql = 'UPDATE CLIENT_PORTAIL SET '.implode(',', $tab_bind_update).' WHERE ID_PORTAIL=? AND ID_SOCIETE=? AND ID_UTILISATEUR=?';
+		$res = $db->query($sql, array_merge( array_values($tab_fields), array($partner, $company, $user)));
+		$sql_error |= PEAR::isError($res);
+		$updated = (int) $db->affectedRows();
+
+		if(0==$updated) {
+			$tab_bind = array_fill(0, count($tab_fields), '?');
+			$sql = "INSERT INTO CLIENT_PORTAIL(ID_PORTAIL, ID_SOCIETE, ID_UTILISATEUR, ".implode(', ', array_keys($tab_fields)).") VALUES(?, ?, ?, ".implode(', ', $tab_bind).")";
+			$res = $db->query($sql, array_merge( array($partner, $company, $user), array_values($tab_fields)));
+			$sql_error |= PEAR::isError($res);
+			$updated = (int) $db->affectedRows();
+		}
+
+		if($updated>1 || $sql_error) {
+			$db->rollback();
+		} else {
+			$db->commit();
+			$result = true;
+		}
+
+		$db->autoCommit(true);
+	}
+	return $result;
+}
+
+
+function get_param_diffusion($diffusion) {
+	global $db;
+	if(is_guid($diffusion)) {
+		$sql = "SELECT dp.Id_portail, dp.Ref_portail, dp.Id_visite, v.Id_utilisateur,dp.Id_diffusion_portail
+					FROM DIFFUSION_PORTAIL dp
+					INNER JOIN VISITE v ON v.Id_visite=dp.Id_visite
+					WHERE dp.Id_diffusion_portail='".$diffusion."'";
+		$result = $db->query($sql);
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$tab_diffusion = $row;
+		}
+	}
+	return $tab_diffusion;
+}
+
+function update_diffusion_portail_option($id, $opt, $value){
+	global $db;
+	$return = false;
+	if(is_guid($id) && $opt != "" && $value != ""){
+		$sql = "SELECT ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL_OPTION WHERE ID_DIFFUSION_PORTAIL='".$id."' AND REF_OPTION='".$opt."'";
+		$result = $db->query($sql);
+		$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+		$sql = "";
+		if(!is_guid($row['ID_DIFFUSION_PORTAIL'])){
+			$sql = "INSERT INTO DIFFUSION_PORTAIL_OPTION (ID_DIFFUSION_PORTAIL,REF_OPTION,VALEUR_OPTION) VALUES ('".$id."','".$opt."',N'".$value."')";
+		}else {
+			$sql = "UPDATE DIFFUSION_PORTAIL_OPTION SET VALEUR_OPTION=N'".$value."' WHERE ID_DIFFUSION_PORTAIL='".$id."' AND REF_OPTION='".$opt."'";
+		}
+		if($sql != ""){
+			$db->query($sql);
+			$return = true;
+		}
+	}
+	return $return;
+}
+
+function update_diffusion_portail_liaison($id_diff, $id_diff_master){
+	global $db;
+	$return = false;
+	if(is_guid($id_diff) && is_guid($id_diff_master)){
+		$sql = "SELECT ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL_LIAISON WHERE ID_DIFFUSION_PORTAIL='".$id_diff."'";
+		$result = $db->query($sql);
+		$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+		$sql = "";
+		if(!is_guid($row['ID_DIFFUSION_PORTAIL'])){
+			$sql = "INSERT INTO DIFFUSION_PORTAIL_LIAISON (ID_DIFFUSION_PORTAIL,ID_DIFFUSION_PORTAIL_MAITRE) VALUES ('".$id_diff."', '".$id_diff_master."')";
+		}else {
+			$sql = "UPDATE DIFFUSION_PORTAIL_LIAISON SET ID_DIFFUSION_PORTAIL_MAITRE='".$id_diff_master."' WHERE ID_DIFFUSION_PORTAIL='".$id_diff."'";
+		}
+		if($sql != ""){
+			$db->query($sql);
+			$return = true;
+		}
+	}
+	return $return;
+}
+
+function delete_diffusion_portail_liaison($id_diff){
+	global $db;
+	if(is_guid($id_diff)){
+		$sql = "DELETE FROM DIFFUSION_PORTAIL_LIAISON WHERE ID_DIFFUSION_PORTAIL='".$id_diff."'";
+		$db->query($sql);
+	}
+}
+?>

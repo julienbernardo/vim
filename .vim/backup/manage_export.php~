@@ -1,0 +1,228 @@
+<?php
+require_once('DB.php');
+require_once('include/global.php');
+require_once('include/security.php');
+require_once('include/function.php');
+require_once('include/function.db.php');
+
+$db_data['name'] = 'gateway';
+$db_data['pool'][$db_data['name']]['NAME'] = $db_data['name']; 
+$db_data['pool'][$db_data['name']]['DSN'] = DSN_GATEWAY; 
+
+$script = $_REQUEST['script'];
+
+//$listPortal = getListPortal();
+$listPortalExport = getListPortalExport();
+$listPortalVideo = getListPortalVideo();
+
+$listOptions = getListOptions();
+
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Previsite Gateway</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="styles/styles.css" rel="stylesheet" type="text/css" />
+	<script type="text/javascript" src="scripts/jquery-1.4.2.min.js"></script>
+	<script type="text/javascript" src="scripts/jquery-ui-1.8.18.min.js"></script>
+	<script type="text/javascript" src="scripts/jquery.json-2.3.min.js"></script>
+	<script type="text/javascript" src="scripts/scripts_export.js"></script>
+</head>
+<body>
+<div id="barre">&nbsp;</div>
+	<div id="global">
+  		<div id="logo"><a href="/manage"><img src="images/logo_gateway.png" alt="Gateway" border="0" /></a></div>
+		<div id="contact">&nbsp;</div>
+		<div id="content">
+		    <div id="content_header"></div>
+		    <div id="content_text" class="h_auto">
+		        <h1>Previsite gateway</h1>
+		        <!-- export -->
+		        <div class="content">
+				    <div class="part">
+				    	<div class="title" onclick="togglePart('part_export');" >export<input id="part_export_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+				    	<div id="part_export">
+							<div class="row">
+								<div class="col"><span>Script name </span><input class="field" type="text" id="export_code" name="code" value="<?=$script;?>" maxlength="50"/></div>
+								<div class="col2" ><label for="export_activate">Activate </label><input type="checkbox" id="export_activate" class="checkbox"/></div>
+								<div class="col_right"><span id="export_update"></span></div>
+							</div>
+							<div class="row">
+								<div class="col"><span>Name </span><input class="field" type="text" id="export_name" name="name" value="" maxlength="100"/></div>
+								<div class="col2"><span>Server </span>
+			   						<select id="export_server" class="small field">
+			<?php
+			foreach($list_srv as $k=>$v){
+				echo '<option value="'.$k.'">'.$k.'</option>';
+			}
+			?>		        	
+									</select>
+						    	</div>
+								<div class="col_right"><input type="button" value="import conf" onclick="showBoxExport();"/></div>
+						  	</div>
+						  	<div class="row col"><span class="vtop">Description </span>
+						  		<textarea id="export_description" class="field small"></textarea>
+						  	</div>
+	   					</div>
+	   				</div>
+				    
+	   				<!-- Execution -->
+	   				<div class="part">
+		   				<div class="title" onclick="togglePart('part_execution');">Execution<input id="part_execution_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+		   				<div id="part_execution">
+							<div class="row col3">
+								<div><span>Period </span><input class="small field" type="text" id="execution_period" name="period" value=""/>(ex:0-1)</div>
+								<div><span>Archive Delay</span><input class="small field" type="text" id="execution_archive" name="archive" value=""/> in days</div>
+								<div><span>Time Max</span><input class="small field" type="text" id="execution_time" name="time" value=""/> in hour</div>
+								<div><span class="right">Current State</span><img id="execution_state" class="checkbox" src="images/icon_waiting.gif" /><span class="pid"></span></div>
+							</div>
+						</div>
+				    </div>
+				    
+				    <!-- Partners -->
+				    <div class="part">
+	   		        	<div class="title" onclick="togglePart('part_partners');">Portals<input id="part_partners_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+	   		        	<div id="part_partners">
+		   		        	<div class="row">
+		   		        		<div class="col"><span>Portal </span><select id="partners_choice" class="field" onchange="addPortail(this.value);">
+								<option value="" selected="selected">-- select a portal --</option>
+	<?php
+	$old_cat = "";
+	foreach($listPortalExport as $opt) {
+		if($old_cat != $opt['ID_TYPE_BUNDLE'].$opt['ID_TYPE_PORTAIL'] && $old_cat != "") echo "</optgroup>";
+		if($old_cat != $opt['ID_TYPE_BUNDLE'].$opt['ID_TYPE_PORTAIL']) echo "<optgroup label=\"".$opt['TYPE_BUNDLE']." / ".$opt['TYPE_PORTAIL']."\">";
+		echo "<option value=\"".$opt['ID_PORTAIL']."#".$opt['ID_PORTAIL']."\">".$opt['NOM_PORTAIL']."</option>";
+		$old_cat = $opt['ID_TYPE_BUNDLE'].$opt['ID_TYPE_PORTAIL'];
+	}
+	echo "</optgroup>";
+	echo "<optgroup label=\"Video\">";
+	foreach($listPortalVideo as $opt) {
+		echo "<option value=\"".$opt['ID_PORTAIL']."#".$opt['NOM_PORTAIL']."\">".($opt['ID_TYPE_BUNDLE'] >= "2" ? ($opt['NOM_PORTAIL']) : ($opt['NOM_PORTAIL']) )."</option>";
+	}
+	echo "</optgroup>";
+	?>
+									</select>
+								</div>
+		   		        	</div>
+		   		        	<div class="row">
+		   		        		<table class="diffusions" id="partners_table" cellspacing="0">
+		   		        			<tr class="header hidden">
+										<th></th>
+										<th></th>
+										<th></th>
+									</tr>
+									<tr class="hidden" id="partners_portail">
+										<td class="name"></td>
+										<td class="img"><input type="checkbox" checked/></td>
+										<td class="img"><img src="images/del.png" /></td>
+										<td class="infos"><span></span></td>
+									</tr>
+		   		        		</table>
+		   		        	</div>
+	   		        	</div>
+			    	</div>
+			    	
+			    	<!-- Options -->
+			    	<div class="part">
+			    		<div class="title" onclick="togglePart('part_options')">Options<input id="part_options_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+			    		<div id="part_options">
+							<div class="row col"><span>Options </span><select id="options_choice" class="field" onchange="addOptions('options_table', this.value, '');"><option>-- Select an option --</option>
+	<?php
+			if(count($listOptions['EXPORT']) > 0){
+				foreach($listOptions['EXPORT'] as $r){
+					echo '<option value="'.$r['REF_OPTION'].'">'.$r['REF_OPTION'].'</option>';
+				}
+			}
+	?>
+				    		</select><a href="/manage_option" ><img src="/images/add.gif" class="top" /></a></div>
+							<div class="row">
+								<table id="options_table" cellspacing="0" class="options">
+	<?php
+			if(count($listOptions['EXPORT']) > 0){
+				foreach($listOptions['EXPORT'] as $r){
+	?>
+									<tr id="options_table_<?=$r['REF_OPTION'];?>" class="hidden">
+										<td class="name"><?=$r['REF_OPTION'];?></td>
+										<td><input class="field" type="text" value="<?=$r['VALEUR_OPTION'];?>"/> <input type="hidden" value="<?=$r['REF_CATEGORIE_OPTION'];?>" /></td>
+										<td class="img" onclick="deleteOptions('options_table_<?=$r['REF_OPTION'];?>')"><img src="images/del.png"/></td>
+										<td class="infos"><span title="<?=$r['DESCRIPTION_OPTION'];?>"><?=$r['DESCRIPTION_OPTION'];?></span></td>
+									</tr>
+	<?php
+				}
+			}
+	?>
+								</table>
+							</div>
+						</div>
+			    	</div>
+			    	
+			    	<!-- Logs -->
+			    	<div class="part">
+			    		<div class="title" onclick="togglePart('part_logs');">Logs<input id="part_logs_check" type="checkbox" onclick="this.checked = !this.checked;" checked></div>
+			    		<div id="part_logs">
+							<div class="row">
+								<table class="resume">
+									<tr class="header">
+										<th>Date</th>
+										<th>During</th>
+										<th>Done</th>
+										<th>Failed</th>
+										<th>Waiting</th>
+										<th>Deleted</th>
+									</tr>
+									<tr class="footer"><td colspan="7"><span class="link">See more user</span></td></tr>
+								</table>
+							</div>
+							<div class="row resume_small">
+								<input class="save" type="button" value="Execute" onclick="executeExport(this.value);"/>
+								<input class="cancel" type="button" value="Check" onclick="checkExport();"/>
+							</div>
+							<div class="row" id="logs_list">
+								<ul>
+								</ul>
+								<textarea readonly></textarea>
+							</div>
+						</div>
+		    		</div>
+		    	</div>
+		    	<div class="footer">
+		    		<div class="row resume" id="end">
+						<input type="button" name="Save" value="Save" class="save" onclick="saveExport();"/>
+						<div class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+		    			<input type="button" name="Cancel" value="Back" class="cancel" onclick="goToHome();"/>
+		    		</div>	
+	    		</div>
+		    </div>
+		    <div id="content_footer"></div>
+		</div>
+	</div>
+	<div id="box" class="hidden">
+		<div id="box_export" class="content">
+			<div class="title"> export config_export.php conf</div>
+			<div class="row col">
+				<select class="field" name="server" onchange="getExportsByServer(this.value);">
+					<option value="">-- select a server --</option>		
+<?php
+		foreach($list_srv as $k=>$v){
+			echo '<option value="'.$k.'">'.$k.'</option>';
+		}
+?>
+				</select>
+			</div>
+			<div class="row col"><select class="field hidden" name="export" onchange="showValidationExport(this.value);"><option value="">-- select an export --</option></select></div>
+			<div class="row last">
+	    		<input type="button" name="Save" value="Ok" class="save hidden" onclick="loadExportInfos();"/>
+	    		<div class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+        		<input type="button" name="Cancel" value="Close" class="cancel" onclick="hideBoxExport();"/>
+        	</div>	
+		</div>
+	</div>
+	<script type="text/javascript">
+		var gb_new = true;
+		var gb_export_code = '';
+		loadScript('<?=$script;?>');
+	</script>
+</body>
+</html>
+

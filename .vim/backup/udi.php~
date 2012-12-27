@@ -1,0 +1,163 @@
+<?php
+
+function udi($script_name, $users, $workPath, $archive_path, $archive_file, $prefixe_archive) {
+	$data = array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array());
+
+	$tab_all_val = array();
+
+	$debug_ref = '';
+
+	try {
+		$path = PATH_FTP.'udi/';
+		$tab_zip = glob($path.'*.zip');
+		if(!isset($tab_zip[0])) {
+			throw new Exception('No files to process');
+		}
+		
+		for($j=0; isset($tab_zip[$j]); $j++) {
+			try {
+				import_log('Start processing '.basename($tab_zip[$j]), $script_name);
+				do {
+					$path_work = $workPath.date('YmdHis').'/';
+					sleep(1);
+				} while(is_dir($path_work));
+			
+				mkdir($path_work);
+				$cmd = 'unzip -j '.$tab_zip[$j].' -d '.$path_work;
+				exec($cmd);
+				
+				$file_csv = glob($path_work.'*.csv');
+				if(!isset($file_csv[0]) || !is_file($file_csv[0])) {
+					throw new Exception('Missing csv');
+				}
+				
+				
+				$file_csv_clean = $path_work.'previsite.csv';
+				$contents = file_get_contents($file_csv[0]);
+				$contents = str_replace(array("\t", '!#'), array(' ', "\t"), $contents); // Convertir tab en space avant pour pouvoir utiliser le tab comme separateur
+				$contents = html_entity_decode($contents, ENT_QUOTES, 'UTF-8');
+				
+				if(!file_put_contents($file_csv_clean, $contents)) {
+					throw new Exception('Error convert csv');
+				}
+				$handle = fopen($file_csv_clean, 'r');
+
+				while($row=fgetcsv($handle, 0, "\t")) {
+					$usercode = $row[0];
+					$ref_portail = $row[1];
+					
+					if(stripos($debug_ref, $ref_portail)!==false) {
+						print_p($row);
+					}
+
+					$keep_row = isset($users[$usercode]);
+
+					if($keep_row) {
+						if(!isset($data['USERS'][$usercode])) {
+							$tmp = array(
+								'USERCODE' => $usercode,
+								'NOM_SOCIETE' => $users[$usercode]['NOM_SOCIETE'],
+								'ADRESSE' => $users[$usercode]['ADRESSE'],
+								'ID_PAYS' => 'FR',
+								'VILLE' => $users[$usercode]['VILLE'],
+								'CODE_POSTAL' => $users[$usercode]['CODE_POSTAL'],
+								'TELEPHONE' => $users[$usercode]['TELEPHONE'],
+								'NOM_UTILISATEUR' => !empty($users[$usercode]['NOM_UTILISATEUR']) ? $users[$usercode]['NOM_UTILISATEUR'] : ' '
+							);
+							$tmp['MD5_USER'] = md5(serialize($tmp));
+							$data['USERS'][$usercode] = $tmp;
+						}
+//						$tab_all_val[ 'nrj_'.$row[175] ]++;
+
+						$tmp = array(
+							'USERCODE' => $usercode,
+							'REF_PORTAIL' => $ref_portail,
+							'REF_VISITE' => $ref_portail,
+							'NOM_SCRIPT_COMPLEMENT' => $usercode,
+							'ID_TYPE_TRANSACTION' => stripos($row[2], 'location')!==false ? 2 : 1,
+							'ID_TYPE_BIEN' => udi_fix_property_type($row[3]),
+							'CODE_POSTAL' => $row[4],
+							'ID_PAYS' => 'FR',
+							'ID_LANGUE' => 'FR',
+							'REF_DEVISE' => 'EUR',
+							'VILLE' => $row[5],
+							'PRIX_BIEN' => $row[10],
+							'SURFACE_HABITABLE' => $row[15],
+							'ID_UNITE_SURFACE_HABITABLE' => 1,
+							'NOMBRE_PIECE' => $row[17],
+							'NOMBRE_CHAMBRE' => $row[18],
+							'DESCRIPTION' => trim(br2nl($row[20])),
+							'URL_ANNONCE' => 'http://www.udi-immo.com/annonce/'.$ref_portail
+						);
+
+						if(1==$tmp['ID_TYPE_TRANSACTION']) {
+							$tmp['DPE_VALEUR'] = (int)$row[175];
+							$tmp['GES_VALEUR'] = (int)$row[177];
+							if(!empty($tmp['DPE_VALEUR'])) {
+								$tmp['DPE_LETTRE'] = fix_dpe_val($tmp['DPE_VALEUR']);
+							}
+							if(!empty($tmp['GES_VALEUR'])) {
+								$tmp['GES_LETTRE'] = fix_dpe_val($tmp['GES_VALEUR']);
+							}
+						}
+
+						$tmp['NOM_VISITE'] = make_nom_visite($row[2], $row[3], $tmp['VILLE'], $tmp['CODE_POSTAL'], $tmp['SURFACE_HABITABLE']);
+						$tmp['MD5_TOUR'] = md5(serialize($tmp));
+						$data['TOURS'][] = $tmp;
+
+						$pos = 1;
+						for($i=84; $pos<10 && !empty($row[$i]) && is_file($path_work.$row[$i]); $i++) {
+							$tmp = array(
+								'REF_PORTAIL' => $ref_portail,
+								'URL_IMAGE' => $path_work.$row[$i],
+								'POIDS' => $pos++,
+								'KEEP_IMAGE' => true
+							);
+							$tmp['MD5_IMAGE'] = md5(file_get_contents($path_work.$row[$i]));
+							$data['IMAGES'][] = $tmp;
+						}
+					}
+				}
+				fclose($handle);
+				
+				if($archive_file) {
+					rename($tab_zip[$j], $archive_path.$prefixe_archive.basename($tab_zip[$j]));
+				}
+				
+				
+			} catch(Exception $e) {
+				import_log('[ERROR] '.$e->getMessage(), $script_name);
+			}
+		}
+
+	} catch(Exception $e) {
+		import_log('[ERROR] '.$e->getMessage(), $script_name);
+		$data = array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array());
+	}
+
+	if(!empty($tab_all_val)) {
+		ksort($tab_all_val);
+		print_p($tab_all_val);
+	}
+	$data['TOURS'] = array($data['TOURS'][0]);
+	$data['IMAGES'] = array();
+	return $data;
+}
+
+function udi_fix_property_type($val) {
+	if(stripos($val, 'batiment')!==false) {
+		return 5;
+	} else if(stripos($val, 'parking')!==false) {
+		return 11;
+	} else if(stripos($val, 'terrain')!==false) {
+		return 3;
+	} else if(stripos($val, 'maison')!==false) {
+		return 2;
+	} else if(stripos($val, 'appartement')!==false) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+

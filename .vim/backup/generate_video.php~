@@ -1,0 +1,52 @@
+<?php
+
+require_once 'DB.php';
+require_once '../include/global.php';
+require_once '../include/fonctions.php';
+require_once '../include/fonction.db.php';
+require_once '../include/fonction.db.publish.php';
+require_once 'previsite/GetDsn.php';
+require_once 'HTTP/Request.php';
+//define('URL_DIFFUSION_VIDEO',       'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/publication/?id=%ID%&site=%SITE%&type=%TYPE%&login=%LOGIN%&password=%PASSWORD%&ref=%REF%&url=%URL%&todo=%TODO%&date=%DATE%&title=%TITLE%&distrib=%DISTRIB%&mode=%MODE%');
+
+$tour    = $_REQUEST['tour'];
+$type	 = $_REQUEST['type'];
+
+// dev.api.previsite.com/diffusion/generate_video.php?tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&type=FR
+
+$output = "false";
+
+if(is_guid($tour) && $type != ""){
+	$getDsn = new GetDsn();
+	$dsn = $getDsn->byTourID($tour);
+	$db = DB::connect($dsn);
+	if(!PEAR::isError($db)) {
+		$tab_tour = get_tour_data($tour);
+
+		if(is_guid($tab_tour['ID_UTILISATEUR'])){
+			$tab_user_options = get_user_option($tab_tour['ID_UTILISATEUR']);
+			if($tab_user_options['PROFILVIDEO'] != ""){ $type = $tab_user_options['PROFILVIDEO'];}
+			
+			//check video
+			$replace = array(
+				'search'=> array('#TOUR#', '#TYPE#'),
+				'replace'=> array($tour, urlencode($type))
+			);
+			$url = str_replace($replace['search'], $replace['replace'], URL_CHECK_VIDEO);
+			$response = file_get_contents($url);
+			if($response != "true"){
+				$replace = array(
+					'search'=> array('%ID%', '%SITE%', '%TYPE%', '%LOGIN%', '%PASSWORD%', '%REF%', '%URL%', '%TODO%', '%DATE%', '%TITLE%', '%DISTRIB%', '%MODE%'),
+					'replace'=> array($tour, 'ONLY_VIDEO', urlencode($type), '', '', '', '', 'generate', '', '', $tab_tour['ID_DISTRIBUTEUR'], 'auto')
+				);
+				$url = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_VIDEO);
+				echo $url;exit;
+				$output = file_get_contents($url);
+			}else{ $output = "true";}
+		}else{ $output = "user not found";}
+		$db->disconnect();
+	}else{ $output = "DB connection error";}
+}else{ $output = "Missing tour id or video type";}
+echo $output;
+exit;
+?>

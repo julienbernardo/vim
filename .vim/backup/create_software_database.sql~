@@ -1,0 +1,2582 @@
+-- Remplacer l'Id_db avec la nouvelle valeur
+-- last = 70B2D40A-7202-9D0F-BFEA-64497DE61501
+
+CREATE TABLE dbo.[ACTION](
+	[Id_action] uniqueidentifier NOT NULL CONSTRAINT [DF__ACTION__Pk_actio__35FCF52C]  DEFAULT (newid()),
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Id_element] uniqueidentifier NOT NULL,
+	[Ref_type_action] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	Adresse_ip varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL ,
+	[Date_action] datetime NOT NULL CONSTRAINT [DF_ACTION_Date_action]  DEFAULT (getdate()),
+	[Commentaire] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Server_IP] varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Server_host] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_ACTION_1] PRIMARY KEY CLUSTERED 
+(
+	[Id_action] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[ACTION_LOGIN](
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Date_action] datetime NOT NULL CONSTRAINT [DF_ACTION_LOGIN_Date_action]  DEFAULT (getdate()),
+	Adresse_ip varchar(15) COLLATE Latin1_General_CI_AS NOT NULL,
+	Type_login varchar(20) COLLATE Latin1_General_CI_AS NOT NULL CONSTRAINT [DF_ACTION_LOGIN_Type_login]  DEFAULT ('STANDALONE')
+) ON [PRIMARY]
+
+CREATE CLUSTERED INDEX [I_LOGIN] ON dbo.[ACTION_LOGIN] 
+(
+	Id_utilisateur ASC,
+	[Date_action] DESC
+)
+
+
+
+CREATE TABLE dbo.[ADRESSE](
+	Id_adresse uniqueidentifier NOT NULL,
+	Id_societe uniqueidentifier NOT NULL,
+	[Nom_adresse] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Adresse] nvarchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Ville] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_pays] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_ADRESSE_Id_pays]  DEFAULT ('FR'),
+	[Code_postal] nvarchar(25) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Etat] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Telephone] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Fax] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_statut_adresse] int NOT NULL CONSTRAINT [DF_ADRESSE_Id_statut_adresse]  DEFAULT ((1)),
+	[Date_creation] datetime NOT NULL CONSTRAINT [DF_ADRESSE_Date_creation]  DEFAULT (getdate()),
+	[Date_modification] datetime NOT NULL CONSTRAINT [DF_ADRESSE_Date_modification]  DEFAULT (getdate()),
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Gps] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	Latitude float null,
+	Longitude float null,
+ CONSTRAINT [PK_ADRESSE] PRIMARY KEY CLUSTERED 
+(
+	Id_adresse ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_SOCIETE] ON dbo.[ADRESSE] 
+(
+	Id_societe ASC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+
+
+
+CREATE TABLE dbo.[AGENCE](
+	[Id_agence] uniqueidentifier NOT NULL,
+	[Nom_agence] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Adresse_agence] [ntext] COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Ville_agence] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Code_postal_agence] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_pays_agence] [char](2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Tel_agence] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Fax_agence] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Code_agence] varchar(5) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_header_site] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_header_popup] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Titre_site] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Tva_agence] int NOT NULL,
+	[Ref_devise] varchar(3) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Entete_agence] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Facture_agence] varchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Avoir_agence] varchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Virgule_agence] varchar(1) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Milliers_agence] varchar(1) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_distributeur_defaut] uniqueidentifier NULL,
+ CONSTRAINT [PK_AGENCE] PRIMARY KEY CLUSTERED 
+(
+	[Id_agence] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[CATEGORIE_OPTION](
+	[Ref_categorie_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_categorie_option] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL
+) ON [PRIMARY]
+
+
+
+
+CREATE TABLE dbo.[CLIENT_PORTAIL](
+	Id_societe uniqueidentifier NOT NULL,
+	Id_portail uniqueidentifier NOT NULL,
+	Id_utilisateur uniqueidentifier NOT NULL CONSTRAINT [DF_CLIENT_PORTAIL_Id_utilisateur]  DEFAULT ('FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF'),
+	[Prefixe_portail] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_CLIENT_PORTAIL_Prefixe_portail]  DEFAULT (''),
+	[Prefixe_diffusion] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL CONSTRAINT [DF_CLIENT_PORTAIL_Prefixe_diffusion]  DEFAULT (''),
+	[Prefixe_logiciel] varchar(50) COLLATE Latin1_General_CI_AS NULL,
+	[Option_logiciel] varchar(250) COLLATE Latin1_General_CI_AS NULL,
+	[Password_portail] varchar(150) COLLATE Latin1_General_CI_AS NULL,
+	[Id_autopublication] tinyint NULL,
+	Dsn_imap varchar(100) NULL,
+	Limite_diffusion smallint null,
+	Ordre_diffusion varchar(30) null,
+ CONSTRAINT [PK_CLIENT_PORTAIL] PRIMARY KEY CLUSTERED 
+(
+	Id_portail ASC,
+	Id_societe ASC,
+	Id_utilisateur ASC,
+	[Prefixe_portail] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+)
+
+alter table client_portail add Ordre_diffusion varchar(30) null
+
+CREATE TABLE dbo.[COMMENTAIRE](
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Date_commentaire] datetime NOT NULL CONSTRAINT [DF_COMMENTAIRE_Date_commentaire]  DEFAULT (getdate()),
+	[Ref_type_commentaire] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_COMMENTAIRE_Ref_type_commentaire]  DEFAULT ('support'),
+	[Auteur_commentaire] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Texte_commentaire] nvarchar(max) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+ CONSTRAINT [PK_COMMENTAIRE] PRIMARY KEY CLUSTERED 
+(
+	Id_utilisateur ASC,
+	[Date_commentaire] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[DEVISE](
+	[Ref_devise] varchar(3) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_devise] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Code_devise] varchar(1) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Symbole_devise] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Symbolebrut_devise] nvarchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+ CONSTRAINT [PK_DEVISE] PRIMARY KEY CLUSTERED 
+(
+	[Ref_devise] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.DIFFUSION_PORTAIL(
+	Id_diffusion_portail uniqueidentifier NOT NULL CONSTRAINT [DF_DIFFUSION_PORTAIL_Id_diffusion_portail]  DEFAULT (newid()),
+	Id_short varchar(12) NULL,
+	Id_portail uniqueidentifier NULL,
+	Ref_portail nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	Id_visite uniqueidentifier NOT NULL,
+	Date_creation smalldatetime null DEFAULT GETDATE(),
+	Date_diffusion datetime NOT NULL DEFAULT GETDATE(),
+	Date_expiration smalldatetime null,
+	Id_statut_diffusion smallint NOT NULL DEFAULT (-1),
+	Id_visite_active tinyint NULL,
+ CONSTRAINT [PK_DIFFUSION_PORTAIL_1] PRIMARY KEY CLUSTERED 
+(
+	[Id_diffusion_portail] ASC
+) WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX I_2012_ID_SHORT ON dbo.DIFFUSION_PORTAIL ( Id_short ASC )
+CREATE NONCLUSTERED INDEX I_2010_PORTAIL_REF ON dbo.DIFFUSION_PORTAIL (Id_portail, Ref_portail) INCLUDE (Id_visite, Id_statut_diffusion, Id_visite_active)
+CREATE NONCLUSTERED INDEX [I_2012_TOUR] ON dbo.DIFFUSION_PORTAIL ( Id_visite ASC ) INCLUDE ( Id_portail, Id_statut_diffusion, Id_visite_active) 
+
+
+
+
+CREATE TABLE dbo.[DIFFUSION_PORTAIL_OPTION](
+	[Id_diffusion_portail] uniqueidentifier NOT NULL,
+	[Ref_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Valeur_option] nvarchar(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_DIFFUSION_PORTAIL_OPTION] PRIMARY KEY CLUSTERED 
+(
+	[Id_diffusion_portail] ASC,
+	[Ref_option] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE TABLE dbo.DIFFUSION_PORTAIL_LIAISON(
+    Id_diffusion_portail uniqueidentifier not null,
+    Id_diffusion_portail_maitre uniqueidentifier not null,
+    CONSTRAINT PK_DIFFUSION_PORTAIL_LIAISON PRIMARY KEY CLUSTERED( Id_visite )
+)
+
+CREATE NONCLUSTERED INDEX [I_DIFFUSION_PORTAIL_MAITRE] ON dbo.[DIFFUSION_PORTAIL_LIAISON] ( [Id_diffusion_portail_maitre] ASC )
+
+CREATE TABLE dbo.[DISTRIBUTEUR](
+	[Id_distributeur] uniqueidentifier NOT NULL,
+	[Id_agence] uniqueidentifier NOT NULL,
+	[Nom_distributeur] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Email_distributeur] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[EmailCopie_distributeur] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_type_distributeur] int NOT NULL,
+	[Contact_distributeur] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Adresse_distributeur] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Ville_distributeur] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Code_postal_distributeur] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Etat_distributeur] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_pays_distributeur] [char](2) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Tel_distributeur] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Fax_distributeur] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Siteweb_distributeur] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Ref_type_distributeur] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Emails_alerte_distributeur] varchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nb_users_distributeur] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nb_visites_distributeur] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nb_images_distributeur] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nb_kits_distributeur] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Engagement_distributeur] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Commentaire_distributeur] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_statut_distributeur] int NULL,
+	[Id_db] uniqueidentifier NULL CONSTRAINT [DF_DISTRIBUTEUR_Id_db]  DEFAULT ('70B2D40A-7202-9D0F-BFEA-64497DE61501'),
+	[Email_compta] varchar(150) COLLATE French_CI_AS NULL,
+	[Timezone] varchar(100) COLLATE French_CI_AS NOT NULL,
+ CONSTRAINT [PK_DISTRIBUTEUR] PRIMARY KEY CLUSTERED 
+(
+	[Id_distributeur] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[DISTRIBUTEUR_OPTION](
+	[Id_distributeur] uniqueidentifier NOT NULL,
+	[Ref_option] varchar(20) COLLATE French_CI_AS NOT NULL,
+	[Ref_categorie_option] varchar(20) COLLATE French_CI_AS NOT NULL,
+	[Valeur_option] nvarchar(255) COLLATE French_CI_AS NULL,
+	Server_db varchar(15) COLLATE French_CI_AS NULL,
+ CONSTRAINT [PK_DISTRIBUTEUR_OPTION] PRIMARY KEY CLUSTERED 
+(
+	[Id_distributeur] ASC,
+	[Ref_option] ASC,
+	[Ref_categorie_option] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+
+
+CREATE TABLE dbo.[ETATS](
+	[Id_pays] varchar(2) COLLATE French_CI_AS NOT NULL,
+	[Ref_etat] varchar(3) COLLATE French_CI_AS NOT NULL,
+	[Nom_etat] nvarchar(100) COLLATE French_CI_AS NOT NULL,
+ CONSTRAINT [PK_ETATS_1] PRIMARY KEY CLUSTERED 
+(
+	[Id_pays] ASC,
+	[Ref_etat] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+-- alter table IMAGE alter column Id_type_image tinyint NOT NULL
+-- alter table IMAGE alter column Date_creation_image smalldatetime NOT NULL
+-- alter table IMAGE alter column Id_type_vue smallint NOT NULL
+-- alter table IMAGE alter column Poids smallint NOT NULL
+-- alter table IMAGE alter column Id_statut_image smallint NOT NULL
+-- remove views V_VISITE_IMAGE & V_PREMIERE_IMAGE
+
+CREATE TABLE dbo.[IMAGE] (
+	Id_image uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NOT NULL,
+	Id_utilisateur uniqueidentifier NOT NULL,
+	Id_type_image tinyint NOT NULL,
+	Id_type_vue smallint NOT NULL DEFAULT ((360)),
+	Width int NOT NULL,
+	Height int NOT NULL,
+	Extension varchar(5) NOT NULL,
+	Poids smallint NOT NULL,
+	Id_statut_image smallint NOT NULL DEFAULT ((1)),
+	Taille_image int NULL,
+	Format_traitement varchar(50)  NULL,
+	Date_creation_image smalldatetime NOT NULL DEFAULT (getdate()),
+	Date_modific
+	ation_image datetime NOT NULL DEFAULT (getdate()),
+	Id_image_favorite tinyint NULL,
+	Id_image_import tinyint null,
+	CONSTRAINT [PK_IMAGE] PRIMARY KEY CLUSTERED ( Id_image ASC ) 
+)
+
+CREATE NONCLUSTERED INDEX [I_ID_UTILISATEUR] ON dbo.[IMAGE] (	Id_utilisateur ASC )INCLUDE ([Id_statut_image])
+CREATE NONCLUSTERED INDEX [I_ID_VISITE] ON dbo.IMAGE ( Id_visite ) INCLUDE ( Id_statut_image, Date_creation_image, Id_image_favorite, Poids, Id_image_import)
+
+CREATE TABLE IMAGE_INFOS(
+	Id_image uniqueidentifier NOT NULL,
+	Modele_camera varchar(50) NULL,
+	Marque_camera varchar(50) NULL,
+	Md5_image char(32) NULL,
+	CONSTRAINT [PK_IMAGE_INFOS] PRIMARY KEY CLUSTERED ( Id_image ASC )
+)
+
+CREATE TABLE IMAGE_HOTSPOT(
+	Id_image uniqueidentifier NOT NULL,
+	Poids_hotspot tinyint NOT NULL,
+	Coord_x real NOT NULL,
+	Coord_y real NOT NULL,
+	Angle_largeur real NULL,
+	Angle_hauteur real NULL,
+	Id_image_dst uniqueidentifier NULL,
+	Url_dst varchar(200) NULL,
+	Description nvarchar(200),
+	CONSTRAINT PK_IMAGE_HOTSPOT PRIMARY KEY CLUSTERED(
+		Id_image, Poids_hotspot
+	)
+)
+
+
+
+CREATE TABLE dbo.[LOGO_SUPPRESSION] (
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Type_logo] varchar(8) NOT NULL,
+	[Id_statut_suppression] tinyint NOT NULL DEFAULT ((0)),
+ CONSTRAINT [PK_LOGO_SUPPRESSION] PRIMARY KEY CLUSTERED 
+(
+	Id_utilisateur ASC,
+	[Type_logo] ASC
+))
+
+CREATE NONCLUSTERED INDEX [I_STATUT] ON dbo.[LOGO_SUPPRESSION] 
+(
+	[Id_statut_suppression] ASC
+)
+
+
+CREATE TABLE dbo.[LEAD_VISITE](
+	Id_lead int IDENTITY(1,1) NOT NULL,
+	Ref_lead varchar(20) NULL,
+	Id_utilisateur uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NULL,
+	Date_lead datetime NOT NULL,
+	Email_source varchar(100) NULL,
+	Email_destination varchar(100) NULL,
+	Titre nvarchar(200) NULL,
+	Commentaire nvarchar(2000) NULL,
+	Date_disponibilite nvarchar(50) NULL,
+	Nom_internaute nvarchar(100) NULL,
+	Prenom_internaute nvarchar(100) NULL,
+	Telephone_internaute varchar(20)  NULL,
+	Adresse_internaute nvarchar(200)  NULL,
+	Ville_internaute nvarchar(100) NULL,
+	Etat_internaute nvarchar(100) NULL,
+	Code_postal_internaute varchar(10) NULL,
+	Id_statut_export tinyint NULL,
+	Id_lead_traite tinyint NULL,
+	Id_lead_transfere tinyint NULL,
+	Email_transfert varchar(100) NULL,
+	Md5_lead char(32) NULL,
+	Domain_referer varchar(100) NULL,
+	Id_portail uniqueidentifier NULL,
+	CONSTRAINT [PK_LEAD_VISITE] PRIMARY KEY CLUSTERED ( Id_lead ASC )
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_USER_TOUR_DATE_REF] ON dbo.[LEAD_VISITE] ( Id_utilisateur ASC, Id_visite ASC, Date_lead DESC, Ref_lead ASC )
+CREATE NONCLUSTERED INDEX I_MD5_LEAD ON LEAD_VISITE (Md5_lead) INCLUDE (Id_visite)
+CREATE NONCLUSTERED INDEX I_DATE ON dbo.LEAD_VISITE ( Date_lead ASC ) INCLUDE (Id_lead_traite, Id_lead_transfere)
+CREATE NONCLUSTERED INDEX I_USER_PARTNER ON LEAD_VISITE (Id_utilisateur) INCLUDE(Date_lead, Id_portail)
+
+CREATE TABLE dbo.[LANGUE](
+	[Id_langue] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_langue] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[LCID] int NOT NULL,
+ CONSTRAINT [PK_LANGUE] PRIMARY KEY CLUSTERED 
+(
+	[Id_langue] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[LIEN_IMAGE](
+	[Id_lien_image] uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NULL,
+	[Id_image_src] uniqueidentifier NOT NULL,
+	[Id_image_dst] uniqueidentifier NULL,
+	[Coord_x1] real NOT NULL,
+	[Coord_y1] real NOT NULL,
+	[Coord_x2] real NULL,
+	[Coord_y2] real NULL,
+	[Point_depart] real NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_LIEN_IMAGE] PRIMARY KEY CLUSTERED 
+(
+	[Id_lien_image] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_IMAGE_SRC] ON dbo.[LIEN_IMAGE] 
+(
+	[Id_image_src] ASC
+)
+INCLUDE ( [Id_image_dst]) WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+
+
+
+CREATE TABLE dbo.[LIEN_PLAN](
+	[Id_lien_plan] uniqueidentifier NOT NULL,
+	Id_plan uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NOT NULL,
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Id_image] uniqueidentifier NOT NULL,
+	[Coord_x] real NOT NULL,
+	[Coord_y] real NOT NULL,
+	[Date_creation] datetime NOT NULL,
+	[Date_modification] datetime NOT NULL,
+	[Id_statut_lien_plan] int NOT NULL CONSTRAINT [DF_LIEN_PLAN_Id_statut_lien_plan]  DEFAULT ((1)),
+	[Angle_hotspot] int NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_LIEN_PLAN] PRIMARY KEY CLUSTERED 
+(
+	[Id_lien_plan] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_PLAN_IMAGE_UTILISATEUR] ON dbo.[LIEN_PLAN] 
+(
+	Id_plan ASC,
+	[Id_image] ASC,
+	Id_visite ASC,
+	Id_utilisateur ASC,
+	[Id_statut_lien_plan] ASC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[LISTE_DB](
+	[Id_db] uniqueidentifier NOT NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Server_name] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Server_base] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Server_location] varchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Ref_pays] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_software] varchar(150) COLLATE French_CI_AS NULL,
+	[Url_viewer] varchar(150) COLLATE French_CI_AS NULL,
+	[Url_upload] varchar(150) COLLATE French_CI_AS NULL,
+	[Url_manager] varchar(150) COLLATE French_CI_AS NULL,
+	[Url_image] varchar(150) COLLATE French_CI_AS NULL,
+	[Dsn_stat] varchar(250) COLLATE French_CI_AS NULL,
+	[Dsn_main] varchar(250) COLLATE French_CI_AS NULL,
+	[Dsn_generic] varchar(250) COLLATE French_CI_AS NULL,
+ CONSTRAINT [PK_LISTE_DB] PRIMARY KEY CLUSTERED 
+(
+	[Id_db] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[LOG_STITCH](
+	[Id_log_stitch] int IDENTITY(1,1) NOT FOR REPLICATION NOT NULL,
+	[Stitcher] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Reference] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Format_in] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Format_out] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Priorite] int NOT NULL,
+	[Nb_images] int NOT NULL,
+	[Image1] uniqueidentifier NULL,
+	[Image2] uniqueidentifier NULL,
+	[Image3] uniqueidentifier NULL,
+	Id_utilisateur uniqueidentifier NULL,
+	Id_visite uniqueidentifier NULL,
+	[Config] nvarchar(4000) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Version] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Duree] int NOT NULL,
+	[Timing] nvarchar(4000) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Date_stitch] datetime NOT NULL DEFAULT (getdate()),
+	[Statut_log_stitch] int NOT NULL DEFAULT ('0'),
+	Server_db varchar(15) NULL,
+ CONSTRAINT [PK_LOG_STITCH] PRIMARY KEY CLUSTERED 
+(
+	[Id_log_stitch] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[MUSIQUE_VIDEO](
+	[Id_musique_video] uniqueidentifier NOT NULL,
+	[Nom_musique_video] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_statut_musique] int NULL,
+	[Type_musique_video] varchar(20) COLLATE French_CI_AS NULL,
+	[Duree_musique_video] int NULL,
+ CONSTRAINT [PK_MUSIQUE_VIDEO] PRIMARY KEY CLUSTERED 
+(
+	[Id_musique_video] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE TABLE dbo.[MUSIQUE_VIDEO_DISTRIBUTEUR](
+	[Id_distributeur] uniqueidentifier NOT NULL,
+	[Id_musique_video] uniqueidentifier NOT NULL,
+ CONSTRAINT [PK_MUSIQUE_VIDEO_DISTRIBUTEUR] PRIMARY KEY CLUSTERED 
+(
+	[Id_distributeur] ASC,
+	[Id_musique_video] ASC
+))
+
+CREATE TABLE dbo.[MUSIQUE_VIDEO_UTILISATEUR](
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Id_musique_video] uniqueidentifier NOT NULL,
+ CONSTRAINT [PK_MUSIQUE_VIDEO_UTILISATEUR] PRIMARY KEY CLUSTERED 
+(
+	Id_utilisateur ASC,
+	[Id_musique_video] ASC
+))
+
+
+CREATE TABLE dbo.[OPTION_GLOBAL](
+	[Ref_categorie_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Ref_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Valeur_option] nvarchar(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_option] nvarchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_option_EN] nvarchar(150) COLLATE French_CI_AS NULL,
+	[Nom_option_FR] nvarchar(150) COLLATE French_CI_AS NULL,
+ CONSTRAINT [PK_OPTION_GLOBAL] PRIMARY KEY CLUSTERED 
+(
+	[Ref_categorie_option] ASC,
+	[Ref_option] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[PAYS](
+	[Id_pays] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_pays] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Indicatif_telephone] varchar(4) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_PAYS] PRIMARY KEY CLUSTERED 
+(
+	[Id_pays] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[PICTUREPATH](
+	[Id_picturepath] uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NOT NULL,
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Mls_number] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Username] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Password] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Client] varchar(10) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Version] varchar(10) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Action] varchar(10) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Xml_request] varchar(1200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Xml_response] varchar(1200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Date_publication] datetime NULL DEFAULT (getdate()),
+	[Status] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Code] int NULL,
+	[Description] varchar(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[Id_picturepath] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[PLAN](
+	Id_plan uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NULL,
+	Id_utilisateur uniqueidentifier NULL,
+	[Id_position_plan] int NULL CONSTRAINT [DF_PLAN_Id_position_plan]  DEFAULT ((1)),
+	[Largeur_plan] int NULL,
+	[Hauteur_plan] int NULL,
+	[Extension_fichier] varchar(4) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Date_creation] datetime NULL,
+	[Date_modification] datetime NULL,
+	[Id_statut_plan] int NULL,
+	[Ordre_plan] int NULL CONSTRAINT [DF_PLAN_Ordre_plan]  DEFAULT ((1)),
+	[Id_type_plan] int NULL CONSTRAINT [DF_PLAN_Id_type_plan]  DEFAULT ((1)),
+	[Xml_simplefloorplan] varchar(max) NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_db] uniqueidentifier NULL CONSTRAINT [DF_PLAN_Id_db]  DEFAULT ('70B2D40A-7202-9D0F-BFEA-64497DE61501'),
+ CONSTRAINT [PK_PLAN] PRIMARY KEY CLUSTERED 
+(
+	Id_plan ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE NONCLUSTERED INDEX [I_UTILISATEUR] ON dbo.[PLAN] 
+(
+	Id_utilisateur ASC,
+	[Id_statut_plan] ASC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_VISITE] ON dbo.[PLAN] 
+(
+	Id_visite ASC,
+	[Id_statut_plan] ASC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[PORTAIL](
+	Id_portail uniqueidentifier NOT NULL,
+	[Nom_portail] nvarchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Email_portail] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Code_portail] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_logo_portail] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_logo_diffusion] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_logo_applet] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_style_portail] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_type_portail] int NULL,
+	[Id_type_site] int NULL,
+	[Id_type_bundle] int NULL,
+	[Id_template] int NULL,
+	[Id_template_viewer] uniqueidentifier NULL,
+	[Title_viewer] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Multiformat] int NULL,
+	[Taille_viewer] int NULL,
+	[Drapeaux_viewer] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[affichage_picto] int NULL,
+	[duree_logo_applet] int NULL,
+	[Horaire_maj] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Type_maj] [char](1) COLLATE French_CI_AS NULL,
+	[Message_maj] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Message_utilisation] nvarchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_pays] varchar(3) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_statut_portail] int NULL,
+	[Description_prefixe_portail] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Description_prefixe_diffusion] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Exemple_reference_diffusion] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Exemple_identifiant_agence] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Email_contrat] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_Viewer] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_retour] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_FAQ] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_Support] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_help] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_agence] uniqueidentifier NULL,
+	[Id_distributeur] uniqueidentifier NULL,
+	[Date_creation] datetime NULL,
+	[Version_viewer] int NULL,
+	[Format_autorise] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_langue] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_logo] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_style] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Domain_name] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Link_logo] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_ws] varchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Restriction_ws] varchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Password_ws] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nb_max_image_vv] int NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Ssii_portail] nvarchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Siteweb_portail] varchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Language_portail] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Contact_technique] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Contact_commercial] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Commentaire_portail] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_software] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_db] uniqueidentifier NULL CONSTRAINT [DF_PORTAIL_Id_db]  DEFAULT ('70B2D40A-7202-9D0F-BFEA-64497DE61501'),
+	[Id_location] varchar(3) COLLATE French_CI_AS NULL,
+	[Id_autopublication] tinyint NULL,
+	[Id_type_inscription] smallint NULL,
+	[Id_type_resultat] smallint NULL,
+	[Id_visible] smallint NOT NULL DEFAULT 1,
+ CONSTRAINT [PK_PORTAIL] PRIMARY KEY CLUSTERED 
+(
+	Id_portail ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_CODE] ON dbo.[PORTAIL] ( Code_portail )
+
+
+CREATE TABLE dbo.[PORTAIL_OPTION](
+	Id_portail uniqueidentifier NOT NULL,
+	[Ref_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Valeur_option] nvarchar(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_PORTAIL_OPTION] PRIMARY KEY CLUSTERED 
+(
+	Id_portail ASC,
+	[Ref_option] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE TABLE [dbo].[PORTAIL_PLAYLIST](
+	[Id_portail] [uniqueidentifier] NOT NULL,
+	[Login_portail] [varchar](100) COLLATE French_CI_AS NOT NULL,
+	[Nom_playlist] [varchar](100) COLLATE French_CI_AS NOT NULL,
+	[Filtre_playlist] [varchar](255) COLLATE French_CI_AS NULL,
+	[date_creation_playlist] [datetime] NOT NULL,
+	[date_modification_playlist] [datetime] NOT NULL,
+	[id_statut_playlist] [int] NOT NULL,
+ CONSTRAINT [PK_PORTAIL_PLAYLIST] PRIMARY KEY CLUSTERED 
+(
+	[Id_portail] ASC,
+	[Login_portail] ASC,
+	[Nom_playlist] ASC
+)WITH (IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE TABLE dbo.[SOCIETE](
+	Id_societe uniqueidentifier NOT NULL,
+	[Id_agence] uniqueidentifier NOT NULL,
+	[Nom_societe] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Groupe_societe] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (''),
+	[Id_distributeur] uniqueidentifier NOT NULL CONSTRAINT [DF_SOCIETE_Id_distributeur]  DEFAULT ('F622B422-83BB-47DF-EF79-2359A7FD0F9A'),
+	[Siteweb_societe] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Code_reference] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT (''),
+	[Id_pays] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT ('FR'),
+	[Id_adresse_facturation] uniqueidentifier NOT NULL,
+	[Id_adresse_livraison] uniqueidentifier NOT NULL,
+	[Id_adresse_viewer] uniqueidentifier NOT NULL,
+	[Email_societe] varchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL CONSTRAINT [DF_SOCIETE_Email_societe]  DEFAULT (''),
+	[Tva_intra_societe] varchar(13) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Tva_intra_societe]  DEFAULT (''),
+	[Nom_logo_societe] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Nom_logo_societe]  DEFAULT (''),
+	[Nom_style_societe] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Nom_style_societe]  DEFAULT (''),
+	[Nom_style_viewer] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_logo_applet] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Nom_logo_applet]  DEFAULT (''),
+	[Nom_tripod_cap] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Nom_tripod_cap]  DEFAULT (''),
+	[Nom_half_tripod_cap] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Nom_half_tripod_cap]  DEFAULT (''),
+	[Affichage_liste_viewer] int NOT NULL CONSTRAINT [DF_SOCIETE_Affichage_liste_viewer]  DEFAULT ((1)),
+	[Multiformat] int NOT NULL CONSTRAINT [DF_SOCIETE_Multiformat]  DEFAULT ((0)),
+	[Affichage_mobile] int NULL CONSTRAINT [DF_SOCIETE_Affichage_mobile]  DEFAULT ((1)),
+	[Minisite_societe] varchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Minisite_societe]  DEFAULT (''),
+	[Ref_devise] varchar(3) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_SOCIETE_Ref_devise]  DEFAULT ('EUR'),
+	[Id_template] int NOT NULL CONSTRAINT [DF_SOCIETE_Id_template]  DEFAULT ((1)),
+	[Logiciel] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_statut_logiciel] int NOT NULL CONSTRAINT [DF_SOCIETE_Id_statut_logiciel]  DEFAULT ((0)),
+	[Commentaire] nvarchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_export_presto] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Option_export_presto] varchar(250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL CONSTRAINT [DF_SOCIETE_Option_export_presto]  DEFAULT (''),
+	[Date_creation] datetime NOT NULL CONSTRAINT [DF_SOCIETE_Date_creation]  DEFAULT (getdate()),
+	[Date_modification] datetime NOT NULL CONSTRAINT [DF_SOCIETE_Date_modification]  DEFAULT (getdate()),
+	[Code_agence_web] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Logo_societe] int NOT NULL CONSTRAINT [DF_SOCIETE_Logo_societe]  DEFAULT ((0)),
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_db] uniqueidentifier NULL CONSTRAINT [DF_SOCIETE_Id_db]  DEFAULT ('70B2D40A-7202-9D0F-BFEA-64497DE61501'),
+ CONSTRAINT [PK_SOCIETE] PRIMARY KEY CLUSTERED 
+(
+	Id_societe ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_AGENCE] ON dbo.[SOCIETE] 
+(
+	[Id_agence] ASC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_DISTRIBUTEUR] ON dbo.[SOCIETE] 
+(
+	[Id_distributeur] ASC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[STATISTIQUE_UTILISATEUR](
+	Id_utilisateur uniqueidentifier NOT NULL,
+	Id_societe uniqueidentifier NOT NULL,
+	[Id_distributeur] uniqueidentifier NOT NULL,
+	[Id_agence] uniqueidentifier NOT NULL,
+	[Mois] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Annee] varchar(4) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Ref_statistique] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Valeur] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Date_generation] datetime NULL,
+ CONSTRAINT [PK_STATISTIQUE_UTILISATEUR] PRIMARY KEY CLUSTERED 
+(
+	Id_utilisateur ASC,
+	[Mois] ASC,
+	[Annee] ASC,
+	[Ref_statistique] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TEMPLATE](
+	[Id_template] int NOT NULL,
+	[Nom_template] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Titre_site] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Ref_compta_template] varchar(5) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Facture_template] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Avoir_template] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Entete_facture_template] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Description_template] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Repertoire_template] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Image_template] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_recherche] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_info] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_services] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_images] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_upload] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_upload1] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_upload2] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_upload_image] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_upload1_image] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_upload2_image] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_floorplan] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_stat] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_account] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Page_export] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_viewer_default] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_viewer_vip] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_viewer_flash] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_viewer_print] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_viewer_mobile] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_viewer_foma] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_viewer_java_mobile] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_email_public] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_imode_site] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_style_site] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_faq] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_support] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Url_help] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nom_logo_viewer] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_tripod_cap] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Nom_half_tripod_cap] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+ CONSTRAINT [PK_TEMPLATE] PRIMARY KEY CLUSTERED 
+(
+	[Id_template] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TIMEZONE](
+	[Timezone] varchar(50) COLLATE French_CI_AS NOT NULL,
+	[Utc] varchar(6) COLLATE French_CI_AS NOT NULL,
+	[Timezone_name] nvarchar(50) COLLATE French_CI_AS NOT NULL,
+	[Ordre] int NOT NULL,
+ CONSTRAINT [PK_TIMEZONE] PRIMARY KEY CLUSTERED 
+(
+	[Timezone] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TITRE_IMAGE](
+	[Id_image] uniqueidentifier NOT NULL,
+	[Nom_image] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_langue] [char](2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Description_image] nvarchar(200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Description_video] nvarchar(200) COLLATE Latin1_General_CI_AS NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_TITRE_IMAGE] PRIMARY KEY CLUSTERED 
+(
+	[Id_image] ASC,
+	[Id_langue] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TITRE_LIEN_IMAGE](
+	[Id_lien_image] uniqueidentifier NOT NULL,
+	[Id_langue] varchar(2) COLLATE Latin1_General_CI_AS NOT NULL,
+	[Nom_lien_image] nvarchar(100) COLLATE Latin1_General_CI_AS NULL,
+ CONSTRAINT [PK_TITRE_LIEN_IMAGE] PRIMARY KEY CLUSTERED 
+(
+	[Id_lien_image] ASC,
+	[Id_langue] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TITRE_PLAN](
+	Id_plan uniqueidentifier NOT NULL,
+	[Nom_plan] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_langue] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_TITRE_PLAN] PRIMARY KEY CLUSTERED 
+(
+	Id_plan ASC,
+	[Id_langue] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[TYPE_BIEN](
+	[Id_type_bien] smallint NOT NULL,
+	[Nom_type_bien] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_statut_type_bien] smallint NOT NULL,
+ CONSTRAINT [PK_TYPE_BIEN] PRIMARY KEY CLUSTERED 
+(
+	[Id_type_bien] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TYPE_BIEN_DISTRIBUTEUR](
+	[Id_distributeur] uniqueidentifier NOT NULL,
+	[Id_type_bien] smallint NOT NULL,
+	[Id_langue] varchar(2) COLLATE French_CI_AS NOT NULL,
+	[Nom_type_bien] nvarchar(50) COLLATE French_CI_AS NOT NULL,
+ CONSTRAINT [PK_TYPE_BIEN_DISTRIBUTEUR_1] PRIMARY KEY CLUSTERED 
+(
+	[Id_distributeur] ASC,
+	[Id_type_bien] ASC,
+	[Id_langue] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TYPE_CHAUFFAGE](
+	[Id_type_chauffage] tinyint NOT NULL,
+	[Nom_type_chauffage] nvarchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_statut_type_chauffage] smallint NOT NULL,
+ CONSTRAINT [PK_TYPE_CHAUFFAGE] PRIMARY KEY CLUSTERED 
+(
+	[Id_type_chauffage] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TYPE_CHAUFFAGE_DISTRIBUTEUR](
+	[Id_distributeur] uniqueidentifier NOT NULL,
+	[Id_type_chauffage] tinyint NOT NULL,
+	[Id_langue] varchar(2) COLLATE French_CI_AS NOT NULL,
+	[Nom_type_chauffage] nvarchar(50) COLLATE French_CI_AS NOT NULL,
+ CONSTRAINT [PK_TYPE_CHAUFFAGE_DISTRIBUTEUR] PRIMARY KEY CLUSTERED 
+(
+	[Id_distributeur] ASC,
+	[Id_type_chauffage] ASC,
+	[Id_langue] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TYPE_CUISINE](
+	[Id_type_cuisine] tinyint NOT NULL,
+	[Nom_type_cuisine] nvarchar(50) COLLATE French_CI_AS NOT NULL,
+	[Id_statut_type_cuisine] smallint NOT NULL,
+ CONSTRAINT [PK_TYPE_CUISINE] PRIMARY KEY CLUSTERED 
+(
+	[Id_type_cuisine] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[TYPE_CUISINE_DISTRIBUTEUR](
+	[Id_distributeur] uniqueidentifier NOT NULL,
+	[Id_type_cuisine] tinyint NOT NULL,
+	[Id_langue] varchar(2) COLLATE French_CI_AS NOT NULL,
+	[Nom_type_cuisine] nvarchar(50) COLLATE French_CI_AS NOT NULL,
+ CONSTRAINT [PK_TYPE_CUISINE_DISTRIBUTEUR] PRIMARY KEY CLUSTERED 
+(
+	[Id_distributeur] ASC,
+	[Id_type_cuisine] ASC,
+	[Id_langue] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[UNITE_SURFACE](
+	[Id_unite_surface] tinyint IDENTITY(1,1) NOT NULL,
+	[Nom_unite_surface] nvarchar(10) COLLATE Latin1_General_CI_AS NOT NULL,
+ CONSTRAINT [PK_UNITE_SURFACE] PRIMARY KEY CLUSTERED 
+(
+	[Id_unite_surface] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[UTILISATEUR](
+	Id_utilisateur uniqueidentifier NOT NULL,
+	Id_societe uniqueidentifier NOT NULL,
+	[Nom_utilisateur] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Prenom_utilisateur] nvarchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_civilite_utilisateur] int NOT NULL CONSTRAINT [DF_UTILISATEUR_Id_civilite_utilisateur]  DEFAULT ((1)),
+	[Qualite_utilisateur] nvarchar(150) COLLATE Latin1_General_CI_AS NULL,
+	[Email_utilisateur] varchar(150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Login_utilisateur] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Password_utilisateur] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_langue] varchar(2) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Telephone_utilisateur] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[mobile_utilisateur] varchar(30) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Angle_lentille] int NOT NULL CONSTRAINT [DF_UTILISATEUR_Angle_lentille]  DEFAULT ((187)),
+	[Nombre_images] int NOT NULL CONSTRAINT [DF_UTILISATEUR_Nombre_images]  DEFAULT ((0)),
+	[Format_autorise] varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL CONSTRAINT [DF_UTILISATEUR_Format_autorise]  DEFAULT ('BUBBLE'),
+	[Photo_utilisateur] int NULL CONSTRAINT [DF_UTILISATEUR_Photo_utilisateur]  DEFAULT ((0)),
+	[id_type_utilisateur] int NULL CONSTRAINT [DF_UTILISATEUR_id_type_utilisateur]  DEFAULT ((1)),
+	[Date_creation] datetime NOT NULL CONSTRAINT [DF_UTILISATEUR_Date_creation]  DEFAULT (getdate()),
+	[Date_modification] datetime NOT NULL CONSTRAINT [DF_UTILISATEUR_Date_modification]  DEFAULT (getdate()),
+	[Date_activation] datetime NOT NULL CONSTRAINT [DF_UTILISATEUR_Date_activation]  DEFAULT (getdate()),
+	[Id_statut_utilisateur] int NOT NULL CONSTRAINT [DF_UTILISATEUR_Id_statut_utilisateur]  DEFAULT ((1)),
+	[Affichage_url_vv] int NULL CONSTRAINT [DF_UTILISATEUR_Affichage_url_vv]  DEFAULT ((0)),
+	[Version_viewer] int NULL CONSTRAINT [DF_UTILISATEUR_Version_viewer]  DEFAULT ((1)),
+	[Url_photo] varchar(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Nombre_vv] int NULL CONSTRAINT [DF_UTILISATEUR_Nombre_vv]  DEFAULT ((0)),
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_db] uniqueidentifier NULL CONSTRAINT [DF_UTILISATEUR_Id_db]  DEFAULT ('70B2D40A-7202-9D0F-BFEA-64497DE61501'),
+	[Timezone] varchar(100) COLLATE Latin1_General_CI_AS NULL,
+	[Bio_utilisateur] nvarchar(2000) COLLATE Latin1_General_CI_AS NULL,
+	[Numero_liscence] varchar(20) NULL,
+	[Id_short] varchar(12) NULL,
+	Facebook_page_id varchar(20) NULL,
+	Facebook_page_url varchar(350) NULL,
+ CONSTRAINT [PK_UTILISATEUR] PRIMARY KEY CLUSTERED 
+(
+	Id_utilisateur ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_LOG_STATUS] ON dbo.[UTILISATEUR] 
+(
+	[Login_utilisateur] ASC
+)
+INCLUDE ( [Id_statut_utilisateur]) WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_SOCIETE] ON [dbo].[UTILISATEUR] ( [Id_societe] ASC ) INCLUDE ( [Id_utilisateur], [Id_statut_utilisateur]) 
+CREATE NONCLUSTERED INDEX [I_SHORT] ON [dbo].[UTILISATEUR] ( [Id_short] ASC )
+
+
+
+
+CREATE TABLE dbo.[UTILISATEUR_OPTION](
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Ref_categorie_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Ref_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Valeur_option] nvarchar(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	Server_db varchar(15) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_db] uniqueidentifier NOT NULL CONSTRAINT [DF_UTILISATEUR_OPTION_Id_db]  DEFAULT ('70B2D40A-7202-9D0F-BFEA-64497DE61501'),
+ CONSTRAINT [PK_DIFFUSION_UTILISATEUR_OPTION] PRIMARY KEY CLUSTERED 
+(
+	Id_utilisateur ASC,
+	[Ref_categorie_option] ASC,
+	[Ref_option] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[UTILISATEUR_SITE](
+	Id_utilisateur uniqueidentifier NOT NULL,
+	[Url_twitter] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Url_youtube] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Url_viadeo] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Url_facebook] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Url_linkedin] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Url_inman] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Url_custom] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Url_activerain] varchar(200) COLLATE Latin1_General_CI_AS NULL,
+ CONSTRAINT [PK_UTILISATEUR_SITE] PRIMARY KEY CLUSTERED 
+(
+	Id_utilisateur ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE VISITE_DETAIL(
+	Id_visite uniqueidentifier NOT NULL,
+	[Id_type_transaction] tinyint NOT NULL DEFAULT ((1)),
+	[Id_statut_listing] tinyint NOT NULL DEFAULT ((1)),
+	[Id_type_bien] tinyint NOT NULL DEFAULT ((1)),
+	[Id_adresse_cachee] tinyint NOT NULL DEFAULT ((0)),
+	[Id_email_restriction] tinyint NOT NULL DEFAULT ((0)),
+	[Id_type_listing] tinyint NOT NULL DEFAULT ((2)), -- template us only
+	[Id_bien_amenage] tinyint NULL,
+	[Annee_construction] smallint NULL,
+	[Orientation] varchar(2) COLLATE Latin1_General_CI_AS NULL,
+	
+	[Espace_total] int NULL, -- Square footage pour les us
+	[Espace_utile] int NULL, --
+	[Id_unite_espace] tinyint NOT NULL DEFAULT ((1)),
+  [Surface_disponible] float null,
+  [Surface_batiment_totale] float null,
+  Surface_division_min float null,
+  Surface_division_max float null,
+	
+	[Frais_agence] int NULL,
+	[Charges] [float] NULL, -- anciennement Charges_mensuelles
+	Caution float null,
+	[Taxes] [float] NULL,
+	[Id_periodicite_loyer] tinyint null,
+	[Nombre_chambre] smallint NULL,
+	[Nombre_piece] smallint NULL,
+	[Nombre_salle_bain] smallint NULL,
+	[Nombre_salle_bain_min] float NULL,
+	[Nombre_salle_bain_max] float NULL,
+	[Nombre_chambre_min] float NULL,
+	[Nombre_chambre_max] float NULL,
+	[Prix_min] float NULL,
+	[Prix_max] float NULL,
+	[Nombre_salle_eau] smallint NULL, -- Nombre demi salle bain pour US
+	[Nombre_garage] smallint NULL,
+	[Nombre_terrasse] tinyint NULL,
+	[Nombre_balcon] tinyint NULL,
+	[Nombre_wc] tinyint NULL,
+	[Nombre_parking_int] smallint NULL,
+	[Nombre_parking_ext] smallint NULL,
+	[Montant_travaux] int NULL,
+	[Nombre_etages] tinyint NULL,
+	[Numero_etage] smallint NULL,
+	[Surface_habitable] int NULL,
+	[Surface_sejour] smallint NULL,
+	[Id_unite_surface_habitable] tinyint NOT NULL DEFAULT ((1)),
+	[Surface_terrain] int NULL,
+	[Id_unite_surface_terrain] tinyint NOT NULL DEFAULT ((1)),
+	[Taille_lot] [float] NULL,
+	[Id_unite_taille_lot] tinyint NOT NULL DEFAULT ((1)), -- Taille_lot_acres US
+	[Date_disponibilite] smalldatetime,
+	[Id_travaux] tinyint NULL,
+	[Id_type_chauffage] tinyint NULL,
+	[Id_type_cuisine] tinyint NULL,
+	[Id_immeuble_recent] tinyint NULL,
+	[Id_digicode] tinyint NULL,
+	[Id_interphone] tinyint NULL,
+	[Id_ascenseur] tinyint NULL,
+	[Id_gardien] tinyint NULL,
+	[Id_cave] tinyint NULL,
+	[Id_internet_haut_debit] tinyint NULL,
+	[Id_exclusivite] tinyint NULL,
+	[Id_piscine] tinyint NULL,
+	[Id_climatisation] tinyint null,
+	[Id_refait_neuf] tinyint null,
+	[Id_neuf] tinyint not null DEFAULT((0)),
+	Id_prestige tinyint null,
+	Id_animaux tinyint null,
+	[Id_amenagement_handicap] tinyint null,
+	[Id_chambre_blindee] tinyint null,
+	[Id_sous_location] tinyint null,
+	Id_rail tinyint null,
+	Id_prix_negociable tinyint null,
+	[Id_agent] uniqueidentifier NULL,
+
+    -- Champs NCI only
+	[Equipements] nvarchar(200) NULL,
+	[Titre_description] nvarchar(500) NULL,
+	[Directions] nvarchar(500) NULL,
+	[Interets] nvarchar(1000)  NULL,
+	[Commodites] nvarchar(1000)  NULL,
+	[Floorplans] nvarchar(1000) NULL,
+	[Heures_bureau] nvarchar(200) NULL,
+	[Bail] nvarchar(100) NULL,
+	[Caution] nvarchar(100) NULL,
+	[Animaux] nvarchar(200) NULL,
+	[Descriptif_piece] nvarchar(200) NULL,
+    -- Champs Cush
+		Prix_surface float null,
+    Id_unite_prix_surface tinyint null,
+    Date_derniere_verification smalldatetime null,
+    Classe_batiment varchar(2) null,
+    Hauteur_plafond_min float null,
+    Hauteur_plafond_max float null,
+    Id_unite_hauteur_plafond float null,
+    Ratio_parking float null,
+    Taux_occupation_batiment float null,
+    
+    Date_fin_bail smalldatetime null,
+    Duree_bail_min smallint null,
+    Duree_bail_max smallint null,
+    Taxe_fonciere float null,
+    Taxe_habitation float null,
+
+
+ CONSTRAINT [PK_VISITE_DETAIL] PRIMARY KEY CLUSTERED 
+(
+	Id_visite ASC
+))
+CREATE NONCLUSTERED INDEX [I_IDAGENT] ON dbo.[VISITE_DETAIL] ( [Id_agent] ASC )
+
+
+
+CREATE TABLE dbo.[VISITE](
+	Id_visite uniqueidentifier NOT NULL,
+	Id_short varchar(8) NULL,
+	Id_utilisateur uniqueidentifier NOT NULL,
+	Id_societe uniqueidentifier NOT NULL,
+	[Video] tinyint NULL,
+	[Numero_mls] varchar(20) NULL,
+	[Id_type_visite] tinyint NULL,
+	[Id_template] int NULL CONSTRAINT [DF_VISITE_Id_template]  DEFAULT ('20'),
+	[Ref_visite] nvarchar(50) NULL,
+	[Hauteur_visite] int NULL CONSTRAINT [DF_VISITE_Hauteur_visite]  DEFAULT ((0)),
+	[Largeur_visite] int NULL,
+	[Prix_bien] int NULL,
+	Id_prix_cache tinyint null,
+	[Ref_devise] [char](3) NOT NULL CONSTRAINT [DF_VISITE_Ref_devise]  DEFAULT ('EUR'),
+	[Nom_secteur] nvarchar(200) NULL,
+	[Adresse] nvarchar(150) NULL,
+	[Ville] nvarchar(100) NULL,
+	[Ref_etat] varchar(3) NULL,
+	[Code_postal] nvarchar(50) NULL,
+	[Id_pays] varchar(2) NOT NULL,
+	[Id_langue] varchar(2) COLLATE NOT NULL,
+	[Id_statut_visite] smallint NOT NULL DEFAULT(1),
+	[Id_musique_video] uniqueidentifier NULL CONSTRAINT [DF_VISITE_Id_musique_video]  DEFAULT ('11111113-8F9D-4405-9FFB-FCF00658E9F7'),
+	[Ref_voice] varchar(15) NULL,
+	[Date_creation_visite] smalldatetime NULL CONSTRAINT [DF_VISITE_Date_creation_visite]  DEFAULT (getdate()),
+	[Date_modification_visite] datetime NULL CONSTRAINT [DF_VISITE_Date_modification_visite]  DEFAULT (getdate()),
+	[Latitude] [float] NULL,
+	[Longitude] [float] NULL,
+	[Verrou_annonce] tinyint NOT NULL DEFAULT(1),
+	[Cacher_localisation] tinyint NULL,
+	[Type_son] varchar(3) NULL,
+	[Url_annonce] varchar(200) NULL,
+	Nb_active_image smallint null,
+	Id_premiere_image uniqueidentifier null,
+  CONSTRAINT [PK_VISITE] PRIMARY KEY CLUSTERED 
+(
+	Id_visite ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_UTILISATEUR] ON dbo.[VISITE] ( Id_utilisateur ) INCLUDE ( Id_statut_visite, Nb_active_image)
+CREATE NONCLUSTERED INDEX [I_MANAGER_SOCIETE] ON [dbo].[VISITE] ( Id_societe ) INCLUDE ( Id_statut_visite, Date_creation_visite) 
+CREATE NONCLUSTERED INDEX [I_SHORT_ID] ON dbo.[VISITE] ( Id_short ASC ) INCLUDE ( Id_statut_visite )  
+CREATE NONCLUSTERED INDEX [I_LAT] ON [dbo].[VISITE]  ( [Latitude] ) INCLUDE ( Longitude ) 
+CREATE NONCLUSTERED INDEX [TMP_STATUS_MODIF] ON [dbo].[VISITE]  ( [Id_statut_visite] ) INCLUDE ( Date_modification_visite ) 
+
+
+
+CREATE TABLE VISITE_INFO_CONTACT(
+	Id_visite uniqueidentifier not null,
+	Nom_utilisateur nvarchar(50) null,
+	Prenom_utilisateur nvarchar(50) null,
+	Email_utilisateur varchar(200) null,
+	Telephone_utilisateur varchar(20) null,
+	Nom_societe nvarchar(100) null,
+	Adresse_societe nvarchar(150) null,
+	Ville_societe nvarchar(100) null,
+	Code_postal_societe nvarchar(25) null,
+	Telephone_societe varchar(20) null,
+	Nom_logo_societe varchar(20) null,
+	Siteweb_societe varchar(100) null
+	CONSTRAINT PK_VISITE_INFO_CONTACT PRIMARY KEY CLUSTERED( Id_visite )
+)
+
+
+CREATE TABLE dbo.VISITE_TEXTE(
+	Id_visite uniqueidentifier not null,
+	Id_langue varchar(2) not null,
+	Nom_visite nvarchar(150) null,
+	Description nvarchar(4000) null,
+	Description_video nvarchar(4000) null,
+	Voisinnage nvarchar(2500) null,
+	CONSTRAINT [PK_VISITE_TEXTE] PRIMARY KEY CLUSTERED  (Id_visite, Id_langue)
+)
+
+
+alter table VISITE_TEXTE ADD 	Voisinnage nvarchar(2500) null
+alter table VISITE_INFO_CONTACT ADD	Nom_societe nvarchar(100) null
+alter table VISITE_INFO_CONTACT ADD	Adresse_societe nvarchar(150) null
+alter table VISITE_INFO_CONTACT ADD	Ville_societe nvarchar(100) null
+alter table VISITE_INFO_CONTACT ADD	Code_postal_societe nvarchar(25) null
+
+
+CREATE TABLE dbo.VISITE_CONTACT(
+    Id_visite uniqueidentifier not null,
+    Id_utilisateur uniqueidentifier not null,
+    CONSTRAINT PK_VISITE_CONTACT PRIMARY KEY CLUSTERED( Id_visite, Id_utilisateur)
+)
+
+CREATE TABLE dbo.VISITE_LIAISON(
+    Id_visite uniqueidentifier not null,
+    Id_visite_maitre uniqueidentifier not null,
+    CONSTRAINT PK_VISITE_LIAISON PRIMARY KEY CLUSTERED( Id_visite )
+)
+
+CREATE NONCLUSTERED INDEX [I_VISITE_MAITRE] ON dbo.[VISITE_LIAISON] ( [Id_visite_maitre] ASC )
+
+CREATE TABLE [dbo].[TTS](
+	[Id_visite] [uniqueidentifier] NOT NULL,
+	[Date_creation_tts] [datetime] NOT NULL,
+	[Date_modification_tts] [datetime] NOT NULL,
+	[Id_statut_tts] [int] NOT NULL,
+	[detail_tts] [varchar](50) COLLATE French_CI_AS NULL,
+	[date_debut_traitement_tts] [datetime] NULL,
+	[date_fin_traitement_tts] [datetime] NULL,
+ CONSTRAINT [PK_TTS] PRIMARY KEY CLUSTERED 
+(
+	[Id_visite] ASC
+)WITH (IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE [dbo].[VIDEO](
+	[Id_video] [uniqueidentifier] NOT NULL,
+	[Ref_video] [varchar](20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_visite] [uniqueidentifier] NOT NULL,
+	[Type_video] [varchar](20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Date_creation_video] [datetime] NOT NULL,
+	[Date_modification_video] [datetime] NOT NULL,
+	[Id_statut_video] [int] NOT NULL,
+	[Id_distributeur] [uniqueidentifier] NULL,
+	[Profil_available] [varchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Duree_conversion] [int] NULL,
+	[Wait_TTS] [tinyint] NULL CONSTRAINT [DF_VIDEO_Wait_TTS]  DEFAULT ((0)),
+	[Id_cron] [tinyint] NULL CONSTRAINT [DF_VIDEO_Id_cron]  DEFAULT ((0)),
+	[Nb_conversions] [int] NULL  DEFAULT ((0)),
+ CONSTRAINT [PK_VIDEO] PRIMARY KEY CLUSTERED 
+(
+	[Id_video] ASC
+)WITH (IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_DISTRIB] ON [dbo].[VIDEO] ( [Id_distributeur] )
+CREATE NONCLUSTERED INDEX [I_VISITE] ON [dbo].[VIDEO] ( Id_visite, Date_creation_video, Ref_video DESC )
+
+CREATE TABLE [dbo].[VIDEO_CONVERSION](
+	[Id_conversion] [uniqueidentifier] NOT NULL,
+	[Ref_video_profil] [varchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Date_demande_conversion] [datetime] NOT NULL,
+	[Date_traitement_conversion] [datetime] NULL,
+	[Date_modification_conversion] [datetime] NOT NULL,
+	[Date_fin_conversion] [datetime] NULL,
+	[Id_statut_conversion] [int] NOT NULL,
+	[Taille_video] [int] NULL,
+	[Nb_image] [int] NOT NULL,
+	[Url_post_conversion] [varchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_notification_conversion] [varchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Xml_source_conversion] nvarchar(max) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Id_video] [uniqueidentifier] NOT NULL,
+	[Result_text_conversion] nvarchar(max) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Result_code_conversion] [int] NULL,
+	[Type_conversion] [varchar](20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_resource] [uniqueidentifier] NULL,
+	video_utilisateur TINYINT DEFAULT 0,
+ CONSTRAINT [PK_VIDEO_CONVERSION] PRIMARY KEY CLUSTERED 
+(
+	[Id_conversion] ASC,
+	[Ref_video_profil] ASC
+)WITH (IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_VIDEO] ON [dbo].[VIDEO_CONVERSION] ([Id_video]) INCLUDE ( [Id_resource], [Date_modification_conversion])
+
+CREATE TABLE [dbo].[VIDEO_DIFFUSION](
+	[Id_video] [uniqueidentifier] NOT NULL,
+	[Site_diffusion] [varchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Login_diffusion] [varchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Password_diffusion] [varchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Url_video_diffusion] [varchar](200) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Date_creation_diffusion] [datetime] NOT NULL,
+	[Date_modification_diffusion] [datetime] NOT NULL,
+	[Result_code_diffusion] [int] NOT NULL,
+	[Result_text_diffusion] [varchar](100) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Result_description_diffusion] [nvarchar](300) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[Id_statut_diffusion] [int] NOT NULL,
+	[url_notification_diffusion] [varchar](255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[title_diffusion] [nvarchar](150) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+	[auto] [tinyint] NULL CONSTRAINT [DF_DIFFUSION_VIDEO_auto]  DEFAULT ((0)),
+ CONSTRAINT [PK_VIDEO_DIFFUSION] PRIMARY KEY CLUSTERED 
+(
+	[Id_video] ASC,
+	[Site_diffusion] ASC,
+	[Login_diffusion] ASC
+)WITH (IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_DATE_MODIF] ON [dbo].[VIDEO_DIFFUSION] ([Date_modification_diffusion] )
+
+
+CREATE TABLE [dbo].[VIDEO_PROFIL](
+	[Ref_video_profil] [varchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Rramerate] [int] NULL,
+	[Width] [int] NOT NULL,
+	[Height] [int] NOT NULL,
+	[Vcodec] [varchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Acodec] [varchar](50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Video_br] [int] NOT NULL,
+	[Audio_br] [int] NOT NULL,
+	[Date_creation_profil] [datetime] NOT NULL,
+	[Date_modification_profil] [datetime] NOT NULL,
+	[Id_statut_profil] [int] NOT NULL,
+	[Extension] [varchar](5) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Fast_start] [tinyint] NOT NULL CONSTRAINT [DF_VIDEO_PROFIL_Fast_start]  DEFAULT ((0)),
+ CONSTRAINT [PK_VIDEO_PROFIL] PRIMARY KEY CLUSTERED 
+(
+	[Ref_video_profil] ASC
+)WITH (IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[VISITE_OPENHOUSE](
+	[Id_openhouse] int IDENTITY(1,1) NOT NULL,
+	Id_visite uniqueidentifier NOT NULL,
+	[Date_openhouse] smalldatetime NOT NULL,
+	[Duree_openhouse] [float] NULL,
+	[Commentaire] nvarchar(50) NULL,
+ CONSTRAINT [PK_VISITE_OPENHOUSE] PRIMARY KEY CLUSTERED 
+(
+	[Id_openhouse] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+CREATE NONCLUSTERED INDEX [I_VISITE_DATE] ON dbo.[VISITE_OPENHOUSE] 
+(
+	Id_visite ASC,
+	[Date_openhouse] DESC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+
+
+
+CREATE TABLE dbo.[VISITE_REMONTEE](
+	Id_visite uniqueidentifier NOT NULL,
+	[Date_remontee] smalldatetime NOT NULL CONSTRAINT [DF_VISITE_REMONTEE_Date_remontee]  DEFAULT (getdate()),
+	[Nom_remontee] varchar(50) NULL,
+	[Commentaire] varchar(255) NULL,
+ CONSTRAINT [PK_VISITE_REMONTEE] PRIMARY KEY CLUSTERED 
+(
+	Id_visite ASC,
+	[Date_remontee] DESC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+
+
+
+
+CREATE TABLE dbo.VISITE_SHORTCODE
+(
+	Shortcode varchar(16) NOT NULL,
+	Id_utilisateur uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NULL,
+	Id_derniere_visite tinyint NULL,
+	Id_mylisting tinyint NULL,
+	Date_creation_shortcode smalldatetime NOT NULL DEFAULT(GETDATE()),
+	Date_modification_shortcode smalldatetime NOT NULL DEFAULT(GETDATE()),
+	Date_validite_shortcode smalldatetime NOT NULL DEFAULT(GETDATE()+365),
+	Id_statut_shortcode smallint NOT NULL DEFAULT 0,
+	CONSTRAINT [PK_VISITE_SHORTCODE] PRIMARY KEY CLUSTERED (
+		Shortcode
+	)
+)
+
+CREATE NONCLUSTERED INDEX [I_UTILISATEUR] ON dbo.[VISITE_SHORTCODE] (	Id_utilisateur ASC ) INCLUDE (Id_statut_shortcode)
+
+
+CREATE TABLE dbo.VISITE_DOMAINE
+(
+	Domaine varchar(50) NOT NULL,
+	Id_utilisateur uniqueidentifier NOT NULL,
+	Id_visite uniqueidentifier NULL,
+	Id_derniere_visite tinyint NULL,
+	Id_mylisting tinyint NULL,
+	Date_creation_domaine smalldatetime NOT NULL DEFAULT(GETDATE()),
+	Date_modification_domaine smalldatetime NOT NULL DEFAULT(GETDATE()),
+	Date_validite_domaine smalldatetime NULL,
+	Date_modification_dns smalldatetime NULL,
+	Id_statut_domaine smallint NOT NULL DEFAULT 0,
+	Id_dns_actif tinyint NOT NULL DEFAULT 0,
+	Id_domaine_enregistre tinyint NOT NULL DEFAULT 0,
+	Ip_serveur varchar(15) NULL,
+	CONSTRAINT [PK_VISITE_DOMAINE] PRIMARY KEY CLUSTERED (
+		Domaine
+	)
+)
+
+CREATE NONCLUSTERED INDEX [I_UTILISATEUR] ON dbo.[VISITE_DOMAINE] (Id_utilisateur) INCLUDE (Id_statut_domaine, Id_dns_actif, Date_modification_dns)
+
+
+CREATE TABLE dbo.[VISITE_COMPLEMENT](
+	Id_visite uniqueidentifier NOT NULL,
+	[Nom_champ] varchar(50) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Valeur_champ] nvarchar(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_VISITE_COMPLEMENT] PRIMARY KEY CLUSTERED 
+(
+	Id_visite ASC,
+	[Nom_champ] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+
+CREATE TABLE dbo.[VISITE_OPTION](
+	Id_visite uniqueidentifier NOT NULL,
+	[Ref_categorie_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL DEFAULT ('OPTION_LISTING'),
+	[Ref_option] varchar(20) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	[Valeur_option] nvarchar(255) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+ CONSTRAINT [PK_VISITE_OPTION] PRIMARY KEY CLUSTERED 
+(
+	Id_visite ASC,
+	[Ref_categorie_option] ASC,
+	[Ref_option] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.VISITE_TPL_AUTO(
+	Id_visite uniqueidentifier NOT NULL,
+	Id_marque smallint NOT NULL,
+	Id_modele smallint NULL,
+	Id_type_vehicule tinyint NOT NULL,
+	Id_type_energie tinyint NOT NULL,
+	Id_neuf tinyint null,
+	Nombre_porte tinyint null,
+	Nombre_place tinyint null,
+	Puissance_fiscale tinyint null,
+	Puissance_moteur smallint null,
+	Id_type_boite tinyint null,
+	Nombre_vitesse tinyint null,
+	Annee_modele smallint null,
+	Date_premiere_immatriculation smalldatetime null,
+	Distance_parcourue int null,
+	Id_unite_distance_parcourue tinyint not null default (1),
+	Couleur_exterieure nvarchar(50),
+	Options nvarchar(1000) NULL,
+	Emissions_CO2 smallint NULL,
+	Remise_pourcentage float NULL,
+	Id_version int NULL	
+)
+
+CREATE TABLE dbo.[VISITE_TPL_EU](
+	Id_visite uniqueidentifier NOT NULL,
+	[Id_type_transaction] tinyint NOT NULL DEFAULT ((1)),
+	[Id_statut_listing] tinyint NOT NULL DEFAULT ((1)),
+	[Id_type_bien] tinyint NOT NULL DEFAULT ((1)),
+	[Id_adresse_cachee] tinyint NOT NULL DEFAULT ((0)),
+	[Id_email_restriction] tinyint NOT NULL DEFAULT ((0)),
+	[Nombre_piece] smallint NULL,
+	[Nombre_demi_piece] tinyint NULL,
+	[Nombre_chambre] tinyint NULL,
+	[Nombre_terrasse] tinyint NULL,
+	[Nombre_balcon] tinyint NULL,
+	[Nombre_salle_bain] tinyint NULL,
+	[Nombre_salle_eau] tinyint NULL,
+	[Nombre_wc] tinyint NULL,
+	[Nombre_parking_int] smallint NULL,
+	[Nombre_parking_ext] smallint NULL,
+	[Nombre_garage] smallint NULL,
+	[Nombre_etages] tinyint NULL,
+	[Numero_etage] smallint NULL,
+	[Surface_habitable] int NULL,
+	[Surface_sejour] smallint NULL,
+	[Id_unite_surface_habitable] tinyint NOT NULL DEFAULT ((1)),
+	[Surface_terrain] int NULL,
+	[Id_unite_surface_terrain] tinyint NOT NULL DEFAULT ((1)),
+--	[Voisinnage] nvarchar(2500) COLLATE Latin1_General_CI_AS NULL,
+	[Frais_agence] int NULL,
+	Caution float null,
+	[Charges_mensuelles] int NULL,
+	[Annee_construction] smallint NULL,
+	[Orientation] varchar(2) COLLATE Latin1_General_CI_AS NULL,
+	[Orientation_fenetres] varchar(4) NULL,
+	[Montant_travaux] int NULL,
+	[Id_travaux] tinyint NULL,
+	[Id_type_chauffage] tinyint NULL,
+	[Id_type_cuisine] tinyint NULL,
+	[Id_bien_amenage] tinyint NULL,
+	[Id_immeuble_recent] tinyint NULL,
+	[Id_digicode] tinyint NULL,
+	[Id_interphone] tinyint NULL,
+	[Id_ascenseur] tinyint NULL,
+	[Id_gardien] tinyint NULL,
+	[Id_cave] tinyint NULL,
+	[Id_internet_haut_debit] tinyint NULL,
+	[Id_exclusivite] tinyint NULL,
+	[Id_piscine] tinyint NULL,
+	[Id_climatisation] tinyint null,
+	[Id_refait_neuf] tinyint null,
+	[Id_neuf] tinyint not null DEFAULT ((0)),
+	[Id_toilette_separe] tinyint null,
+	Id_chambre_blindee tinyint null,
+	Id_prestige tinyint null,
+	Id_animaux tinyint null,
+	[Id_amenagement_handicap] tinyint null,
+	[Id_periodicite_loyer] tinyint null,
+	[Date_disponibilite] smalldatetime null,
+	Classe_batiment varchar(2) null,
+	Prix_min float null,
+	Prix_max float null,
+	Hauteur_plafond_min float null,
+	Date_derniere_verification smalldatetime null,
+	Hauteur_plafond_max float null,
+	Id_unite_hauteur_plafond tinyint null,
+	Id_rail tinyint null,
+	Id_sous_location tinyint null,
+	Prix_surface float null,
+	Id_unite_prix_surface tinyint null,
+	Id_prix_negociable tinyint null,
+	Ratio_parking float null,
+	Taux_occupation_batiment float null,
+	Surface_disponible float null,
+	Surface_batiment_totale float null,
+	Date_fin_bail smalldatetime null,
+	Duree_bail_min smallint null,
+	Duree_bail_max smallint null,
+	Surface_division_min float null,
+	Surface_division_max float null,
+	Taxe_fonciere float null,
+	Taxe_habitation float null,
+	Dpe_lettre varchar(2) NULL,
+	Dpe_valeur smallint null,
+	Ges_lettre varchar(2) null,
+	Ges_valeur smallint null,
+	Id_logement_occupe tinyint null,
+	Rente_mensuelle int null,
+	Age_proprietaire_m tinyint null,
+	Age_proprietaire_f tinyint null,
+	Id_eau_courante tinyint null,
+	Id_assainissement tinyint null,
+	Id_gaz_naturel tinyint null,
+	Id_lumiere tinyint null,
+	Id_trottoir tinyint null,
+	Id_telephone tinyint null,
+	Id_cable tinyint null,
+	Id_alarme tinyint null,
+	Id_terrain_sport tinyint null,
+	Id_salle_gym tinyint null,
+	Id_jacuzzi tinyint null,
+	Id_buanderie tinyint null,
+	Id_salle_jeu tinyint null,
+	Id_sauna tinyint null,
+	Id_solarium tinyint null,
+	Id_surveillance tinyint null,
+	Id_usage_pro tinyint null,
+	Id_usage_commercial tinyint null,
+Id_equipement_barbecue tinyint null,
+Id_equipement_grill tinyint null,
+Id_chauffage tinyint null,
+Id_jardin tinyint null,
+Id_hall tinyint null,
+Id_vaisselier tinyint null,
+Id_reception tinyint null,
+Id_suite_parentale tinyint null,
+Id_cuisine tinyint null,
+Id_patio tinyint null,
+Id_type_etat tinyint null,
+Nombre_personne tinyint null,
+numero_rue smallint null,
+numero_propriete smallint null,
+url_youtube varchar(200) null,
+salle_manger tinyint null,
+salle_manger_quotidienne tinyint null,
+dependence tinyint null,
+sejour tinyint null,
+salon_multi_usage tinyint null,
+buanderie_privee tinyint null,
+salon_salle_manger tinyint null,
+
+ CONSTRAINT [PK_VISITE_TPL_EU] PRIMARY KEY CLUSTERED 
+(
+	Id_visite ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[VISITE_TPL_US](
+	Id_visite uniqueidentifier NOT NULL,
+	[Id_type_listing] tinyint NOT NULL CONSTRAINT [CONSTRAINT_Id_type_listing]  DEFAULT ((2)),
+	[Id_type_transaction] tinyint NOT NULL CONSTRAINT [CONSTRAINT_Id_type_transaction]  DEFAULT ((1)),
+	[Id_statut_listing] tinyint NOT NULL CONSTRAINT [DF_VISITE_TPL_US_Id_statut_listing]  DEFAULT ((1)),
+	[Id_type_bien] tinyint NOT NULL CONSTRAINT [DF_VISITE_TPL_US_Id_type_bien]  DEFAULT ((1)),
+	[Id_adresse_cachee] tinyint NOT NULL CONSTRAINT [CONSTRAINT_Id_adresse_cachee]  DEFAULT ((0)),
+	[Id_bien_amenage] tinyint NOT NULL CONSTRAINT [CONSTRAINT_Id_bien_amenage]  DEFAULT ((0)),
+	[Id_email_restriction] tinyint NOT NULL CONSTRAINT [CONSTRAINT_Id_email_restriction]  DEFAULT ((0)),
+	[Location_annuelle] int NULL,
+	[Periodicite_location] [char](1) COLLATE Latin1_General_CI_AS NULL CONSTRAINT [DF_VISITE_TPL_US_Periodicite_location]  DEFAULT ('M'),
+	[Taxes] [float] NULL,
+	[Espace_total] int NULL,
+	[Espace_utile] int NULL,
+	[Id_unite_surface_habitable] tinyint NOT NULL DEFAULT ((2)),
+	[Nombre_piece] smallint NULL,
+	[Nombre_chambre] smallint NULL,
+	[Nombre_salle_bain] smallint NULL,
+	[Nombre_demi_salle_bain] smallint NULL,
+--	[Voisinnage] nvarchar(2500) COLLATE Latin1_General_CI_AS NULL,
+	[Equipements] nvarchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Annee_construction] smallint NULL,
+	[Taille_lot_acres] [float] NULL,
+	[Id_unite_taille_lot] tinyint NOT NULL DEFAULT (3),
+	[Id_agent] uniqueidentifier NULL,
+	[Nombre_chambre_min] varchar(5) COLLATE Latin1_General_CI_AS NULL,
+	[Nombre_chambre_max] varchar(5) COLLATE Latin1_General_CI_AS NULL,
+	[Nombre_salle_bain_min] varchar(5) COLLATE Latin1_General_CI_AS NULL,
+	[Nombre_salle_bain_max] varchar(5) COLLATE Latin1_General_CI_AS NULL,
+	[Prix_min] varchar(10) COLLATE Latin1_General_CI_AS NULL,
+	[Prix_max] varchar(10) COLLATE Latin1_General_CI_AS NULL,
+	[Titre_description] nvarchar(500) COLLATE Latin1_General_CI_AS NULL,
+	[Directions] nvarchar(500) COLLATE Latin1_General_CI_AS NULL,
+	[Interets] nvarchar(1000) COLLATE Latin1_General_CI_AS NULL,
+	[Commodites] nvarchar(1000) COLLATE Latin1_General_CI_AS NULL,
+	[Floorplans] nvarchar(1000) COLLATE Latin1_General_CI_AS NULL,
+	[Taxe_mutation] float null,
+	[Heures_bureau] nvarchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Bail] nvarchar(100) COLLATE Latin1_General_CI_AS NULL,
+	[Caution] nvarchar(100) COLLATE Latin1_General_CI_AS NULL,
+	[Animaux] nvarchar(200) COLLATE Latin1_General_CI_AS NULL,
+	[Nombre_garage] smallint NULL,
+	[Charges] [float] NULL,
+	[Descriptif_piece] nvarchar(200) COLLATE Latin1_General_CI_AS NULL,
+	Id_prestige tinyint null,
+Id_eau_courante tinyint null,
+Id_assainissement tinyint null,
+Id_gaz_naturel tinyint null,
+Id_lumiere tinyint null,
+Id_trottoir tinyint null,
+Id_telephone tinyint null,
+Id_cable tinyint null,
+Id_climatisation tinyint null,
+Id_alarme tinyint null,
+Id_terrain_sport tinyint null,
+Id_salle_gym tinyint null,
+Id_jacuzzi tinyint null,
+Id_buanderie tinyint null,
+Id_piscine tinyint null,
+Id_salle_jeu tinyint null,
+Id_sauna tinyint null,
+Id_solarium tinyint null,
+Id_surveillance tinyint null,
+Id_neuf tinyint null,
+Id_usage_pro tinyint null,
+Id_usage_commercial tinyint null,
+Orientation varchar(2) null,
+Nombre_terrasse tinyint null,
+Nombre_balcon tinyint null,
+Id_equipement_barbecue tinyint null,
+Id_equipement_grill tinyint null,
+Id_chauffage tinyint null,
+Id_toilette_separe tinyint null,
+Id_jardin tinyint null,
+Id_hall tinyint null,
+Id_vaisselier tinyint null,
+Id_reception tinyint null,
+Id_suite_parentale tinyint null,
+Id_cuisine tinyint null,
+Id_patio tinyint null,
+Id_type_etat tinyint null,
+Nombre_personne tinyint null,
+numero_rue smallint null,
+numero_propriete smallint null,
+url_youtube varchar(200) null,
+salle_manger tinyint null,
+salle_manger_quotidienne tinyint null,
+dependence tinyint null,
+sejour tinyint null,
+salon_multi_usage tinyint null,
+buanderie_privee tinyint null,
+salon_salle_manger tinyint null,
+Id_periodicite_loyer tinyint null,
+ CONSTRAINT [PK_VISITE_TEMPLATE_US] PRIMARY KEY CLUSTERED 
+(
+	Id_visite ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE NONCLUSTERED INDEX [I_AGENT] ON dbo.[VISITE_TPL_US] 
+(
+	[Id_agent] ASC
+)WITH (PAD_INDEX  = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+
+CREATE TABLE dbo.[VISITE_TPL_US_AGENT](
+	[Id_agent] uniqueidentifier NOT NULL,
+	Id_utilisateur uniqueidentifier NULL,
+	[Id_statut_agent] tinyint NOT NULL,
+	[Nom_agent] nvarchar(50) COLLATE Latin1_General_CI_AS NULL,
+	[Prenom_agent] nvarchar(50) COLLATE Latin1_General_CI_AS NULL,
+	[Telephone_agent] varchar(20) COLLATE Latin1_General_CI_AS NULL,
+	[Extension_logo] varchar(3) COLLATE Latin1_General_CI_AS NULL,
+	[Date_modification_agent] smalldatetime NULL,
+	[Email_agent] varchar(150) COLLATE Latin1_General_CI_AS NULL,
+	[Url_agent] varchar(255) COLLATE Latin1_General_CI_AS NULL,
+ CONSTRAINT [PK_VISITE_TPL_US_AGENT] PRIMARY KEY CLUSTERED 
+(
+	[Id_agent] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[VISITE_TPL_US_STATUT_LISTING](
+	[Id_statut_listing] tinyint NOT NULL,
+	[Nom_statut_listing] varchar(20) COLLATE Latin1_General_CI_AS NOT NULL,
+ CONSTRAINT [PK_VISITE_TPL_US_STATUT_LISTING] PRIMARY KEY CLUSTERED 
+(
+	[Id_statut_listing] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+CREATE TABLE dbo.[VISITE_TPL_US_TYPE_BIEN](
+	[Id_type_bien] tinyint NOT NULL,
+	[Nom_type_bien] varchar(20) COLLATE Latin1_General_CI_AS NOT NULL,
+ CONSTRAINT [PK_VISITE_TPL_US_TYPE_BIEN] PRIMARY KEY CLUSTERED 
+(
+	[Id_type_bien] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE dbo.[VISITE_TPL_US_TYPE_LISTING](
+	[Id_type_listing] tinyint NOT NULL,
+	[Nom_type_listing] varchar(20) COLLATE Latin1_General_CI_AS NOT NULL,
+ CONSTRAINT [PK_VISITE_TPL_US_TYPE_LISTING] PRIMARY KEY CLUSTERED 
+(
+	[Id_type_listing] ASC
+)WITH (PAD_INDEX  = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+CREATE TABLE [dbo].[VISITE_WS](
+	[Id_visite] [uniqueidentifier] NOT NULL,
+	[Id_utilisateur] [uniqueidentifier] NOT NULL,
+	[Id_langue] [char](2) NOT NULL,
+	[Id_statut_visite] [smallint] NOT NULL,
+	[Date_creation_visite] [smalldatetime] NOT NULL,
+	[Date_modification_visite] [smalldatetime] NOT NULL,
+	[Nb_active_image] [smallint] NULL,
+ CONSTRAINT [PK_VISITE_WS] PRIMARY KEY CLUSTERED 
+(
+	[Id_visite] ASC
+))
+CREATE NONCLUSTERED INDEX I_UTILISATEUR ON dbo.VISITE_WS ( Id_utilisateur ASC) INCLUDE ( Id_statut_visite, Nb_active_image, Date_creation_visite, Date_modification_visite, Id_langue) 
+
+
+
+-- Remplir table 
+insert into visite_ws(
+[Id_visite],[Id_utilisateur],[Id_langue],[Id_statut_visite],[Date_creation_visite],[Date_modification_visite],[Nb_active_image]
+)
+SELECT top 50000 [Id_visite],[Id_utilisateur],[Id_langue],[Id_statut_visite],[Date_creation_visite],[Date_modification_visite],[Nb_active_image]
+from visite where not exists(
+select visite_ws.id_visite from visite_ws where visite_ws.id_visite=visite.id_visite
+)
+
+
+
+
+
+CREATE TABLE dbo.[STAT_DISTRIBUTEUR](
+        [Id_distributeur] uniqueidentifier NOT NULL,
+        [Date_statistique] smalldatetime NOT NULL,
+        [Ref_statistique] varchar(50) NOT NULL,
+        [Period] [char](1) NOT NULL CONSTRAINT [DF_STAT_DISTRIBUTEUR_Period]  DEFAULT ('M'),
+        [Valeur] [bigint] NOT NULL,
+        [Date_generation] datetime NULL CONSTRAINT [DF_STAT_DISTRIBUTEUR_Date_generation]  DEFAULT (getdate()),
+ CONSTRAINT [PK_STAT_DISTRIBUTEUR] PRIMARY KEY CLUSTERED 
+(
+        [Id_distributeur] ASC,
+        [Date_statistique] ASC,
+        [Ref_statistique] ASC,
+        [Period] ASC
+)WITH (PAD_INDEX  = OFF, STATISTICS_NORECOMPUTE  = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS  = ON, ALLOW_PAGE_LOCKS  = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+
+
+
+
+-- Vues
+CREATE VIEW dbo.V_VISITE_IMAGE
+WITH SCHEMABINDING
+AS
+SELECT Id_visite, Id_statut_image, COUNT_BIG(*)AS Nb_image
+FROM dbo.IMAGE
+GROUP BY Id_visite, Id_statut_image
+
+CREATE UNIQUE CLUSTERED INDEX I_VISITE_IMAGE ON dbo.V_VISITE_IMAGE ( Id_visite, Id_statut_image )
+
+
+
+create view V_DISTRIB_VISITE
+WITH SCHEMABINDING
+AS
+select 
+	dbo.societe.id_distributeur, dbo.visite.id_visite, dbo.visite.id_statut_visite, dbo.visite.nb_active_image, dbo.visite.date_creation_visite, dbo.visite.date_modification_visite
+from
+	dbo.societe inner join dbo.utilisateur on dbo.societe.id_societe=dbo.utilisateur.id_societe
+	inner join dbo.visite on dbo.utilisateur.id_utilisateur=dbo.visite.id_utilisateur
+
+CREATE UNIQUE CLUSTERED INDEX [I_DISTRIB_VISITE] ON dbo.[V_DISTRIB_VISITE] ( [id_distributeur] ASC,	Id_visite ASC )
+
+
+
+CREATE VIEW dbo.[V_DISTRIB_USERS]
+WITH SCHEMABINDING
+AS
+SELECT dbo.SOCIETE.Id_distributeur, dbo.SOCIETE.Groupe_societe, dbo.UTILISATEUR.Id_statut_utilisateur, dbo.UTILISATEUR.Date_creation, COUNT_BIG(*) AS Nb
+FROM dbo.SOCIETE
+INNER JOIN dbo.UTILISATEUR ON dbo.SOCIETE.Id_societe=dbo.UTILISATEUR.Id_societe
+GROUP BY 
+dbo.SOCIETE.Id_distributeur, dbo.SOCIETE.Groupe_societe, dbo.UTILISATEUR.Id_statut_utilisateur, dbo.UTILISATEUR.Date_creation
+
+CREATE UNIQUE CLUSTERED INDEX [I_DISTRIB_USERS] ON dbo.[V_DISTRIB_USERS] ( [Id_distributeur], [Groupe_societe], [Id_statut_utilisateur], [Date_creation] )
+
+
+
+CREATE VIEW V_VISITE_LOTS
+WITH SCHEMABINDING
+AS
+SELECT Id_visite_maitre, COUNT_BIG(*) AS Nb_lots
+FROM dbo.VISITE_LIAISON
+GROUP BY Id_visite_maitre
+
+CREATE UNIQUE CLUSTERED INDEX [I_V_VISITE_LOTS] ON dbo.[V_VISITE_LOTS] ( [Id_visite_maitre] ASC )
+
+
+
+
+
+
+
+
+
+
+
+
+-- Appli Facebook
+CREATE TABLE dbo.FACEBOOK_APP (
+	Id_diffusion_portail uniqueidentifier,
+	Date_modification_visite smalldatetime,
+	Date_creation_visite smalldatetime,
+	Id_visite uniqueidentifier,
+	Id_utilisateur uniqueidentifier,
+	Id_portail uniqueidentifier,
+	Id_distributeur uniqueidentifier,
+	Prefixe_portail varchar(100),
+	Id_langue varchar(2),
+	Ref_devise varchar(3),
+	Ref_visite nvarchar(50),
+	Prix_bien int,
+	Adresse nvarchar(150),
+	Code_postal nvarchar(50),
+	Ville nvarchar(100),
+	Ref_etat varchar(3),
+	Nb_image smallint,
+	Ref_portail nvarchar(50),
+	Nombre_chambre smallint,
+	Nombre_salle_bain smallint,
+	Nombre_demi_salle_bain int,
+	Area int,
+	Surface_disponible float,
+	Surface_terrain float,
+	Id_type_bien tinyint,
+	Id_type_transaction tinyint,
+	Id_neuf tinyint,
+	Id_prestige tinyint null,
+	Nombre_piece smallint,
+	Nom_type_bien nvarchar(50),
+	Nom_type_bien_distrib nvarchar(50),
+	CONSTRAINT [PK_STAT_DISTRIBUTEUR] PRIMARY KEY CLUSTERED (
+		Id_diffusion_portail
+	)
+)
+
+CREATE NONCLUSTERED INDEX I_VISITE ON dbo.FACEBOOK_APP ( Id_visite )
+CREATE NONCLUSTERED INDEX I_USER ON dbo.FACEBOOK_APP ( Id_utilisateur )
+
+--CREATE NONCLUSTERED INDEX I_PORTAIL ON dbo.FACEBOOK_APP ( Id_portail, Prefixe_portail, Id_distributeur, Id_langue, Date_creation_visite DESC ) INCLUDE (Id_type_transaction, Id_type_bien, Area, Prix_bien, Nb_image, Id_prestige, Ville)
+CREATE NONCLUSTERED INDEX I_PORTAIL_2012 ON dbo.FACEBOOK_APP ( Id_portail, Prefixe_portail, Id_distributeur, Date_creation_visite DESC ) INCLUDE (Id_langue, Id_type_transaction, Id_type_bien, Area, Prix_bien, Nb_image, Id_prestige, Ville)
+
+
+
+CREATE TABLE dbo.FACEBOOK_APP_PORTAIL (
+	Id_portail uniqueidentifier,
+	CONSTRAINT PK_FACEBOOK_APP_PORTAIL PRIMARY KEY CLUSTERED (
+		Id_portail ASC
+	)
+)
+
+
+-- Triggers
+/*
+CREATE TRIGGER T_VISITE_WS_INSERT ON VISITE
+AFTER INSERT
+AS
+BEGIN
+	SET NOCOUNT ON
+
+	-- Ne faire que les insert dans VISITE_WS (la ligne n'existe pas en théorie)
+	INSERT INTO VISITE_WS(Id_visite, Id_utilisateur, Id_langue, Id_statut_visite, Date_creation_visite, Date_modification_visite, Nb_active_image)
+	SELECT Id_visite, Id_utilisateur, Id_langue, Id_statut_visite, Date_creation_visite, Date_modification_visite, Nb_active_image
+	FROM inserted
+
+	SET NOCOUNT OFF
+END
+
+
+CREATE TRIGGER T_VISITE_WS_UPDATE ON VISITE
+AFTER UPDATE,DELETE
+AS
+BEGIN
+	SET NOCOUNT ON
+	-- Mise a jour ou Delete dans VISITE_WS
+	IF EXISTS(
+		SELECT Id_visite FROM deleted
+	) AND (
+		-- Et colonnes mise a jour
+		UPDATE(Id_utilisateur) 
+		OR UPDATE(Id_langue) 
+		OR UPDATE(Id_statut_visite) 
+		OR UPDATE(Date_creation_visite)
+		OR UPDATE(Date_modification_visite)
+		OR UPDATE(Nb_active_image)
+	)
+	BEGIN
+		-- Delete des lignes plus dans visite
+		DELETE FROM VISITE_WS WHERE VISITE_WS.Id_visite IN ( SELECT Id_visite FROM deleted )
+		AND NOT EXISTS (
+			SELECT VISITE_WS.Id_visite FROM VISITE_WS WHERE VISITE_WS.Id_visite=VISITE_WS.Id_visite
+		)
+
+		-- Maj VISITE_WS si la ligne existe
+		UPDATE 
+			VISITE_WS
+		SET
+			VISITE_WS.Id_utilisateur=VISITE.Id_utilisateur,
+			VISITE_WS.Id_langue=VISITE.Id_langue,
+			VISITE_WS.Id_statut_visite=VISITE.Id_statut_visite,
+			VISITE_WS.Date_creation_visite=VISITE.Date_creation_visite,
+			VISITE_WS.Date_modification_visite=VISITE.Date_modification_visite,
+			VISITE_WS.Nb_active_image=VISITE.Nb_active_image
+		FROM
+			VISITE_WS
+			INNER JOIN deleted ON VISITE_WS.Id_visite=deleted.Id_visite
+			INNER JOIN VISITE ON deleted.Id_visite=VISITE.Id_visite
+		WHERE
+			-- Et si au moins 1 valeur change vraiment
+			VISITE_WS.Id_utilisateur<>VISITE.Id_utilisateur
+			OR VISITE_WS.Id_langue COLLATE French_CI_AS<>VISITE.Id_langue COLLATE French_CI_AS
+			OR VISITE_WS.Id_statut_visite<>VISITE.Id_statut_visite
+			OR VISITE_WS.Date_creation_visite<>VISITE.Date_creation_visite
+			OR VISITE_WS.Date_modification_visite<>VISITE.Date_modification_visite
+			OR VISITE_WS.Nb_active_image<>VISITE.Nb_active_image
+
+
+		-- Insert dans VISITE_WS si la ligne n'existe pas
+		INSERT INTO VISITE_WS(Id_visite, Id_utilisateur, Id_langue, Id_statut_visite, Date_creation_visite, Date_modification_visite, Nb_active_image)
+		SELECT VISITE.Id_visite, VISITE.Id_utilisateur, VISITE.Id_langue, VISITE.Id_statut_visite, VISITE.Date_creation_visite, VISITE.Date_modification_visite, VISITE.Nb_active_image
+		FROM 
+			deleted
+			INNER JOIN VISITE on deleted.Id_visite=VISITE.Id_visite
+		WHERE NOT EXISTS(
+			SELECT VISITE.Id_visite FROM VISITE_WS WHERE VISITE_WS.Id_visite=VISITE.Id_visite
+		)
+	END
+	SET NOCOUNT OFF
+END
+*/
+
+CREATE TRIGGER T_CONVERT_GPS ON ADRESSE
+AFTER UPDATE,INSERT
+AS
+DECLARE @address uniqueidentifier
+BEGIN
+	SET NOCOUNT ON
+	IF UPDATE(GPS)
+	BEGIN
+		SELECT @address=Id_adresse FROM deleted WHERE CHARINDEX('#', GPS)>1
+		IF @address IS NULL
+			SELECT @address=Id_adresse FROM inserted WHERE CHARINDEX('#', GPS)>1
+		IF @address IS NOT NULL
+			EXEC sp_ConvertGpsCompany @address
+	END
+	SET NOCOUNT OFF
+END
+
+
+
+
+ALTER TRIGGER T_STATUS_DIFFUSION ON VISITE
+AFTER UPDATE
+AS
+BEGIN
+	SET NOCOUNT ON
+	UPDATE DIFFUSION_PORTAIL
+	SET
+		DIFFUSION_PORTAIL.Id_visite_active=1
+	FROM
+		DIFFUSION_PORTAIL
+		INNER JOIN deleted ON DIFFUSION_PORTAIL.Id_visite=deleted.Id_visite
+		INNER JOIN VISITE ON deleted.Id_visite=VISITE.Id_visite AND (UPDATE(Id_statut_visite) OR UPDATE(Nb_active_image))
+	WHERE
+		VISITE.Id_statut_visite>0 AND VISITE.Nb_active_image>0
+
+	UPDATE DIFFUSION_PORTAIL
+	SET
+		DIFFUSION_PORTAIL.Id_visite_active=NULL
+	FROM
+		DIFFUSION_PORTAIL
+		INNER JOIN deleted ON DIFFUSION_PORTAIL.Id_visite=deleted.Id_visite
+		INNER JOIN VISITE ON deleted.Id_visite=VISITE.Id_visite AND (UPDATE(Id_statut_visite) OR UPDATE(Nb_active_image))
+	WHERE
+		VISITE.Id_statut_visite<1 OR ISNULL(VISITE.Nb_active_image, 0)=0
+	SET NOCOUNT OFF
+END
+
+CREATE TRIGGER T_STATUT_DIFFUSION ON DIFFUSION_PORTAIL
+AFTER INSERT
+AS
+BEGIN
+	SET NOCOUNT ON
+
+	UPDATE
+		DIFFUSION_PORTAIL
+	SET
+		DIFFUSION_PORTAIL.Id_visite_active=1
+	FROM
+		DIFFUSION_PORTAIL
+		INNER JOIN inserted ON DIFFUSION_PORTAIL.Id_diffusion_portail=inserted.Id_diffusion_portail
+		INNER JOIN VISITE ON inserted.Id_visite=VISITE.Id_visite
+	WHERE
+		VISITE.Id_statut_visite>0 AND VISITE.Nb_active_image>0
+
+	SET NOCOUNT OFF
+END
+
+
+
+
+CREATE TRIGGER T_SHORT_ID ON VISITE
+AFTER INSERT
+AS
+DECLARE
+@short varchar(8)
+BEGIN
+	SET NOCOUNT ON
+	UPDATE VISITE SET Id_short=CAST(CAST(Id_visite AS VARCHAR(36)) AS VARCHAR(8)) WHERE Id_visite = (
+		SELECT Id_visite FROM inserted
+	)
+	SET NOCOUNT OFF
+END
+
+CREATE TRIGGER T_SHORT_DIFF ON DIFFUSION_PORTAIL
+AFTER INSERT
+AS
+DECLARE
+@short varchar(12)
+BEGIN
+	SET NOCOUNT ON
+
+	UPDATE
+		DIFFUSION_PORTAIL
+	SET
+		DIFFUSION_PORTAIL.Id_short=CAST(REPLACE(CAST(DIFFUSION_PORTAIL.Id_diffusion_portail AS VARCHAR(36)), '-', '') AS VARCHAR(12)) 
+	FROM
+		DIFFUSION_PORTAIL
+		INNER JOIN inserted ON DIFFUSION_PORTAIL.Id_diffusion_portail=inserted.Id_diffusion_portail
+
+	SET NOCOUNT OFF
+END
+
+
+CREATE TRIGGER T_SHORT_USER ON UTILISATEUR
+AFTER INSERT
+AS
+DECLARE
+@short varchar(12)
+BEGIN
+	SET NOCOUNT ON
+
+	UPDATE
+		UTILISATEUR
+	SET
+		UTILISATEUR.Id_short=CAST(REPLACE(CAST(UTILISATEUR.Id_utilisateur AS VARCHAR(36)), '-', '') AS VARCHAR(12)) 
+	FROM
+		UTILISATEUR
+		INNER JOIN inserted ON UTILISATEUR.Id_utilisateur=inserted.Id_utilisateur
+
+	SET NOCOUNT OFF
+END
+
+
+
+
+ALTER TRIGGER T_FACEBOOK_APP_MODIF_VISITE ON VISITE
+AFTER UPDATE
+AS
+DECLARE
+@tour uniqueidentifier
+SET NOCOUNT ON
+-- Check updated fields
+IF UPDATE (Ref_visite) 
+OR UPDATE(Prix_bien) OR UPDATE(Nom_secteur) OR UPDATE(Id_statut_visite)
+OR UPDATE(Adresse) OR UPDATE(Code_postal) OR UPDATE(Ville) OR UPDATE(Ref_etat) OR UPDATE(Nb_active_image)
+OR UPDATE(Ref_devise)  OR UPDATE(Id_utilisateur) OR UPDATE(Id_langue) 
+
+BEGIN
+	DELETE FROM FACEBOOK_APP WHERE Id_visite IN (
+		SELECT
+			VISITE.Id_visite
+		FROM
+			deleted
+			INNER JOIN VISITE ON deleted.Id_visite=VISITE.Id_visite AND VISITE.Id_statut_visite<0
+	)
+
+	-- Check diff between old values and new values
+	SELECT 
+		@tour=deleted.Id_visite
+	FROM 
+		deleted 
+		INNER JOIN VISITE ON deleted.Id_visite=VISITE.Id_visite
+	WHERE
+		ISNULL(deleted.Ref_visite, '') <> ISNULL(VISITE.Ref_visite, '')
+		OR deleted.Id_utilisateur<>VISITE.Id_utilisateur
+		OR ISNULL(deleted.Id_langue, '') <> ISNULL(VISITE.Id_langue, '')
+		OR ISNULL(deleted.Prix_bien, 0) <> ISNULL(VISITE.Prix_bien, 0)
+		OR ISNULL(deleted.Nom_secteur, '') <> ISNULL(VISITE.Nom_secteur, '')
+		OR deleted.Id_statut_visite<>VISITE.Id_statut_visite
+		OR ISNULL(deleted.Ref_devise, '') <> ISNULL(VISITE.Ref_devise, '')
+		OR ISNULL(deleted.Adresse, '') <> ISNULL(VISITE.Adresse, '')
+		OR ISNULL(deleted.Code_postal, '') <> ISNULL(VISITE.Code_postal, '')
+		OR ISNULL(deleted.Ville, '') <> ISNULL(VISITE.Ville, '')
+		OR ISNULL(deleted.Ref_etat, '') <> ISNULL(VISITE.Ref_etat, '')
+		OR ISNULL(deleted.Nb_active_image, 0) <> ISNULL(VISITE.Nb_active_image, 0)
+
+	-- At least 1 update
+	IF @tour IS NOT NULL
+		EXEC sp_Facebook_Update_Row @tour
+
+	-- Reactivation vv : remise à jour du compteur
+	IF UPDATE(Id_statut_visite) 
+	BEGIN
+		SELECT
+			@tour=deleted.Id_visite
+		FROM
+			deleted
+			INNER JOIN VISITE ON deleted.id_visite=VISITE.Id_visite
+		WHERE
+			deleted.id_statut_visite<0 AND VISITE.Id_statut_visite>0
+
+		IF @tour IS NOT NULL
+			EXEC sp_Software_Tour_Count_Image @tour
+	END
+END
+SET NOCOUNT OFF
+-- End trigger
+
+
+
+
+ALTER TRIGGER T_FACEBOOK_APP_MODIF_VISITE_TPL_EU ON VISITE_TPL_EU
+AFTER UPDATE--, INSERT
+AS DECLARE
+@tour uniqueidentifier
+SET NOCOUNT ON
+-- Check Update
+IF UPDATE(Nombre_chambre) OR UPDATE(Nombre_salle_bain) OR UPDATE(Nombre_salle_eau) OR UPDATE(Surface_habitable) 
+	OR UPDATE(Surface_terrain) OR UPDATE(Id_type_bien) OR UPDATE(Id_type_transaction) OR UPDATE(Id_neuf)
+	OR UPDATE(Id_prestige) OR UPDATE(Nombre_piece)
+BEGIN
+	UPDATE
+		FACEBOOK_APP
+	SET
+		FACEBOOK_APP.Nombre_chambre=VISITE_TPL_EU.Nombre_chambre,
+		FACEBOOK_APP.Nombre_salle_bain=VISITE_TPL_EU.Nombre_salle_bain,
+		FACEBOOK_APP.Nombre_demi_salle_bain=VISITE_TPL_EU.Nombre_salle_eau,
+		FACEBOOK_APP.Surface_disponible=VISITE_TPL_EU.Surface_habitable,
+		FACEBOOK_APP.Surface_terrain=VISITE_TPL_EU.Surface_terrain,
+		FACEBOOK_APP.Id_type_bien=VISITE_TPL_EU.Id_type_bien,
+		FACEBOOK_APP.Id_type_transaction=VISITE_TPL_EU.Id_type_transaction,
+		FACEBOOK_APP.Id_neuf=VISITE_TPL_EU.Id_neuf,
+		FACEBOOK_APP.Id_prestige=VISITE_TPL_EU.Id_prestige,
+		FACEBOOK_APP.Nombre_piece=VISITE_TPL_EU.Nombre_piece,
+
+		FACEBOOK_APP.Nom_type_bien=tb.Nom_type_bien,
+		FACEBOOK_APP.Nom_type_bien_distrib=tbd.Nom_type_bien
+	FROM
+		deleted
+		INNER JOIN VISITE ON deleted.Id_visite=VISITE.Id_visite AND VISITE.Id_statut_visite=1 AND VISITE.Id_template NOT IN (21, 23)
+		INNER JOIN VISITE_TPL_EU ON deleted.Id_visite=VISITE_TPL_EU.Id_visite
+		INNER JOIN FACEBOOK_APP ON VISITE_TPL_EU.Id_visite=FACEBOOK_APP.Id_visite
+
+		INNER JOIN SOCIETE s ON VISITE.Id_societe=s.Id_societe
+		INNER JOIN DISTRIBUTEUR d ON s.Id_distributeur=d.Id_distributeur
+		LEFT JOIN TYPE_BIEN_DISTRIBUTEUR tbd ON d.Id_distributeur=tbd.Id_distributeur AND tbd.Id_langue COLLATE French_CI_AS=VISITE.Id_langue COLLATE French_CI_AS AND tbd.Id_type_bien=VISITE_TPL_EU.Id_type_bien
+		LEFT JOIN TYPE_BIEN tb ON tb.Id_type_bien=VISITE_TPL_EU.Id_type_bien
+
+	WHERE
+		ISNULL(deleted.Nombre_chambre, 0) <> ISNULL(VISITE_TPL_EU.Nombre_chambre, 0)
+		OR ISNULL(deleted.Nombre_salle_bain, 0) <> ISNULL(VISITE_TPL_EU.Nombre_salle_bain, 0)
+		OR ISNULL(deleted.Nombre_salle_eau, 0) <> ISNULL(VISITE_TPL_EU.Nombre_salle_eau, 0)
+		OR ISNULL(deleted.Surface_habitable, 0) <> ISNULL(VISITE_TPL_EU.Surface_habitable, 0)
+		OR ISNULL(deleted.Surface_terrain, 0) <> ISNULL(VISITE_TPL_EU.Surface_terrain, 0)
+		OR ISNULL(deleted.Id_type_bien, 0) <> ISNULL(VISITE_TPL_EU.Id_type_bien, 0)
+		OR ISNULL(deleted.Id_type_transaction, 0) <> ISNULL(VISITE_TPL_EU.Id_type_transaction, 0)
+		OR ISNULL(deleted.Id_neuf, 0) <> ISNULL(VISITE_TPL_EU.Id_neuf, 0)
+		OR ISNULL(deleted.Id_prestige, 0) <> ISNULL(VISITE_TPL_EU.Id_prestige, 0)
+		OR ISNULL(deleted.Nombre_piece, 0) <> ISNULL(VISITE_TPL_EU.Nombre_piece, 0)
+
+
+/*
+			CASE v.Id_template WHEN 21 THEN
+			(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN tp WHERE tp.ID_TYPE_BIEN=vtu.ID_TYPE_BIEN)
+			ELSE
+			(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN tp WHERE tp.ID_TYPE_BIEN=vte.ID_TYPE_BIEN)
+	    END AS Nom_type_bien,
+			CASE v.Id_template WHEN 21 THEN
+				(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN_DISTRIBUTEUR tbd WHERE tbd.ID_TYPE_BIEN=vtu.ID_TYPE_BIEN AND tbd.ID_DISTRIBUTEUR=s.ID_DISTRIBUTEUR AND tbd.ID_LANGUE COLLATE French_CI_AS=u.ID_LANGUE COLLATE French_CI_AS) 
+			ELSE
+				(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN_DISTRIBUTEUR tbd WHERE tbd.ID_TYPE_BIEN=vte.ID_TYPE_BIEN AND tbd.ID_DISTRIBUTEUR=s.ID_DISTRIBUTEUR AND tbd.ID_LANGUE COLLATE French_CI_AS=u.ID_LANGUE COLLATE French_CI_AS)
+	    END AS Nom_type_bien_distrib
+*/
+
+--	SELECT 
+--		@tour=deleted.Id_visite
+--	FROM 
+--		deleted 
+--		INNER JOIN VISITE_TPL_EU ON deleted.Id_visite=VISITE_TPL_EU.Id_visite
+--	WHERE
+--		ISNULL(deleted.Nombre_chambre, 0) <> ISNULL(VISITE_TPL_EU.Nombre_chambre, 0)
+--		OR ISNULL(deleted.Nombre_salle_bain, 0) <> ISNULL(VISITE_TPL_EU.Nombre_salle_bain, 0)
+--		OR ISNULL(deleted.Nombre_salle_eau, 0) <> ISNULL(VISITE_TPL_EU.Nombre_salle_eau, 0)
+--		OR ISNULL(deleted.Surface_habitable, 0) <> ISNULL(VISITE_TPL_EU.Surface_habitable, 0)
+--		OR ISNULL(deleted.Surface_terrain, 0) <> ISNULL(VISITE_TPL_EU.Surface_terrain, 0)
+--		OR ISNULL(deleted.Id_type_bien, 0) <> ISNULL(VISITE_TPL_EU.Id_type_bien, 0)
+--		OR ISNULL(deleted.Id_type_transaction, 0) <> ISNULL(VISITE_TPL_EU.Id_type_transaction, 0)
+--		OR ISNULL(deleted.Id_neuf, 0) <> ISNULL(VISITE_TPL_EU.Id_neuf, 0)
+--		OR ISNULL(deleted.Id_prestige, 0) <> ISNULL(VISITE_TPL_EU.Id_prestige, 0)
+--		OR ISNULL(deleted.Nombre_piece, 0) <> ISNULL(VISITE_TPL_EU.Nombre_piece, 0)
+-- Real insert
+--IF @tour IS NULL AND NOT EXISTS(
+--	SELECT * FROM deleted
+--)
+--BEGIN
+--	SELECT @tour=Id_visite
+--	FROM inserted
+--END
+--IF @tour IS NOT NULL
+--	EXEC sp_Facebook_Update_Row @tour
+END
+SET NOCOUNT OFF
+-- End trigger
+
+
+
+
+ALTER TRIGGER T_FACEBOOK_APP_MODIF_VISITE_TPL_US ON VISITE_TPL_US
+AFTER UPDATE--, INSERT
+AS DECLARE
+@tour uniqueidentifier
+SET NOCOUNT ON
+-- Check Update
+IF UPDATE(Nombre_chambre) OR UPDATE(Nombre_salle_bain) OR UPDATE(Nombre_demi_salle_bain)
+	OR UPDATE(Id_type_bien) OR UPDATE(Espace_utile) OR UPDATE(Id_type_transaction) OR UPDATE(Nombre_piece)
+BEGIN
+	UPDATE
+		FACEBOOK_APP
+	SET
+		FACEBOOK_APP.Nombre_chambre=VISITE_TPL_US.Nombre_chambre,
+		FACEBOOK_APP.Nombre_salle_bain=VISITE_TPL_US.Nombre_salle_bain,
+		FACEBOOK_APP.Nombre_demi_salle_bain=VISITE_TPL_US.Nombre_demi_salle_bain,
+		FACEBOOK_APP.Id_type_bien=VISITE_TPL_US.Id_type_bien,
+		FACEBOOK_APP.Surface_disponible=VISITE_TPL_US.Espace_utile,
+		FACEBOOK_APP.Id_type_transaction=VISITE_TPL_US.Id_type_transaction,
+		FACEBOOK_APP.Nombre_piece=VISITE_TPL_US.Nombre_piece,
+
+		FACEBOOK_APP.Nom_type_bien=tb.Nom_type_bien,
+		FACEBOOK_APP.Nom_type_bien_distrib=tbd.Nom_type_bien
+
+	FROM
+		deleted
+		INNER JOIN VISITE ON deleted.Id_visite=VISITE.Id_visite AND VISITE.Id_statut_visite=1 AND VISITE.Id_template=21
+		INNER JOIN VISITE_TPL_US ON deleted.Id_visite=VISITE_TPL_US.Id_visite
+		INNER JOIN FACEBOOK_APP ON VISITE_TPL_US.Id_visite=FACEBOOK_APP.Id_visite
+
+		INNER JOIN SOCIETE s ON VISITE.Id_societe=s.Id_societe
+		INNER JOIN DISTRIBUTEUR d ON s.Id_distributeur=d.Id_distributeur
+		LEFT JOIN TYPE_BIEN_DISTRIBUTEUR tbd ON d.Id_distributeur=tbd.Id_distributeur AND tbd.Id_langue COLLATE French_CI_AS=VISITE.Id_langue COLLATE French_CI_AS AND tbd.Id_type_bien=VISITE_TPL_US.Id_type_bien
+		LEFT JOIN TYPE_BIEN tb ON tb.Id_type_bien=VISITE_TPL_US.Id_type_bien
+		
+	WHERE
+		ISNULL(deleted.Nombre_chambre, 0) <> ISNULL(VISITE_TPL_US.Nombre_chambre, 0)
+		OR ISNULL(deleted.Nombre_salle_bain, 0) <> ISNULL(VISITE_TPL_US.Nombre_salle_bain, 0)
+		OR ISNULL(deleted.Nombre_demi_salle_bain, 0) <> ISNULL(VISITE_TPL_US.Nombre_demi_salle_bain, 0)
+		OR ISNULL(deleted.Espace_utile, 0) <> ISNULL(VISITE_TPL_US.Espace_utile, 0)
+		OR ISNULL(deleted.Id_type_bien, 0) <> ISNULL(VISITE_TPL_US.Id_type_bien, 0)
+		OR ISNULL(deleted.Id_type_transaction, 0) <> ISNULL(VISITE_TPL_US.Id_type_transaction, 0)
+		OR ISNULL(deleted.Nombre_piece, 0) <> ISNULL(VISITE_TPL_US.Nombre_piece, 0)
+END
+--	SELECT
+--		@tour=deleted.Id_visite 
+--	FROM
+--		deleted 
+--		INNER JOIN VISITE_TPL_US ON deleted.Id_visite=VISITE_TPL_US.Id_visite
+--	WHERE
+--		ISNULL(deleted.Nombre_chambre, 0) <> ISNULL(VISITE_TPL_US.Nombre_chambre, 0)
+--		OR ISNULL(deleted.Nombre_salle_bain, 0) <> ISNULL(VISITE_TPL_US.Nombre_salle_bain, 0)
+--		OR ISNULL(deleted.Nombre_demi_salle_bain, 0) <> ISNULL(VISITE_TPL_US.Nombre_demi_salle_bain, 0)
+--		OR ISNULL(deleted.Espace_utile, 0) <> ISNULL(VISITE_TPL_US.Espace_utile, 0)
+--		OR ISNULL(deleted.Id_type_bien, 0) <> ISNULL(VISITE_TPL_US.Id_type_bien, 0)
+--		OR ISNULL(deleted.Id_type_transaction, 0) <> ISNULL(VISITE_TPL_US.Id_type_transaction, 0)
+--		OR ISNULL(deleted.Nombre_piece, 0) <> ISNULL(VISITE_TPL_US.Nombre_piece, 0)
+--END
+-- Real insert
+--IF @tour IS NOT NULL AND EXISTS(
+--	select * from deleted
+--)
+--BEGIN
+--	SELECT @tour=Id_visite 
+--	FROM inserted
+--END
+--IF @tour IS NOT NULL
+--	EXEC sp_Facebook_Update_Row @tour
+SET NOCOUNT OFF
+-- End trigger
+
+
+
+
+ALTER TRIGGER T_FACEBOOK_APP_MODIF_DIFFUSION ON DIFFUSION_PORTAIL
+AFTER INSERT, UPDATE, DELETE
+AS
+DECLARE
+@tour uniqueidentifier
+SET NOCOUNT ON
+SELECT @tour=Id_visite 
+FROM deleted
+INNER JOIN FACEBOOK_APP_PORTAIL ON deleted.Id_portail=FACEBOOK_APP_PORTAIL.Id_portail
+
+IF @tour IS NULL
+BEGIN
+	SELECT @tour=Id_visite 
+	FROM inserted
+	INNER JOIN FACEBOOK_APP_PORTAIL ON inserted.Id_portail=FACEBOOK_APP_PORTAIL.Id_portail
+END
+
+IF @tour IS NOT NULL
+BEGIN
+	EXEC sp_Facebook_Update_Row @tour
+END
+SET NOCOUNT OFF
+-- End trigger
+
+
+
+ALTER TRIGGER T_FACEBOOK_APP_MODIF ON CLIENT_PORTAIL
+AFTER INSERT, UPDATE
+AS
+DECLARE
+@user uniqueidentifier,
+@prefix varchar(50),
+@partner uniqueidentifier
+
+BEGIN
+	SET NOCOUNT ON
+
+	SELECT 
+		@user=inserted.Id_utilisateur, @prefix=inserted.Prefixe_portail, @partner=inserted.Id_portail 
+	FROM 
+		inserted 
+		INNER JOIN FACEBOOK_APP_PORTAIL ON inserted.Id_portail=FACEBOOK_APP_PORTAIL.Id_portail
+
+--	IF @user IS NULL
+--		SELECT @user=Id_utilisateur, @prefix=Prefixe_portail, @partner=Id_portail FROM deleted WHERE deleted.Id_portail IN (
+--		SELECT Id_portail FROM FACEBOOK_APP_PORTAIL
+--	)
+
+	IF @user IS NOT NULL AND @partner IS NOT NULL
+		UPDATE FACEBOOK_APP SET Prefixe_portail=@prefix WHERE Id_utilisateur=@user AND Id_portail=@partner
+	SET NOCOUNT OFF
+END
+
+
+
+
+ALTER PROCEDURE dbo.sp_Facebook_Update_Row
+@tour uniqueidentifier
+AS
+DECLARE
+@status_tour smallint
+BEGIN
+--	IF OBJECT_ID('_LOG_TRIGGER', 'u') IS NOT NULL
+--	BEGIN
+--		INSERT INTO _LOG_TRIGGER(Id_visite) VALUES(@tour)
+--	END
+
+	SELECT TOP 1 @status_tour=Id_statut_visite 
+	FROM VISITE 
+	WHERE Id_visite=@tour
+
+	SET NOCOUNT ON
+	DELETE FROM FACEBOOK_APP WHERE Id_visite=@tour
+
+	IF @status_tour>0
+	BEGIN
+
+		INSERT INTO FACEBOOK_APP(
+			Id_diffusion_portail, Ref_portail,
+			Id_distributeur, 
+			Id_portail, Prefixe_portail, 
+			Date_modification_visite, Date_creation_visite, Id_visite, Id_utilisateur,
+			Id_langue, Ref_devise, Ref_visite,
+			Prix_bien, Adresse, Code_postal, Ville, Ref_etat, Nb_image,
+			Nombre_chambre, 
+			Nombre_salle_bain, 
+			Nombre_demi_salle_bain, 
+			Area, 
+			Surface_disponible, 
+			Surface_terrain, 
+			Id_type_bien, 
+			Id_type_transaction, 
+			Id_neuf,
+			Id_prestige, 
+			Nombre_piece, 
+			Nom_type_bien, 
+			Nom_type_bien_distrib,
+			Nom_secteur
+		)
+		SELECT
+			dp.Id_diffusion_portail, dp.Ref_portail, 
+			s.Id_distributeur, 
+			cp.Id_portail, cp.Prefixe_portail,
+			v.Date_modification_visite, v.Date_creation_visite, v.Id_visite, v.Id_utilisateur, 
+			v.Id_langue,v.Ref_devise, v.Ref_visite, 
+			v.Prix_bien, v.Adresse, v.Code_postal, v.Ville, v.Ref_etat, v.Nb_active_image AS Nb_image,
+			CASE v.Id_template WHEN 21 THEN vtu.Nombre_chambre ELSE vte.Nombre_chambre END AS Nombre_chambre,
+			CASE v.Id_template WHEN 21 THEN vtu.Nombre_salle_bain ELSE vte.Nombre_salle_bain END AS Nombre_salle_bain,
+			CASE v.Id_template WHEN 21 THEN vtu.Nombre_demi_salle_bain ELSE vte.Nombre_salle_eau END AS Nombre_demi_salle_bain,
+			CASE v.Id_template WHEN 21 THEN vtu.Espace_utile ELSE vte.Surface_habitable END AS Area,
+			CASE v.Id_template WHEN 21 THEN null ELSE vte.Surface_disponible END AS Surface_disponible,
+			CASE v.Id_template WHEN 21 THEN null ELSE vte.Surface_terrain END AS Surface_terrain,
+			CASE v.Id_template WHEN 21 THEN vtu.Id_type_bien ELSE vte.Id_type_bien END AS Id_type_bien,
+			CASE v.Id_template WHEN 21 THEN vtu.Id_type_transaction ELSE vte.Id_type_transaction END AS Id_type_transaction,
+			CASE v.Id_template WHEN 21 THEN null ELSE vte.Id_neuf END AS Id_neuf,
+			CASE v.Id_template WHEN 21 THEN null ELSE vte.Id_prestige END AS Id_prestige,
+			CASE v.Id_template WHEN 21 THEN vtu.NOMBRE_PIECE ELSE vte.NOMBRE_PIECE END AS Nombre_piece,
+			CASE v.Id_template WHEN 21 THEN
+			(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN tp WHERE tp.ID_TYPE_BIEN=vtu.ID_TYPE_BIEN)
+			ELSE
+			(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN tp WHERE tp.ID_TYPE_BIEN=vte.ID_TYPE_BIEN)
+	    END AS Nom_type_bien,
+			CASE v.Id_template WHEN 21 THEN
+				(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN_DISTRIBUTEUR tbd WHERE tbd.ID_TYPE_BIEN=vtu.ID_TYPE_BIEN AND tbd.ID_DISTRIBUTEUR=s.ID_DISTRIBUTEUR AND tbd.ID_LANGUE COLLATE French_CI_AS=u.ID_LANGUE COLLATE French_CI_AS) 
+			ELSE
+				(SELECT NOM_TYPE_BIEN FROM TYPE_BIEN_DISTRIBUTEUR tbd WHERE tbd.ID_TYPE_BIEN=vte.ID_TYPE_BIEN AND tbd.ID_DISTRIBUTEUR=s.ID_DISTRIBUTEUR AND tbd.ID_LANGUE COLLATE French_CI_AS=u.ID_LANGUE COLLATE French_CI_AS)
+	    END AS Nom_type_bien_distrib,
+	    v.Nom_secteur
+		FROM
+			VISITE v 
+			INNER JOIN DIFFUSION_PORTAIL dp ON v.Id_visite=dp.Id_visite AND dp.Id_statut_diffusion>0 
+			INNER JOIN FACEBOOK_APP_PORTAIL fb ON dp.Id_portail=fb.Id_portail 
+			INNER JOIN UTILISATEUR u ON v.Id_utilisateur=u.Id_utilisateur --AND u.Id_statut_utilisateur>0
+			INNER JOIN SOCIETE s ON u.Id_societe=s.Id_societe
+			INNER JOIN CLIENT_PORTAIL cp ON cp.Id_societe=s.Id_societe AND cp.Id_portail=fb.Id_portail
+			LEFT JOIN VISITE_TPL_EU vte ON v.Id_visite=vte.Id_visite
+			LEFT JOIN VISITE_TPL_US vtu ON v.Id_visite=vtu.Id_visite
+		WHERE
+			v.Id_visite=@tour
+	END
+	SET NOCOUNT OFF
+END
+
+
+select 'exec sp_ConvertGpsCompany @address='''+cast(id_adresse as varchar(36))+'''' from adresse where latitude is null
+
+
+ALTER PROCEDURE sp_ConvertGpsCompany
+@address uniqueidentifier
+AS
+DECLARE
+@lat float,
+@lon float,
+@gps varchar(30),
+@sep int
+
+BEGIN
+	SET NOCOUNT ON
+	SELECT @gps=Gps FROM ADRESSE WHERE Id_adresse=@address AND Gps IS NOT NULL
+	IF @gps IS NOT NULL
+	BEGIN
+		BEGIN TRY
+			SET @sep = CHARINDEX('#', @gps)
+			SET @lat = CAST(SUBSTRING(@gps, 1, @sep-1) AS float)
+			SET @lon = CAST(SUBSTRING(@gps, @sep+1, len(@gps)) AS float)
+			IF @lat=0 OR @lon=0
+			BEGIN
+				SET @lat=NULL
+				SET @lon=NULL
+			END
+			UPDATE ADRESSE SET Latitude=@lat, Longitude=@lon WHERE id_adresse=@address
+		END TRY
+		BEGIN CATCH
+			UPDATE ADRESSE SET Gps=NULL, Latitude=NULL, Longitude=NULL WHERE id_adresse=@address
+		END CATCH
+	END
+	SET NOCOUNT OFF
+END
+

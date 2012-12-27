@@ -1,0 +1,1643 @@
+<?php
+
+function import_data($data, $config, $table = "IMPORT",	$date_reference = "", &$diffusions_allowed, $need_delete = false){
+	if($date_reference == "") $date_reference = date('Y-m-d H:i:s');
+	$data_to_import = array(
+		'UPDATE' => array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array(), 'PLANS'=>array()),
+		'DELETE' => array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array(), 'PLANS'=>array()),
+		'COMPLEMENTS' => array()		
+	);
+	
+	// not full import
+	$list_nom_script_complement = "";
+	if($config['OPTIONS']['IMPORT_NOT_FULL'] == 1){
+		$list_nom_script_complement = array();
+		foreach($data['USERS'] as $user){ 
+			if(!in_array($user['NOM_SCRIPT_COMPLEMENT'], $list_nom_script_complement)){
+				import_log('USER NOM_SCRIPT_COMPLEMENT FOUND: '.$user['NOM_SCRIPT_COMPLEMENT'] , $config['CODE_IMPORT']);
+			}
+			$list_nom_script_complement[$user['USERCODE']] = $user['NOM_SCRIPT_COMPLEMENT'];
+		}
+		$data_to_import['COMPLEMENTS']['LIST_NOM_SCRIPT_COMPLEMENT_USERS'] = $list_nom_script_complement;
+	}
+	
+	if($config['OPTIONS']['DIFFERENTIAL_IMPORT_USER'] == 1){
+		if($config['STEPS']['DELETE_USERS'] == 1){
+			for($i = 0; $i < count($data['USERS_DEL']); $i++){
+				$data['USERS_DEL'][$i] = merge($data['USERS_DEL'][$i], array('NOM_SCRIPT'=>$config['CODE_IMPORT']));
+			}
+			$data_to_import['DELETE']['USERS'] = $data['USERS_DEL'];
+		}
+	}
+	
+	//import in db
+	if($config['STEPS']['IMPORT_USERS'] == 1){
+		//default user
+		if($config['OPTIONS']['DEFAULT_USER'] == 1 && count($data['TOURS']) > 0){
+			if(!is_array($data['USERS'])){ $data['USERS'] = array();}
+			$list_usercode = array();
+			for($i=0;$i < count($data['USERS']); $i++){ $list_usercode[] = $data['USERS'][$i]['USERCODE'];}
+			for($i=0;$i < count($data['TOURS']); $i++){
+				if(!in_array($data['TOURS'][$i]['USERCODE'], $list_usercode)){
+					$data['USERS'][] = merge($data['DEFAULT_USER'],  array('USERCODE'=>$data['TOURS'][$i]['USERCODE'], 'DEFAULT_USER'=>true) );
+					$list_usercode[] = $data['TOURS'][$i]['USERCODE'];
+				}
+			}
+		}
+		
+		$data_to_import['UPDATE']['USERS'] = import_data_users($data['USERS'], $config, $table, $list_nom_script_complement);
+		if($config['STEPS']['DELETE_USERS'] == 1 && ((count($data['USERS']) > 0 && $config['OPTIONS']['DIFFERENTIAL_IMPORT_USER'] != 1) || ($need_delete && $config['OPTIONS']['PART_IMPORT'] == 1))){
+			$tmp = get_deleted_users($config['CODE_IMPORT'], $table, $date_reference, $list_nom_script_complement, $config);}
+			$data_to_import['DELETE']['USERS'] = $tmp['DELETE'];
+			$data_to_import['WILL_DELETED'] = $tmp['WILL_DELETE'];
+	}
+		
+	if($config['STEPS']['IMPORT_TRANSACTIONS'] == 1){
+//		$data_to_import['UPDATE']['TRANSACTIONS'] = import_data_transactions($data['TRANSACTIONS'], $config['CODE_IMPORT'], $config['STEPS']['FORCE_UPDATE_TRANSACTIONS'],  $table, $config['OPTIONS']['IMPORT_NOT_FULL'] == 1, $list_nom_script_complement, $config['OPTIONS']['DEBUG'] == 1);
+		$data_to_import['UPDATE']['TRANSACTIONS'] = import_data_transactions($data['TRANSACTIONS'], $config,  $table, $list_nom_script_complement);
+		if((($need_delete && $config['OPTIONS']['PART_IMPORT'] == 1) || count($data['TRANSACTIONS']) > 0) && $config['STEPS']['DELETE_TRANSACTIONS'] == 1){
+			$data_to_import['DELETE']['TRANSACTIONS'] = get_deleted_transactions($config['CODE_IMPORT'], $table, $date_reference, $list_nom_script_complement, $config['OPTIONS']['DEBUG'] == 1);
+		}
+	}
+	
+	//diffusion_limit
+	if(count($data['USERS']) > 0){
+		foreach($data['USERS'] as $user){
+			if(count($config['DIFFUSIONS']) > 0){
+				foreach($config['DIFFUSIONS'] as $k=>$diffusion){
+					$diffusion_infos = replace_diffusions_usercode($user, $diffusion, $checkAllowed = true);
+					if($diffusion_infos['usercode'] != ""){ 
+						$diffusions_allowed[$user['USERCODE']][$k] = ($diffusion_infos['diffusion_forced'] == true ? 2 : 1);
+					}
+				}
+			}
+		}
+	}
+	//import not full
+	if($config['OPTIONS']['IMPORT_NOT_FULL'] == 1 || $config['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1){
+		$tmp = array();
+		foreach($data['TOURS'] as $tour){
+			if($config['OPTIONS']['IMPORT_NOT_FULL'] == 1 && $list_nom_script_complement[$tour['USERCODE']] != ""){
+				$tmp[$tour['REF_PORTAIL']] = $list_nom_script_complement[$tour['USERCODE']];
+			}else if($config['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1 && $tour['NOM_SCRIPT_COMPLEMENT'] != ""){
+				$tmp[$tour['REF_PORTAIL']] = $tour['NOM_SCRIPT_COMPLEMENT'];
+			}
+		}
+		$list_nom_script_complement = $tmp;
+		$data_to_import['COMPLEMENTS']['LIST_NOM_SCRIPT_COMPLEMENT_TOURS'] = $list_nom_script_complement;
+	}
+	
+	if($config['OPTIONS']['DIFFERENTIAL_IMPORT_TOUR'] == 1){
+		for($i = 0; $i < count($data['TOURS_DEL']); $i++){
+			$data['TOURS_DEL'][$i] = merge($data['TOURS_DEL'][$i], array('NOM_SCRIPT'=>$config['CODE_IMPORT']));
+		}
+		if($config['STEPS']['DELETE_TOURS'] == 1){ $data_to_import['DELETE']['TOURS'] = $data['TOURS_DEL'];}
+	}
+
+	if($config['STEPS']['IMPORT_TOURS'] == 1){
+		$data_to_import['UPDATE']['TOURS'] = import_data_tours($data['TOURS'], $config, $table, $list_nom_script_complement, $diffusions_allowed);
+		if((($need_delete && $config['OPTIONS']['PART_IMPORT'] == 1) || (count($data['TOURS']) > 0 && $config['OPTIONS']['DIFFERENTIAL_IMPORT_TOUR'] != 1)) && $config['STEPS']['DELETE_TOURS'] == 1) {
+			$data_to_import['DELETE']['TOURS'] = get_deleted_tours($config['CODE_IMPORT'], $table, $date_reference, $list_nom_script_complement, $diffusions_allowed, $config['OPTIONS']['DEBUG'] == 1);
+		}
+	}
+	
+	$nb_images = 0;
+	$nb_plans = 0;
+	if($config['STEPS']['IMPORT_IMAGES'] == 1){
+		if($config['OPTIONS']['DIFFERENTIAL_IMPORT_IMAGE'] == 1){
+			if($config['STEPS']['DELETE_IMAGES'] == 1){
+				$keys = array('IMAGES', 'PLANS');
+				foreach($keys as $k){
+					for($i = 0; $i < count($data[$k.'_DEL']); $i++){
+						$data[$k.'_DEL'][$i] = merge($data[$k.'_DEL'][$i], array('NOM_SCRIPT'=>$config['CODE_IMPORT']));
+					}
+					$data_to_import['DELETE'][$k] = $data[$k.'_DEL'];
+				}
+			}
+		}
+		
+		$list_usercode_by_ref_portail = array();
+		$list_tours_allowed_import_images = false;
+		if($config['OPTIONS']['OPTIONAL_IMPORT_IMAGES'] == 1 || $config['OPTIONS']['DIFFERENTIAL_IMPORT_TOUR'] == 1){
+			$list_tours_allowed_import_images = array();
+		}
+		for($i=0;$i < count($data['TOURS']); $i++){
+			$tour = $data['TOURS'][$i];
+			if($list_tours_allowed_import_images !== false && ($tour['IMPORT_IMAGES'] === true || $config['OPTIONS']['DIFFERENTIAL_IMPORT_TOUR'] == 1)){
+				$list_tours_allowed_import_images[] = $tour['REF_PORTAIL'];
+			}
+			$list_usercode_by_ref_portail[$tour['REF_PORTAIL']] = $tour['USERCODE'];
+		}
+		//images
+		$data_to_import['UPDATE']['IMAGES'] = import_data_images($data['IMAGES'], $config, $list_usercode_by_ref_portail, $list_nom_script_complement, $table, "image");
+
+		if(count($data_to_import['UPDATE']['IMAGES']) > 0){
+			foreach($data_to_import['UPDATE']['IMAGES'] as $ref=>$img){ 
+				$nb_images += count($img);
+				if(!is_array($data_to_import['UPDATE']['TOURS'][$ref])){ 
+					$data_to_import['UPDATE']['TOURS'][$ref] = array('REF_PORTAIL' => $ref, 'ONLY_IMAGES' => true);
+				}
+				$data_to_import['UPDATE']['TOURS'][$ref]['IMAGES'] = $img;
+			}
+		}
+		if((($need_delete && $config['OPTIONS']['PART_IMPORT'] == 1) || (count($data['IMAGES']) > 0 && $config['OPTIONS']['DIFFERENTIAL_IMPORT_IMAGE'] != 1)) && $config['STEPS']['DELETE_IMAGES'] == 1){
+			$data_to_import['DELETE']['IMAGES'] = get_deleted_images($config['CODE_IMPORT'], $table, $date_reference, "image", $list_nom_script_complement, $list_tours_allowed_import_images, $config['OPTIONS']['DEBUG'] == 1);
+		}
+		
+		//plan
+		$data_to_import['UPDATE']['PLANS'] = import_data_images($data['PLANS'], $config, $list_usercode_by_ref_portail, $list_nom_script_complement,  $table, "plan");
+		if(count($data_to_import['UPDATE']['PLANS']) > 0){		
+			foreach($data_to_import['UPDATE']['PLANS'] as $ref=>$img){ 
+				$nb_plans += count($img);
+				if( !is_array($data_to_import['UPDATE']['TOURS'][$ref])){ 
+					$data_to_import['UPDATE']['TOURS'][$ref] = array('REF_PORTAIL' => $ref, 'ONLY_PLANS' => true);
+				}
+				$data_to_import['UPDATE']['TOURS'][$ref]['PLANS'] = $img;
+			}
+		}
+		if((($need_delete && $config['OPTIONS']['PART_IMPORT'] == 1) || (count($data['PLANS']) > 0   && $config['OPTIONS']['DIFFERENTIAL_IMPORT_IMAGE'] != 1)) && $config['STEPS']['DELETE_IMAGES'] == 1){
+			$data_to_import['DELETE']['PLANS'] = get_deleted_images($config['CODE_IMPORT'], $table, $date_reference, "plan", $list_nom_script_complement, $list_tours_allowed_import_images, $config['OPTIONS']['DEBUG'] == 1);
+		}
+	}
+	$data_to_import['UPDATE']['PLANS'] = $nb_plans;
+	$data_to_import['UPDATE']['IMAGES'] = $nb_images;
+//	db_close();
+	sql_disconnect('import', $config['CODE_IMPORT'], $config['OPTIONS']['DEBUG'] == 1);
+	return $data_to_import;
+}
+
+/**
+*  import
+**/
+function import_data_users($data, $config, $table, $list_nom_script_complement = array()){
+	global $db_data;
+	
+	$script_name = $config['CODE_IMPORT']; 
+	$force_update = $config['STEPS']['FORCE_UPDATE_USERS']; 
+	$import_not_full = ($config['OPTIONS']['IMPORT_NOT_FULL'] == 1);
+	$debug = ($config['OPTIONS']['DEBUG'] == 1);
+	$update_allowed = ($config['STEPS']['UPDATE_USERS'] == 1);
+	$return = array();
+	$logs = array('insert' => 0, 'update'=>0, 'unchange'=>0);
+	if(count($data)){
+		foreach($data as $user){
+			$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+			if($import_not_full){
+				if($list_nom_script_complement[$user['USERCODE']]){ $script_name_sql .= "_".$list_nom_script_complement[$user['USERCODE']];}
+				else{
+					import_log('[ERROR] User:'.$user['USERCODE'].' NOM_SCRIPT_COMPLEMENT not found' , $script_name);
+					continue;
+				}
+			}
+			
+			$force_update_user = $force_update;
+			$force_update_user |= (count($config['USERS'][$user['USERCODE']]) > 0 && $config['USERS'][$user['USERCODE']]['ID_FORCE_UPDATE'] > 0);
+			if($debug && $force_update_user && !$force_update){
+				import_log('[DEBUG][FORCE_UPDATE] User:'.$user['USERCODE'] , $script_name);
+			}
+			
+			$user['NOM_SCRIPT'] = $script_name_sql;
+			$sql = "SELECT USERCODE, MD5_USER, MD5_LOGO, ID_STATUT_USER FROM ".$table."_USERS WHERE USERCODE='".fix_text($user['USERCODE'],50)."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+			$md5_user = "";
+			$md5_logo = "";
+			$usercode = "";
+			$result = sql_query($sql, "import", $script_name, $debug);
+			if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+				$usercode = $r['USERCODE'];
+				$md5_user = $r['MD5_USER'];
+				$md5_logo = $r['MD5_LOGO'];
+				//empêche la mise à jour de l'utilisateur si c'est un utilisateur par défault
+				if($user['DEFAULT_USER'] && $r['ID_STATUT_USER'] > 0){ $md5_user = $user['MD5_USER'];}
+			}
+			$update_allowed_user = $update_allowed;
+			$only_reactivation = false;
+			if(count($config['USERS'][$user['USERCODE']]) > 0){
+				$update_allowed_user = ($config['USERS'][$user['USERCODE']]['ID_STATUT_USER'] > 0);
+			}
+			if(!$update_allowed_user){
+				$params = array('partnerID' => $config['ID_PORTAIL'], 'password' => $config['PASSWORD_WS']);
+				$url_base = str_replace( '#USERCODE#', $user['USERCODE'], WS_GET_USER);
+				$response = make_ws_request($script_name, $url_base, $params, "GET");
+				if($debug){ import_log('[DEBUG] User getID:'.$user['USERCODE'].'  ('.make_ws_request($script_name, $url_base, $params, "GET", true).':'.$response.')',$script_name);}
+				$xml = @simplexml_load_string($response);
+				if(count($xml) > 0){
+					if(is_guid($xml->userID."")){
+						if($xml->userStatus."" == -1){
+							if($debug){ import_log('[DEBUG] user: '.$user['USERCODE'].' re-activation',$script_name);}
+							$only_reactivation = true;
+						}
+						if($debug){ import_log('[DEBUG] Update user: '.$user['USERCODE'].' unauthorized',$script_name);}
+						$update_allowed_user = false;
+					}
+				}
+			}
+
+			$fields = array(		
+				'Nom_utilisateur' => array('function'=>'fix_text', 'limit'=>100), 
+				'Prenom_utilisateur' => array('function'=>'fix_text', 'limit'=>100), 
+				'Telephone_utilisateur' => array('function'=>'fix_text', 'limit'=>30), 
+				'Bio_utilisateur' => array('function'=>'fix_text', 'limit'=>2000), 
+				'Qualite_utilisateur' => array('function'=>'fix_text', 'limit'=>150), 
+				'Numero_liscence' => array('function'=>'fix_text', 'limit'=>20), 
+				'Mobile_utilisateur' => array('function'=>'fix_text', 'limit'=>30), 
+				'Email_utilisateur' => array('function'=>'fix_text', 'limit'=>150), 
+				'Nom_societe' => array('function'=>'fix_text', 'limit'=>100), 
+				'Siteweb_societe' => array('function'=>'fix_text', 'limit'=>100), 
+				'Adresse' => array('function'=>'fix_text', 'limit'=>150), 
+				'Ville' => array('function'=>'fix_text', 'limit'=>100), 
+				'Code_postal' => array('function'=>'fix_text', 'limit'=>25), 
+				'Etat' => array('function'=>'fix_text', 'limit'=>50), 
+				'Id_pays' => array('function'=>'fix_text', 'limit'=>2), 
+				'Fax' => array('function'=>'fix_text', 'limit'=>30), 
+				'Telephone' => array('function'=>'fix_text', 'limit'=>30), 
+				'Latitude' => 'fix_real',
+				'Longitude' => 'fix_real', 
+				'Login' => array('function'=>'fix_text', 'limit'=>50), 
+				'Password' => array('function'=>'fix_text', 'limit'=>50), 
+				'Email_societe' => array('function'=>'fix_text', 'limit'=>200),
+				'Url_logo' => array('function'=>'fix_text', 'limit'=>200),
+				'Md5_logo' => array('function'=>'fix_text', 'limit'=>32),
+				'Url_logo_user' => array('function'=>'fix_text', 'limit'=>200),
+				'Md5_logo_user' => array('function'=>'fix_text', 'limit'=>32),
+				'Url_logo_video' => array('function'=>'fix_text', 'limit'=>200),
+				'Md5_logo_video' => array('function'=>'fix_text', 'limit'=>32)
+			);
+			$reg_md5_error = str_replace('#TABLE#', 'user', '/('.MD5_UPDATE_FAILED.'|'.MD5_UPDATE_IN_PROGRESS.'|'.MD5_DELETE.')$/i');
+			for ($retry = 0, $sql_result = 0, $sql_action = ""; $retry < 2 && ($sql_result === 9 || $sql_result === 0); $retry++) {
+				if($md5_user == "" && $usercode == "" && $sql_result !== 9){
+					$request = make_request_insert($fields, $user);
+					$sql = "INSERT INTO ".$table."_USERS(USERCODE, DATE_CREATION_USER, DATE_MODIFICATION_USER, DATE_LAST_IMPORT_USER, MD5_USER, ID_STATUT_USER, NOM_SCRIPT ".$request['fields'].") VALUES('".fix_text($user['USERCODE'],50)."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."','".fix_text(MD5_UPDATE_IN_PROGRESS,32)."', 1, '".fix_text($script_name_sql,50)."' ".$request['values'].")";
+					$update = true;
+					$sql_action = 'insert';
+				}else if(($md5_user != $user['MD5_USER'] || $force_update_user) && ($update_allowed_user || $only_reactivation || preg_match($reg_md5_error, $md5_user) > 0 || $sql_result === 9)){
+					$sql = "UPDATE ".$table."_USERS SET DATE_MODIFICATION_USER='".date('Y-m-d H:i:s')."', DATE_LAST_IMPORT_USER='".date('Y-m-d H:i:s')."', MD5_USER='".fix_text(MD5_UPDATE_IN_PROGRESS,32)."', ID_STATUT_USER=1 ".make_request_update($fields, $user)." WHERE USERCODE='".fix_text($user['USERCODE'],50)."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = true;
+					$sql_action = 'update';
+				}else{
+					$sql = "UPDATE ".$table."_USERS SET ID_STATUT_USER=1, DATE_LAST_IMPORT_USER='".date('Y-m-d H:i:s')."' WHERE USERCODE='".fix_text($user['USERCODE'],50)."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = false;
+					$sql_action = 'unchange';
+				}
+				$sql_result = sql_query($sql, "import", $script_name, $debug);
+			}
+			$logs[$sql_action]++;
+			if($update){
+				$logo_count =0;
+				$user_logo_suffixes = array('','_USER','_VIDEO');
+				foreach($user_logo_suffixes as $user_logo_suffixe){
+					if(isset($user['URL_LOGO'.$user_logo_suffixe])){
+						if($user['URL_LOGO'.$user_logo_suffixe] != "" && ($md5_logo != $user['MD5_LOGO'.$user_logo_suffixe] || $force_update) ){
+							$user['LOGO_ACTION'.$user_logo_suffixe] = "add";
+							$logo_count++;
+						}else if($user['URL_LOGO'.$user_logo_suffixe] == "" && $md5_logo != ""){
+							$user['LOGO_ACTION'.$user_logo_suffixe] = "delete";
+							$logo_count++;
+						}
+					}
+				}
+				$return[] = $user;
+			}else if($force_update_user && !$update_allowed_user){
+				if($debug){ import_log('[DEBUG] user:'.$user['USERCODE'].' update not allowed even with the force update option' , $script_name);}
+				$return[] = $user;
+			}else if(count($config['DIFFUSIONS']) > 0 && $update_allowed_user){
+				foreach($config['DIFFUSIONS'] as $k=>$v){
+					if(count($v['USERS'][$user['USERCODE']]) > 0){
+						$v = $v['USERS'][$user['USERCODE']];
+					}
+					if($v['ID_STATUT_IMPORT_DIFFUSION'] == 2){
+						if($debug){	import_log('[DEBUG][USER] force update diffusion on '.$v['NOM_PORTAIL'].' for user '.$user['USERCODE'], $script_name);}
+						$user['ONLY_DIFFUSION'] = true;
+						$return[] = $user;
+						break;
+					}	
+				}
+			}
+		}
+	}
+//	import_log('[DEBUG]:'.count($return).' nb user' , $script_name);
+	import_log('Users resume: '.$logs['insert'].' inserted / '.$logs['update'].' updated / '.$logs['unchange'].' unchanged' , $script_name);
+	return $return;
+}
+
+//function import_data_tours($data, $script_name, $force_update=false, $table, $import_not_full = false, $list_nom_script_complement = array(), $diffusions_allowed = array(), $debug = false){
+function import_data_tours($data, $config, $table, $list_nom_script_complement = array(), $diffusions_allowed = array()){
+	global $db_data;
+	
+	$script_name = $config['CODE_IMPORT'];
+	$force_update = ($config['STEPS']['FORCE_UPDATE_TOURS'] == 1);
+	$import_not_full = ($config['OPTIONS']['IMPORT_NOT_FULL'] == 1 || $config['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1);
+	$debug = ($config['OPTIONS']['DEBUG'] == 1);
+	
+	$return = array();
+	$logs = array('insert' => 0, 'update'=>0, 'unchange'=>0);
+	if($debug){ 	import_log('[DEBUG] Tours start import' , $script_name);}
+	if(count($data) > 0){
+		foreach($data as $tour){
+			$md5_tour = "";
+			$id_statut_tour = "";
+			$ref_portail = "";
+			$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+			if($import_not_full){
+				if($list_nom_script_complement[$tour['REF_PORTAIL']]){ $script_name_sql .= "_".$list_nom_script_complement[$tour['REF_PORTAIL']];}
+				else{
+					import_log('[ERROR] TOUR:'.$tour['REF_PORTAIL'].' NOM_SCRIPT_COMPLEMENT not found' , $script_name);
+					continue;
+				}
+			}
+			$force_update_tour = $force_update;
+			$force_update_tour |= (count($config['USERS'][$tour['USERCODE']]) > 0 && $config['USERS'][$tour['USERCODE']]['ID_FORCE_UPDATE'] > 0);
+			if($debug && $force_update_tour && !$force_update){
+				import_log('[DEBUG][FORCE_UPDATE] User:'.$tour['USERCODE'].' tour:'.$tour['REF_PORTAIL'] , $script_name);
+			}
+			
+			if($debug){ import_log('[DEBUG] Tour:'.$tour['REF_PORTAIL'].' START' , $script_name);}
+			$tour['NOM_SCRIPT'] = $script_name_sql;
+			$sql = "SELECT REF_PORTAIL, MD5_TOUR, ID_STATUT_TOUR FROM ".$table."_TOURS WHERE REF_PORTAIL='".fix_text($tour['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+//			if($debug){ 	import_log('[DEBUG_SQL] '.$sql , $script_name); }
+			$result = sql_query($sql, "import", $script_name, $debug);
+//			if($debug){ 	import_log('[DEBUG_SQL] FIN REQUETTE '.$sql , $script_name); }
+			if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+				if($debug){ 	import_log('[DEBUG_SQL] FOUND '.$r['REF_PORTAIL'] , $script_name); }
+				$ref_portail = $r['REF_PORTAIL'];
+				$md5_tour = $r['MD5_TOUR'];
+				$id_statut_tour = $r['ID_STATUT_TOUR'];
+			}elseif($debug){	import_log('[DEBUG_SQL] NOT FOUND '.fix_text($tour['REF_PORTAIL'],50) , $script_name); }
+			
+			$fields = array(
+				'Id_pays' => array('function' => 'fix_text', 'limit'=>'2'),
+				'Id_type_bien' => 'fix_tinyint',
+				'Id_type_transaction' => 'fix_tinyint',
+				'Adresse' => array('function' => 'fix_text', 'limit'=>'150'),
+				'Annee_construction' => 'fix_smallint',
+				'Charges' => 'fix_real',
+				'Code_postal' => array('function' => 'fix_text', 'limit'=>'50'),
+				'Description' => array('function' => 'fix_text', 'limit'=>'4000'),
+				'Equipements' => array('function' => 'fix_text', 'limit'=>'400'),
+				'Frais_agence' => 'fix_int',
+				'Id_amenagement_handicap' => 'fix_tinyint',
+				'Id_ascenseur' => 'fix_tinyint',
+				'Id_bien_amenage' => 'fix_tinyint',
+				'Id_cave' => 'fix_tinyint',
+				'Id_climatisation' => 'fix_tinyint',
+				'Id_digicode' => 'fix_tinyint',
+				'Id_exclusivite' => 'fix_tinyint',
+				'Id_gardien' => 'fix_tinyint',
+				'Id_immeuble_recent' => 'fix_tinyint',
+				'Id_neuf' => 'fix_tinyint',
+				'Id_internet_haut_debit' => 'fix_tinyint',
+				'Id_interphone' => 'fix_tinyint',
+				'Id_periodicite_loyer' => 'fix_tinyint',
+				'Id_piscine' => 'fix_tinyint',
+				'Id_refait_neuf' => 'fix_tinyint',
+				'Id_statut_listing' => 'fix_tinyint',
+				'Id_travaux' => 'fix_tinyint',
+				'Id_type_chauffage' => 'fix_tinyint',
+				'Id_type_cuisine' => 'fix_tinyint',
+				'Id_unite_surface_habitable' => 'fix_tinyint',
+				'Id_unite_surface_terrain' => 'fix_tinyint',
+				'Latitude' => 'fix_real',
+				'Longitude' => 'fix_real',
+				'Montant_travaux' => 'fix_int',
+				'Nom_visite' => array('function' => 'fix_text', 'limit'=>'150'),
+				'Nombre_piece' => 'fix_real',
+				'Nombre_chambre' => 'fix_tinyint',
+				'Nombre_terrasse' => 'fix_tinyint',
+				'Nombre_salle_bain' => 'fix_smallint',
+				'Nombre_demi_salle_bain' => 'fix_smallint',
+				'Nombre_garage' => 'fix_smallint',
+				'Nombre_etages' => 'fix_tinyint',
+				'Nombre_salle_eau' => 'fix_tinyint',
+				'Numero_etage' => 'fix_tinyint',
+				'Numero_mls' => array('function' => 'fix_text', 'limit'=>'20'),
+				'Orientation' => array('function' => 'fix_text', 'limit'=>'2'),
+//				'Periodicite_location' => array('function' => 'fix_text', 'limit'=>'1'),
+				'Prix_bien' => 'fix_int',
+				'Ref_devise' => array('function' => 'fix_text', 'limit'=>'3'),
+				'Ref_etat' => array('function' => 'fix_text', 'limit'=>'3'),
+				'Ref_visite' => array('function' => 'fix_text', 'limit'=>'50'),
+				'Surface_habitable' => 'fix_int',
+				'Surface_sejour' => 'fix_smallint',
+				'Surface_terrain' => 'fix_int',
+				'Taxes' => 'fix_real',
+				'Url_annonce' => array('function' => 'fix_text', 'limit'=>'200'),
+				'Ville' => array('function' => 'fix_text', 'limit'=>'100'),
+				'Voisinnage' => array('function' => 'fix_text', 'limit'=>'250'),
+				'Id_adresse_cachee' => 'fix_tinyint',
+				'Id_langue' => array('function' => 'fix_text', 'limit'=>'2'),
+				'Classe_batiment' => array('function' => 'fix_text', 'limit' =>2),      
+				'Date_disponibilite' => 'fix_smalldatetime',
+				'Date_derniere_verification' => 'fix_datetime',
+				'Duree_bail_min' => 'fix_int',                   
+				'Duree_bail_max' => 'fix_int',                   
+				'Id_rail' => 'fix_tinyint',                    
+				'Id_sous_location' => 'fix_tinyint',           
+				'Id_unite_prix_surface' => 'fix_tinyint',      
+				'Id_prix_negociable' => 'fix_tinyint',
+				'Prix_min' => 'fix_real',                     
+				'Prix_max' => 'fix_real',                     
+				'Ref_portail_master' => array('function' => 'fix_text', 'limit' =>50),      
+				'Surface_disponible' => 'fix_real',           
+				'Surface_totale_batiment' => 'fix_real',       
+				'Id_prestige' => 'fix_int',
+				'Taxe_fonciere' => 'fix_real',
+				'Taxe_habitation' => 'fix_real',
+			);
+			for ($retry = 0, $sql_result = 0, $sql_action = ""; $retry < 2 && ($sql_result === 9 || $sql_result === 0); $retry++) {
+				if($md5_tour == "" && $ref_portail == "" && $sql_result !== 9){
+					$request = make_request_insert($fields, $tour);
+					$sql = "INSERT INTO ".$table."_TOURS(USERCODE,REF_PORTAIL, DATE_CREATION_TOUR, DATE_MODIFICATION_TOUR, DATE_LAST_IMPORT_TOUR, MD5_TOUR, ID_STATUT_TOUR, NOM_SCRIPT ".$request['fields'].") VALUES('".fix_text($tour['USERCODE'], 50)."','".fix_text($tour['REF_PORTAIL'], 50)."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."','".fix_text(MD5_UPDATE_IN_PROGRESS,32)."', 1, '".fix_text($script_name_sql,50)."' ".$request['values'].")";		
+					$update = true;
+					$sql_action = 'insert';				
+				}else if($md5_tour != $tour['MD5_TOUR'] || $force_update_tour){
+					$sql = "UPDATE ".$table."_TOURS SET USERCODE='".fix_text($tour['USERCODE'], 50)."', DATE_MODIFICATION_TOUR='".date('Y-m-d H:i:s')."', DATE_LAST_IMPORT_TOUR='".date('Y-m-d H:i:s')."', MD5_TOUR='".fix_text(MD5_UPDATE_IN_PROGRESS,32)."', ID_STATUT_TOUR=1 ".make_request_update($fields, $tour)." WHERE REF_PORTAIL='".fix_text($tour['REF_PORTAIL'], 50)."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = true;
+					$sql_action = 'update';
+				}else{
+					$sql = "UPDATE ".$table."_TOURS SET ID_STATUT_TOUR=1,DATE_LAST_IMPORT_TOUR='".date('Y-m-d H:i:s')."' WHERE REF_PORTAIL='".fix_text($tour['REF_PORTAIL'], 50)."'  AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = false;
+					$sql_action = 'unchange';
+				}
+				if($debug){ import_log('[DEBUG] Tour:'.$tour['REF_PORTAIL'].' MAKE REQUEST ('.$sql.')' , $script_name);}
+					//		import_log($sql,'debug');
+				$sql_result = sql_query($sql, "import", $script_name, $debug);
+			}
+			$logs[$sql_action]++;
+			if($update){ 
+				$tour['DIFFUSIONS_ALLOWED'] = $diffusions_allowed[$tour['USERCODE']];
+				$return[$tour['REF_PORTAIL']] = $tour;
+			}else if(count($diffusions_allowed[$tour['USERCODE']]) > 0){
+				foreach($diffusions_allowed[$tour['USERCODE']] as $k=>$v){
+					if($v == 2){
+						if($debug){	import_log('[DEBUG][TOUR] force update diffusion on '.$k.' for tour '.$tour['REF_PORTAIL'].' / '.$tour['USERCODE'], $script_name);}
+						$tour['ONLY_DIFFUSION'] = true;
+						if(!is_array($tour['DIFFUSIONS_ALLOWED'])){ $tour['DIFFUSIONS_ALLOWED'] = array();}
+						$tour['DIFFUSIONS_ALLOWED'][$k] = $v;
+						$return[$tour['REF_PORTAIL']] = $tour;
+					}	
+				}
+			}
+			if($debug && is_array($tour['DIFFUSIONS_ALLOWED']) && count($tour['DIFFUSIONS_ALLOWED']) > 0){
+				import_log('Tour: '.$tour['REF_PORTAIL'].' diffusions allowed on '.implode(', ',array_keys($tour['DIFFUSIONS_ALLOWED'])) , $script_name);
+			}
+			if($debug){ import_log('[DEBUG] Tour:'.$tour['REF_PORTAIL'].' END' , $script_name);}
+		}
+	}
+	import_log('Tours resume: '.$logs['insert'].' inserted / '.$logs['update'].' updated / '.$logs['unchange'].' unchanged' , $script_name);
+	return $return;
+}
+
+
+//$data_to_import['UPDATE']['TRANSACTIONS'] = import_data_transactions($data['TRANSACTIONS'], $config,  $table, $list_nom_script_complement);
+//function import_data_transactions($data, $script_name, $force_update=false, $table, $import_not_full = false, $list_nom_script_complement = array(), $debug = false){
+function import_data_transactions($data, $config, $table, $list_nom_script_complement = array()){
+	global $db_data;
+	
+	$script_name = $config['CODE_IMPORT'];
+	$force_update = $config['STEPS']['FORCE_UPDATE_TRANSACTIONS'];
+	$import_not_full = ($config['OPTIONS']['IMPORT_NOT_FULL'] == 1);
+	$debug = ($config['OPTIONS']['DEBUG'] == 1);
+	
+	$return = array();
+	$logs = array('insert' => 0, 'update'=>0, 'unchange'=>0);
+	if(count($data) > 0){
+		foreach($data as $transaction){
+			$md5_transaction = "";
+			$id_statut_transaction = "";
+			$ref_portail = "";
+			$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+			
+			$force_update_transaction = $force_update;
+			$force_update_transaction |= (count($config['USERS'][$transaction['USERCODE']]) > 0 && $config['USERS'][$transaction['USERCODE']]['ID_STATUT_USER'] > 1);
+			if($debug && $force_update_transaction && !$force_update){
+				import_log('[DEBUG][FORCE_UPDATE] User:'.$transaction['USERCODE'].' transaction:'.$transaction['REF_PORTAIL'] , $script_name);
+			}
+			if($import_not_full){
+				if($list_nom_script_complement[$transaction['REF_PORTAIL']]){ $script_name_sql .= "_".$list_nom_script_complement[$transaction['REF_PORTAIL']];}
+				else{
+					import_log('[ERROR] TRANSACTION:'.$transaction['REF_PORTAIL'].' NOM_SCRIPT_COMPLEMENT not found' , $script_name);
+					continue;
+				}
+			}
+			$transaction['NOM_SCRIPT'] = $script_name_sql;
+			$sql = "SELECT REF_PORTAIL,MD5_TRANSACTION, ID_STATUT_TRANSACTION FROM ".$table."_TRANSACTIONS WHERE REF_PORTAIL='".fix_text($transaction['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+			$result = sql_query($sql, "import", $script_name, $debug);
+			if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+				$md5_transaction = $r['MD5_TRANSACTION'];
+				$id_statut_transaction = $r['ID_STATUT_TRANSACTION'];
+				$ref_portail = $r['REF_PORTAIL'];
+			}
+			$fields = array(
+				'Id_pays' => array('function' => 'fix_text', 'limit'=>'2'),
+				'Id_type_bien' => 'fix_tinyint',
+				'Id_type_transaction' => 'fix_tinyint',
+				'Adresse' => array('function' => 'fix_text', 'limit'=>'150'),
+				'Code_postal' => array('function' => 'fix_text', 'limit'=>'50'),
+				'Latitude' => 'fix_real',
+				'Longitude' => 'fix_real',
+				'Nom_visite' => array('function' => 'fix_text', 'limit'=>'150'),
+				'Ref_etat' => array('function' => 'fix_text', 'limit'=>'3'),
+				'Ville' => array('function' => 'fix_text', 'limit'=>'100'),
+			);
+			for ($retry = 0, $sql_result = 0, $sql_action = ""; $retry < 2 && ($sql_result === 9 || $sql_result === 0); $retry++) {
+				if($md5_transaction == "" && $ref_portail == "" && $sql_result !== 9){
+					$request = make_request_insert($fields, $transaction);
+					$sql = "INSERT INTO ".$table."_TRANSACTIONS(USERCODE,REF_PORTAIL, DATE_CREATION_TRANSACTION, DATE_MODIFICATION_TRANSACTION, DATE_LAST_IMPORT_TRANSACTION, MD5_TRANSACTION, ID_STATUT_TRANSACTION, NOM_SCRIPT ".$request['fields'].") VALUES('".fix_text($transaction['USERCODE'], 50)."','".fix_text($transaction['REF_PORTAIL'], 50)."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."','".fix_text(MD5_UPDATE_IN_PROGRESS,32)."', 1, '".fix_text($script_name_sql,50)."' ".$request['values'].")";		
+					$update = true;
+					$sql_action = 'insert';
+				}else if($md5_transaction != $transaction['MD5_TRANSACTION'] || $force_update_transaction){
+					$sql = "UPDATE ".$table."_TRANSACTIONS SET USERCODE='".fix_text($transaction['USERCODE'], 50)."', DATE_MODIFICATION_TRANSACTION='".date('Y-m-d H:i:s')."', DATE_LAST_IMPORT_TRANSACTION='".date('Y-m-d H:i:s')."', MD5_TRANSACTION='".fix_text(MD5_UPDATE_IN_PROGRESS,32)."', ID_STATUT_TRANSACTION=1 ".make_request_update($fields, $transaction)." WHERE REF_PORTAIL='".fix_text($transaction['REF_PORTAIL'], 50)."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = true;
+					$sql_action = 'update';
+				}else{
+					$sql = "UPDATE ".$table."_TRANSACTIONS SET ID_STATUT_TRANSACTION=1,DATE_LAST_IMPORT_TRANSACTION='".date('Y-m-d H:i:s')."' WHERE REF_PORTAIL='".fix_text($transaction['REF_PORTAIL'], 50)."'  AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = false;
+					$sql_action = 'unchange';
+				}
+				$sql_result = sql_query($sql, "import", $script_name, $debug);
+			}
+			$logs[$sql_action]++;
+			if($update){ $return[$transaction['REF_PORTAIL']] = $transaction;}
+		}
+	}
+	import_log('Transactions resume: '.$logs['insert'].' inserted / '.$logs['update'].' updated / '.$logs['unchange'].' unchanged' , $script_name);
+	return $return;
+}
+
+function import_data_images($data, $config, $list_usercode_by_ref_portail = array(), $list_nom_script_complement = array(), $table, $type = "image"){
+	global $db_data;	
+	$script_name = $config['CODE_IMPORT'];
+	$force_update = ($config['STEPS']['FORCE_UPDATE_'.strtoupper($type)."S"] == 1);
+	$import_not_full = ($config['OPTIONS']['IMPORT_NOT_FULL'] == 1 || $config['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1);
+	$partner_id = $config['ID_PORTAIL']; 
+	$password = $config['PASSWORD_WS']; 
+	$debug = ($config['OPTIONS']['DEBUG'] == 1);
+	
+	$return = array();
+	$logs = array('insert' => 0, 'update'=>0, 'unchange'=>0);
+	$bad_ref_portails = array();
+	//$debug_update_list = array('logisquare','c21b_fr','c21b_en','c21b_nl');
+	$list_poids = array();
+	$poids = 0;
+	if(count($data) > 0){
+		foreach($data as $image){
+			$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+			if($import_not_full){
+				if($list_nom_script_complement[$image['REF_PORTAIL']]){ $script_name_sql .= "_".$list_nom_script_complement[$image['REF_PORTAIL']];}
+				else{
+					import_log('[ERROR] IMAGE:'.$image['REF_PORTAIL'].'/'.$image['POIDS'].' NOM_SCRIPT_COMPLEMENT not found' , $script_name);
+					continue;				
+				}
+			}
+			$image['USERCODE'] = $list_usercode_by_ref_portail[$image['REF_PORTAIL']];
+			$force_update_image = $force_update;
+			$force_update_image |= (count($config['USERS'][$image['USERCODE']]) > 0 && $config['USERS'][$image['USERCODE']]['ID_STATUT_USER'] > 1);
+			if($debug && $force_update_image && !$force_update){
+				import_log('[DEBUG][FORCE_UPDATE] User:'.$image['USERCODE'].' tour:'.$image['REF_PORTAIL']."/".$image['POIDS'] , $script_name);
+			}
+			
+			$image['NOM_SCRIPT'] = $script_name_sql;
+			if($image['TYPE'] == ""){ $image['TYPE'] = $type;}
+			$sql = "SELECT REF_PORTAIL,MD5_IMAGE FROM ".$table."_IMAGES WHERE REF_PORTAIL='".fix_text($image['REF_PORTAIL'],50)."' AND POIDS='".fix_int($image['POIDS'])."' AND TYPE='".fix_text($image['TYPE'])."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+			$md5_image = "";
+			$ref_portail = "";
+			$result = sql_query($sql, "import", $script_name, $debug);
+			if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+				$md5_image = $r['MD5_IMAGE'];
+				$ref_portail = $r['REF_PORTAIL'];
+			}
+			$fields = array(
+				'Titre_image' => array('function' => 'fix_text', 'limit'=>'100'),
+				'Url_image' => array('function' => 'fix_text', 'limit'=>'350'),
+				'Type' => array('function' => 'fix_text', 'limit'=>'20')
+			);
+			if($image['NO_UPDATE'] == true){ 
+				$image['MD5_IMAGE'] = $md5_image;
+			}
+			for ($retry = 0, $sql_result = 0, $sql_action = ""; $retry < 2 && ($sql_result === 9 || $sql_result === 0); $retry++) {
+				if($md5_image == "" && $ref_portail == "" && $sql_result !== 9){
+					$request = make_request_insert($fields, $image);
+					$sql = "INSERT INTO ".$table."_IMAGES(POIDS,REF_PORTAIL, DATE_CREATION_IMAGE, DATE_MODIFICATION_IMAGE, DATE_LAST_IMPORT_IMAGE, MD5_IMAGE, ID_STATUT_IMAGE, NOM_SCRIPT ".$request['fields'].") VALUES('".fix_int($image['POIDS'])."','".fix_text($image['REF_PORTAIL'], 50)."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."','".fix_text(MD5_UPDATE_IN_PROGRESS,32)."', 1, '".fix_text($script_name_sql,50)."' ".$request['values'].")";
+					$update = true;
+					$sql_action = 'insert';
+				}else if($md5_image != $image['MD5_IMAGE'] || $force_update_image){
+					$sql = "UPDATE ".$table."_IMAGES SET DATE_MODIFICATION_IMAGE='".date('Y-m-d H:i:s')."', DATE_LAST_IMPORT_IMAGE='".date('Y-m-d H:i:s')."', MD5_IMAGE='".fix_text( MD5_UPDATE_IN_PROGRESS, 32)."', ID_STATUT_IMAGE=1, NOM_SCRIPT='".fix_text($script_name_sql,50)."' ".make_request_update($fields, $image)." WHERE REF_PORTAIL='".fix_text($image['REF_PORTAIL'], 50)."' AND POIDS='".fix_int($image['POIDS'])."' AND TYPE='".fix_text($image['TYPE'])."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = true;				
+					$sql_action = 'update';
+				}else{
+					$sql = "UPDATE ".$table."_IMAGES SET ID_STATUT_IMAGE=1,DATE_LAST_IMPORT_IMAGE='".date('Y-m-d H:i:s')."' WHERE REF_PORTAIL='".fix_text($image['REF_PORTAIL'], 50)."' AND POIDS='".fix_int($image['POIDS'])."' AND TYPE='".fix_text($image['TYPE'])."' AND NOM_SCRIPT='".fix_text($script_name_sql,50)."'";
+					$update = false;
+					$sql_action = 'unchange';
+				}
+				$sql_result = sql_query($sql, "import", $script_name, $debug);
+			}
+			$logs[$sql_action]++;
+			if($update){ 
+				if(!is_array($return[$image['REF_PORTAIL']])){ $return[$image['REF_PORTAIL']] = array();}
+					$return[$image['REF_PORTAIL']][$image['POIDS']] = $image;
+			}
+		}
+		import_log(ucfirst($type).' resume: '.$logs['insert'].' inserted / '.$logs['update'].' updated / '.$logs['unchange'].' unchanged' , $script_name);
+	}
+	return $return;
+}
+
+/**	
+*	get
+**/
+function get_imported_tours($script_name, $table, $nom_script_complement = false, $debug = false){
+	$return = array();
+	$sql = "SELECT REF_PORTAIL FROM ".$table."_TOURS WHERE ID_STATUT_TOUR > 0 AND NOM_SCRIPT";
+	if($nom_script_complement){ $sql .= " LIKE '".fix_text($script_name, 50)."%'";}
+	else{ $sql .= "='".fix_text($script_name, 50)."'";}
+	$sql .= " AND len(MD5_TOUR) = 32";
+	$result = sql_query($sql, "import", $script_name, $debug);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+		$return[] = $row['REF_PORTAIL'];
+	}
+	import_log(count($return).' tours imported found' , $script_name);
+	return $return;
+}
+/**
+*  delete
+**/
+function get_deleted_users($script_name, $table, $date_reference, $list_nom_script_complement = array(), $config){	
+	$return = array();
+	$will_delete = array();
+	$debug = $config['OPTIONS']['DEBUG'] == 1;
+	$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+	$script_names_sql = array($script_name_sql);
+	if(is_array($list_nom_script_complement) && count($list_nom_script_complement) > 0){ 
+		$script_names_sql = array();
+		foreach($list_nom_script_complement as $v){ 
+			if(!in_array($script_name_sql."_".$v,$script_names_sql)){ $script_names_sql[] = $script_name_sql."_".$v;}
+		}
+	}
+	
+	foreach($script_names_sql as $script_name_value){
+		$sql = "SELECT USERCODE, NOM_SCRIPT FROM ".$table."_USERS WHERE DATE_LAST_IMPORT_USER < '".$date_reference."' AND ID_STATUT_USER > -1 AND NOM_SCRIPT='".fix_text($script_name_value, 50)."'";
+		$result = sql_query($sql, "import", $script_name, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $row;}	
+	}
+	
+	if($config['OPTIONS']['DELETE_DELAY'] >= 3 && preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $date_reference, $date_limit) > 0){
+		$time_limit = mktime($date_limit[4], $date_limit[5], $date_limit[6], $date_limit[2], $date_limit[3], $date_limit[1])-$config['OPTIONS']['DELETE_DELAY']*24*60*60;
+		$date_delete_alert = date('Y-m-d H:i:s', $time_limit+3*24*60*60);
+		$date_delete = date('Y-m-d H:i:s', $time_limit);
+
+		$sql = "SELECT USERCODE, NOM_SCRIPT, NOM_SOCIETE, DATEDIFF(dd, '".$date_delete."', DATE_LAST_IMPORT_USER) DELAY FROM ".$table."_USERS WHERE (DATE_LAST_IMPORT_USER BETWEEN '".$date_delete."' AND '".$date_delete_alert."') AND ID_STATUT_USER > -1 AND NOM_SCRIPT LIKE '".fix_text($script_name_sql, 50)."_%'";
+		$result = sql_query($sql, "import", $script_name, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $will_delete[] = $row;}
+
+		$sql = "SELECT USERCODE, NOM_SCRIPT FROM ".$table."_USERS WHERE (DATE_LAST_IMPORT_USER < '".$date_delete."') AND ID_STATUT_USER > -1 AND NOM_SCRIPT LIKE '".fix_text($script_name_sql, 50)."_%'";
+		$result = sql_query($sql, "import", $script_name, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $row;}
+	}
+
+	$md5_deleted = str_replace('#TABLE#', 'user', MD5_DELETE);
+	foreach($return as $row){
+		$sql = "UPDATE ".$table."_IMAGES SET  DATE_MODIFICATION_IMAGE='".date('Y-m-d H:i:s')."', ID_STATUT_IMAGE='-1', MD5_IMAGE='".fix_text($md5_deleted, 32)."' WHERE REF_PORTAIL IN (SELECT REF_PORTAIL FROM ".$table."_TOURS WHERE USERCODE='".fix_text($row['USERCODE'],50)."' AND NOM_SCRIPT='".fix_text($row['NOM_SCRIPT'],50)."') AND ID_STATUT_IMAGE > -1 AND NOM_SCRIPT='".fix_text($row['NOM_SCRIPT'],50)."'";
+		sql_query($sql, "import", $script_name, $debug);
+
+		$sql = "UPDATE ".$table."_TOURS SET DATE_MODIFICATION_TOUR='".date('Y-m-d H:i:s')."', ID_STATUT_TOUR='-1', MD5_TOUR='".fix_text($md5_deleted, 32)."' WHERE USERCODE='".fix_text($row['USERCODE'],50)."' AND ID_STATUT_TOUR > -1  AND NOM_SCRIPT='".fix_text($row['NOM_SCRIPT'],50)."'";
+		sql_query($sql, "import", $script_name, $debug);
+	}
+	import_log(count($return).' users to delete found' , $script_name);
+	if(count($will_delete) > 0) import_log(count($will_delete).' users will be deleted soon' , $script_name);
+	return array('DELETE' => $return, 'WILL_DELETE' => $will_delete);
+}
+
+function get_deleted_tours($script_name, $table, $date_reference, $list_nom_script_complement = array(), $diffusions_allowed, $debug = false){
+	$return = array();
+	$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+	$script_names_sql = array($script_name_sql);
+	if(is_array($list_nom_script_complement) && count($list_nom_script_complement) > 0){
+		$script_names_sql = array();
+		foreach($list_nom_script_complement as $v){ 
+			$tmp = $script_name_sql."_".$v;
+			if(!in_array($tmp, $script_names_sql)){ $script_names_sql[] = $tmp;}
+		}
+	}
+
+	foreach($script_names_sql as $script_name_value){
+		$sql = "SELECT REF_PORTAIL, NOM_SCRIPT,USERCODE FROM ".$table."_TOURS WHERE DATE_LAST_IMPORT_TOUR < '".$date_reference."' AND ID_STATUT_TOUR > -1 AND NOM_SCRIPT='".fix_text($script_name_value, 50)."'";
+		$result = sql_query($sql, "import", $script_name, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+			$row['DIFFUSIONS_ALLOWED'] = $diffusions_allowed[$row['USERCODE']];
+			$return[] = $row;
+		}	
+	}
+	$md5_deleted = str_replace('#TABLE#', 'tour', MD5_DELETE);
+	foreach($return as $row){
+		$sql = "UPDATE ".$table."_IMAGES SET DATE_MODIFICATION_IMAGE='".date('Y-m-d H:i:s')."', ID_STATUT_IMAGE='-1', MD5_IMAGE='".fix_text($md5_deleted, 32)."' WHERE  REF_PORTAIL='".fix_text($row['REF_PORTAIL'],50)."' AND ID_STATUT_IMAGE > -1 AND NOM_SCRIPT='".fix_text($row['NOM_SCRIPT'],50)."'";
+		sql_query($sql, "import", $script_name, $debug);
+	}
+	import_log(count($return).' tours to delete found' , $script_name);
+	return $return;
+}
+
+function get_deleted_transactions($script_name, $table, $date_reference, $list_nom_script_complement = array(), $debug = false){
+	$return = array();
+	$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+	$script_names_sql = array($script_name_sql);
+	if(is_array($list_nom_script_complement) && count($list_nom_script_complement) > 0){
+		$script_names_sql = array();
+		foreach($list_nom_script_complement as $v){ 
+			$tmp = $script_name_sql."_".$v;
+			if(!in_array($tmp, $script_names_sql)){ $script_names_sql[] = $tmp;}
+		}
+	}
+	
+	foreach($script_names_sql as $script_name_value){
+		$sql = "SELECT REF_PORTAIL, NOM_SCRIPT FROM ".$table."_TRANSACTIONS WHERE DATE_LAST_IMPORT_TRANSACTION < '".$date_reference."' AND ID_STATUT_TRANSACTION > -1 AND NOM_SCRIPT='".fix_text($script_name_value, 50)."'";
+		$result = sql_query($sql, "import", $script_name, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $row;}	
+	}
+	import_log(count($return).' transactions to delete found' , $script_name);
+	
+	return $return;
+}
+
+function get_deleted_images($script_name, $table, $date_reference, $type="image", $list_nom_script_complement = array(), $list_tours_allowed_import_images = false, $debug = false){
+	$return = array();
+	$sql_restriction = "";
+	$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+	$script_names_sql = array($script_name_sql);
+	if(is_array($list_nom_script_complement) && count($list_nom_script_complement) > 0){
+		$script_names_sql = array();
+		foreach($list_nom_script_complement as $v){ 
+			$tmp = $script_name_sql."_".$v;
+			if(!in_array($tmp, $script_names_sql)) $script_names_sql[] = $tmp;
+		}
+	}
+	if(is_array($list_tours_allowed_import_images)){
+		if(count($list_tours_allowed_import_images) == 0){ return $return;}
+		$sql_restriction = "AND REF_PORTAIL IN ('".implode("', '", $list_tours_allowed_import_images)."')";
+	}
+	
+	foreach($script_names_sql as $script_name_value){
+		$sql = "SELECT REF_PORTAIL, POIDS, NOM_SCRIPT FROM ".$table."_IMAGES WHERE DATE_LAST_IMPORT_IMAGE < '".$date_reference."' AND ID_STATUT_IMAGE > -1 and type='".$type."' AND NOM_SCRIPT='".fix_text($script_name_value,50)."' ".$sql_restriction." order by POIDS DESC";
+		if($debug) 	import_log('[DEBUG][get_deleted_images] request:'.$sql , $script_name);
+		
+		$result = sql_query($sql, "import", $script_name, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $row;}	
+	}
+	import_log(count($return).' '.$type.'s to delete found' , $script_name);
+	return $return;
+}
+
+
+function get_new_tour_with_images($script_name, $table, $date_reference, $list_nom_script_complement = array(), $debug = false){
+	$return = array();
+	$script_name_sql = ($config['OPTIONS']['NOM_SCRIPT_SQL'] != "" ? $config['OPTIONS']['NOM_SCRIPT_SQL'] : $script_name);
+	$script_names_sql = array($script_name_sql);
+	if(is_array($list_nom_script_complement) && count($list_nom_script_complement) > 0){
+		$script_names_sql = array();
+		foreach($list_nom_script_complement as $v){ 
+			$tmp = $script_name_sql."_".$v;
+			if(!in_array($tmp, $script_names_sql)){ $script_names_sql[] = $tmp;}
+		}
+	}
+
+	foreach($script_names_sql as $script_name_value){
+		$sql = "SELECT ".$table."_USERS.USERCODE,EMAIL_UTILISATEUR, REF_PORTAIL, (SELECT COUNT(*) FROM ".$table."_IMAGES WHERE REF_PORTAIL=".$table."_TOURS.REF_PORTAIL) NB FROM ".$table."_TOURS INNER JOIN ".$table."_USERS ON ".$table."_USERS.USERCODE=".$table."_TOURS.USERCODE WHERE DATE_CREATION_TOUR > '".$date_reference."' AND ID_STATUT_TOUR > 0 AND ".$table."_TOURS.NOM_SCRIPT='".fix_text($script_name_value, 50)."'";
+		$result = sql_query($sql, "import", $script_name, $debug);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+			if($row['NB'] > 0 && $row['EMAIL_UTILISATEUR'] != "" && !isset($return[$row['USERCODE']])){
+				$return[$row['USERCODE']] = $row;
+			}
+		}	
+	} 
+	import_log(count($return).' new tour with image found' , $script_name);
+	return $return;
+}
+
+/**
+* update delete
+**/
+function delete_data_users($users, $script_name, $table, $debug = false){
+	global $db_data;
+	import_log('[DEBUG] USERS'.count($users) , $script_name);
+	if(count($users) > 0){
+		$md5_deleted = str_replace('#TABLE#', 'user', MD5_DELETE);
+		foreach($users as $user){
+			$sql = "UPDATE ".$table."_USERS SET  ID_STATUT_USER='".($user['DONE'] ? '-1' : '0')."', DATE_MODIFICATION_USER='".date('Y-m-d H:i:s')."', MD5_USER='".fix_text($md5_deleted)."' WHERE USERCODE='".fix_text($user['USERCODE'],50)."' AND NOM_SCRIPT='".fix_text($user['NOM_SCRIPT'],50)."'";
+//			import_log('[DEBUG] SQL'.$sql , $script_name);
+			sql_query($sql, "import", $script_name, $debug);
+		}
+	}
+}
+
+function delete_data_tours($tours, $script_name, $table, $debug = false){
+	if(count($tours) > 0){
+		$md5_deleted = str_replace('#TABLE#', 'tour', MD5_DELETE);
+		foreach($tours as $tour){
+			$sql = "UPDATE ".$table."_TOURS SET DATE_MODIFICATION_TOUR='".date('Y-m-d H:i:s')."', ID_STATUT_TOUR='".($tour['DONE'] ? '-1' : '0')."', MD5_TOUR='tour deleted' WHERE REF_PORTAIL='".fix_text($tour['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($tour['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);
+		}
+	}
+}
+
+function delete_data_images($images, $script_name, $table, $type="image", $debug = false){
+	if(count($images) > 0){
+		$md5_deleted = str_replace('#TABLE#', 'image', MD5_DELETE);
+		foreach($images as $image){
+			$sql = "UPDATE ".$table."_IMAGES SET DATE_MODIFICATION_IMAGE='".date('Y-m-d H:i:s')."', ID_STATUT_IMAGE='".($image['DONE'] ? '-1' : '0')."', MD5_IMAGE='".fix_text($md5_deleted)."' WHERE REF_PORTAIL='".fix_text($image['REF_PORTAIL'],50)."' AND POIDS='".fix_int($image['POIDS'])."' AND TYPE='".$type."'  AND NOM_SCRIPT='".fix_text($image['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);
+		}
+	}
+}
+
+function delete_data_plans($plans, $script_name, $table, $debug = false){
+	delete_data_images($plans, $script_name, $table, 'plan', $debug);
+}
+
+function delete_data_transactions($transactions, $script_name, $table, $debug = false){
+	if(count($transactions) > 0){
+		$md5_deleted = str_replace('#TABLE#', 'transaction', MD5_DELETE);
+		foreach($transactions as $transaction){
+			$sql = "UPDATE ".$table."_TRANSACTIONS SET DATE_MODIFICATION_TRANSACTION='".date('Y-m-d H:i:s')."', ID_STATUT_TRANSACTION='".($transaction['DONE'] ? '-1' : '0')."', MD5_TRANSACTION='".fix_text($md5_deleted)."' WHERE REF_PORTAIL='".fix_text($transaction['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($transaction['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);	
+		}
+	}
+}
+
+/**
+* update done
+**/
+function update_done_data_users($users, $script_name, $table, $debug = false){
+	global $db_data;
+	if(count($users) > 0){
+		foreach($users as $user){
+			$sql = "UPDATE ".$table."_USERS SET DATE_MODIFICATION_USER='".date('Y-m-d H:i:s')."', MD5_USER='".fix_text($user['MD5_USER'] , 32)."' WHERE USERCODE='".fix_text($user['USERCODE'],50)."' AND NOM_SCRIPT='".fix_text($user['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);	
+		}
+	}
+}
+
+function update_done_data_tours($tours, $script_name, $table, $debug = false){
+	if(count($tours) > 0){
+		foreach($tours as $tour){
+			$sql = "UPDATE ".$table."_TOURS SET DATE_MODIFICATION_TOUR='".date('Y-m-d H:i:s')."', MD5_TOUR='".fix_text($tour['MD5_TOUR'] , 32)."' WHERE REF_PORTAIL='".fix_text($tour['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($tour['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);
+		}
+	}
+}
+
+function update_done_data_images_table($images, $script_name, $table, $type="image", $debug = false){
+	if(count($images) > 0){
+		foreach($images as $image){
+			$sql = "UPDATE ".$table."_IMAGES SET DATE_MODIFICATION_IMAGE='".date('Y-m-d H:i:s')."', MD5_IMAGE='".fix_text($image['MD5_IMAGE'] , 32)."' WHERE REF_PORTAIL='".fix_text($image['REF_PORTAIL'],50)."' AND POIDS='".fix_int($image['POIDS'])."' AND TYPE='".$type."'  AND NOM_SCRIPT='".fix_text($image['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);
+			$tours_failed[$image['REF_PORTAIL']] = $image;
+		}
+	}
+}
+
+function update_done_data_images($plans, $script_name, $table, $debug = false){
+	update_done_data_images_table($plans, $script_name, $table, "image", $debug);
+}
+
+function update_done_data_plans($plans, $script_name, $table, $debug = false){
+	update_done_data_images_table($plans, $script_name, $table, "plan", $debug);
+}
+
+function update_done_data_transactions($transactions, $script_name, $table, $debug = false){
+	if(count($transactions) > 0){
+		foreach($transactions as $transaction){
+			$sql = "UPDATE ".$table."_TRANSACTIONS SET DATE_MODIFICATION_TRANSACTION='".date('Y-m-d H:i:s')."', MD5_TRANSACTION='".fix_text($transaction['MD5_TRANSACTION'] , 32)."' WHERE REF_PORTAIL='".fix_text($transaction['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($transaction['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);
+		}
+	}
+}
+
+/**
+* update failed
+**/
+function update_failed_data_users($users, $script_name, $table, $debug = false){
+	global $db_data;
+	if(count($users) > 0){
+		$user_logo_suffixes = array('','_USER','_VIDEO');
+		$md5_update_failed = str_replace('#TABLE#', 'user', MD5_UPDATE_FAILED);
+		foreach($users as $user){
+			$sql_complement = "";
+			foreach($user_logo_suffixes as $suffixe){
+				$sql_complement .= ', MD5_LOGO'.$suffixe."='".$md5_update_failed."' ";
+			}
+			$sql = "UPDATE ".$table."_USERS SET DATE_MODIFICATION_USER='".date('Y-m-d H:i:s')."', MD5_USER='".fix_text($md5_update_failed , 32)."'".$sql_complement." WHERE USERCODE='".fix_text($user['USERCODE'],50)."' AND NOM_SCRIPT='".fix_text($user['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);	
+		}
+	}
+}
+
+function update_failed_data_tours($tours, $script_name, $table, $debug = false){
+	if(count($tours) > 0){
+		$md5_update_failed = str_replace('#TABLE#', 'tour', MD5_UPDATE_FAILED);
+		foreach($tours as $tour){
+			$sql = "UPDATE ".$table."_TOURS SET DATE_MODIFICATION_TOUR='".date('Y-m-d H:i:s')."', MD5_TOUR='".fix_text($md5_update_failed , 32)."' WHERE REF_PORTAIL='".fix_text($tour['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($tour['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);	
+		}
+	}
+}
+
+function update_failed_data_images_table($images, $script_name, $table, $type="image", $debug = false){
+	if(count($images) > 0){
+		$md5_update_failed = str_replace('#TABLE#', 'image', MD5_UPDATE_FAILED);
+		$tours_failed = array();
+		foreach($images as $image){
+			$sql = "UPDATE ".$table."_IMAGES SET DATE_MODIFICATION_IMAGE='".date('Y-m-d H:i:s')."', MD5_IMAGE='".fix_text($md5_update_failed , 32)."' WHERE REF_PORTAIL='".fix_text($image['REF_PORTAIL'],50)."' AND POIDS='".fix_int($image['POIDS'])."' AND TYPE='".$type."'  AND NOM_SCRIPT='".fix_text($image['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);
+			$tours_failed[$image['REF_PORTAIL']] = $image;
+		}
+		if(count($tours_failed) > 0){
+			foreach($tours_failed as $tour){
+				$sql = "UPDATE ".$table."_TOURS SET DATE_MODIFICATION_TOUR='".date('Y-m-d H:i:s')."', MD5_TOUR='".fix_text($md5_update_failed , 32)."' WHERE REF_PORTAIL='".fix_text($tour['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($tour['NOM_SCRIPT'],50)."'";
+				sql_query($sql, "import", $script_name, $debug);	
+			}
+		}
+	}
+}
+
+
+function update_failed_data_images($plans, $script_name, $table, $debug = false){
+	update_failed_data_images_table($plans, $script_name, $table, 'image', $debug);
+}
+
+function update_failed_data_plans($plans, $script_name, $table, $debug = false){
+	update_failed_data_images_table($plans, $script_name, $table, 'plan', $debug);
+}
+
+function update_failed_data_transactions($transactions, $script_name, $table, $debug = false){
+	if(count($transactions) > 0){
+		$md5_update_failed = str_replace('#TABLE#', 'transaction', MD5_UPDATE_FAILED);
+		foreach($transactions as $transaction){
+			$sql = "UPDATE ".$table."_TRANSACTIONS SET DATE_MODIFICATION_TRANSACTION='".date('Y-m-d H:i:s')."', MD5_TRANSACTION='".fix_text($md5_update_failed , 32)."' WHERE REF_PORTAIL='".fix_text($transaction['REF_PORTAIL'],50)."' AND NOM_SCRIPT='".fix_text($transaction['NOM_SCRIPT'],50)."'";
+			sql_query($sql, "import", $script_name, $debug);	
+		}
+	}
+}
+
+/**
+* other
+**/
+function make_request_insert($fields, &$data){
+	$return = array('fields'=>'', 'values'=>'');
+	
+	// RS 2012-08-24 : Ne plus stocker certains champs useless...
+	$tab_skip_fields = array(
+		'description', 'equipements', 'nom_visite', 'voisinnage', 'adresse', 'code_postal', 'numero_mls', 'titre_image', 
+		'url_annonce', 'ville', 'classe_batiment', 'date_derniere_verification', 'duree_bail_min', 'duree_bail_max', 'id_rail', 'id_sous_location', 'orientation',
+		'prix_min', 'prix_max', 'surface_totale_batiment', 'taxe_habitation', 'taxe_fonciere', 'taxes', 'surface_terrain', 'surface_sejour', 'surface_habitable',
+		'numero_etage', 'nombre_salle_eau', 'nombre_etages', 'nombre_garage', 'nombre_demi_salle_bain', 'nombre_salle_bain', 'nombre_terrasse', 'nombre_chambre', 'nombre_piece',
+		'montant_travaux', 'latitude', 'longitude', 'frais_agence', 'id_amenagement_handicap', 'id_ascenseur', 'id_bien_amenage', 'id_cave', 'id_climatisation', 'id_digicode',
+		'id_exclusivite', 'id_gardien', 'id_immeuble_recent', 'id_neuf', 'id_internet_haut_debit', 'id_interphone', 'id_periodicite_loyer', 'id_piscine', 'id_refait_neuf',
+		'id_travaux', 'id_type_chauffage', 'id_type_cuisine', 'id_unite_surface_habitable', 'id_unite_surface_terrain', 'charges', 'date_disponibilite', 'annee_construction',
+		'periodicite_location', 'id_prix_negociable', 'surface_disponible', 'prix_bien', 'ref_devise', 'ref_etat', 'id_prestige'
+	);
+	foreach($data as $key=>$v){
+		$k = ucfirst(strtolower($key));
+		if(!in_array(strtolower($key), $tab_skip_fields)) {
+			if(is_array($fields[$k])){
+				$return['fields'] .= ', '.$k;
+				$return['values'] .= ", '".$fields[$k]['function']( $v, $fields[$k]['limit'])."'";
+				$data[$key] = $fields[$k]['function']( $v, $fields[$k]['limit']);
+			}else if($fields[$k] != ""){
+				$return['fields'] .= ', '.$k;
+				if(preg_match('/datetime/i', $fields[$k]) > 0 && $fields[$k]($v) == ""){
+					$return['values'] .= ", NULL";
+					$data[$key] = "";
+				}else{
+					$return['values'] .= ", '".$fields[$k]($v)."'";
+					$data[$key] = $fields[$k]($v);
+				}
+			}
+		}
+	}
+	return $return;
+}
+
+function make_request_update($fields, &$data){
+	$return = "";
+	// RS 2012-08-24 : Ne plus stocker certains champs useless...
+	$tab_skip_fields = array(
+		'description', 'equipements', 'nom_visite', 'voisinnage', 'adresse', 'code_postal', 'numero_mls', 'titre_image', 
+		'url_annonce', 'ville', 'classe_batiment', 'date_derniere_verification', 'duree_bail_min', 'duree_bail_max', 'id_rail', 'id_sous_location', 'orientation',
+		'prix_min', 'prix_max', 'surface_totale_batiment', 'taxe_habitation', 'taxe_fonciere', 'taxes', 'surface_terrain', 'surface_sejour', 'surface_habitable',
+		'numero_etage', 'nombre_salle_eau', 'nombre_etages', 'nombre_garage', 'nombre_demi_salle_bain', 'nombre_salle_bain', 'nombre_terrasse', 'nombre_chambre', 'nombre_piece',
+		'montant_travaux', 'latitude', 'longitude', 'frais_agence', 'id_amenagement_handicap', 'id_ascenseur', 'id_bien_amenage', 'id_cave', 'id_climatisation', 'id_digicode',
+		'id_exclusivite', 'id_gardien', 'id_immeuble_recent', 'id_neuf', 'id_internet_haut_debit', 'id_interphone', 'id_periodicite_loyer', 'id_piscine', 'id_refait_neuf',
+		'id_travaux', 'id_type_chauffage', 'id_type_cuisine', 'id_unite_surface_habitable', 'id_unite_surface_terrain', 'charges', 'date_disponibilite', 'annee_construction',
+		'periodicite_location', 'id_prix_negociable', 'surface_disponible', 'prix_bien', 'ref_devise', 'ref_etat', 'id_prestige'
+	);
+	foreach($data as $key=>$v){
+		$k = ucfirst(strtolower($key));
+		if(!in_array(strtolower($key), $tab_skip_fields)) {
+			if(is_array($fields[$k])){
+				$return .= ", ".$k."='".$fields[$k]['function']( $v, $fields[$k]['limit'])."'";
+				$data[$key] = $fields[$k]['function']( $v, $fields[$k]['limit']);
+			}else if($fields[$k] != ""){
+				if(preg_match('/datetime/i', $fields[$k]) > 0 && $fields[$k]($v) == ""){
+					$return .= ", ".$k."=NULL";	
+					$data[$key] = "";
+				}else{
+					$return .= ", ".$k."='".$fields[$k]($v)."'";
+					$data[$key] = $fields[$k]($v);
+				}
+			}
+		}
+	}
+	return $return;
+}
+
+
+/**
+* check import data
+*/
+
+function convert_table_for_sample($array){
+	if(!is_array($array)){
+		if($array === true) $array = 'REQUIRE';
+	}else if(count($array) > 0){
+		if(array_key_exists('ALLOWED_VALUES', $array)){
+			$tmp = array();
+			foreach($array['ALLOWED_VALUES'] as $k=>$v){
+				if($v === true){ $tmp[] = "true";}
+				else if($v === false){ $tmp[] = "false";}
+				else if(is_array($v) && $v['REQUIRE_ONLY']){ $tmp[] = $k.' (REQUIRE ONLY:'.implode(';' , $v['REQUIRE_ONLY']).')';}
+				else{ $tmp[] = $v;}
+			}
+			$array['ALLOWED_VALUES'] = $tmp;
+		}else if(!array_key_exists('SUBSTITUTE', $array) && !array_key_exists('REQUIRE', $array)){
+			foreach($array as $k=>$v){
+				$array[$k] = convert_table_for_sample($v);
+			}
+		}
+	}
+	return $array;
+}
+
+function get_import_data_model($config ="", $sample = false){
+	$model = array(
+		'USERS' => array(
+			'USERCODE' => true,
+			'MD5_USER' => true,
+			'NOM_UTILISATEUR' => true,
+			'PRENOM_UTILISATEUR' => false,
+			'TELEPHONE_UTILISATEUR' => false,
+			'BIO_UTILISATEUR' => false,
+			'QUALITE_UTILISATEUR' => false,
+			'NUMERO_LISCENCE' => false,
+			'MOBILE_UTILISATEUR' => false,
+			'EMAIL_UTILISATEUR' => false,
+			'NOM_SOCIETE' => true,
+			'SITEWEB_SOCIETE' => false,
+			'ADRESSE' => false,
+			'VILLE' => false,
+			'CODE_POSTAL' => false,
+			'ETAT' => false,
+			'ID_PAYS' => false,
+			'FAX' => false,
+			'TELEPHONE' => false,
+			'LATITUDE' => false,
+			'LONGITUDE' => false,
+			'LOGIN' => false,
+			'PASSWORD' => false,
+			'EMAIL_SOCIETE' => false,
+			'URL_LOGO' => array('REQUIRE' => 'MD5_LOGO'),
+			'MD5_LOGO' => false,
+			'URL_LOGO_USER' => array('REQUIRE' => 'MD5_LOGO_USER'),
+			'MD5_LOGO_USER' => false,
+			'URL_LOGO_VIDEO' => array('REQUIRE' => 'MD5_LOGO_VIDEO'),
+			'MD5_LOGO_VIDEO' => false,
+			'PROFIL_VIDEO' => false,
+			'DIFFUSIONS' => array( 'LOGIN'=>true, 'PASSWORD'=>false, 'PREFIXE_DIFFUSION' => false, 'DSN_IMAP' => false, 'LIMIT' => false, 'LIMIT_ORDER' => false),
+			'OPTIONS' => array('DISABLED'=> false),
+			'COMPLEMENTS' => array('FIELD'=>true, 'VALUE'=>false),
+		),
+		'TOURS' => array(
+			'USERCODE' => true,
+			'REF_PORTAIL' => true,
+			'ID_PAYS' => true,
+			'ID_TYPE_BIEN' => true,
+			'ID_TYPE_TRANSACTION' => true,
+			'MD5_TOUR' => true,
+			'ADRESSE' => false,
+			'ANNEE_CONSTRUCTION' => false,
+			'CHARGES' => false,
+			'CODE_POSTAL' => false,
+			'DATE_DISPONIBILITE' => false,
+			'DESCRIPTION' => false,
+			'EQUIPEMENTS' => false,
+			'FRAIS_AGENCE' => false,
+			'ID_AMENAGEMENT_HANDICAP' => false,
+			'ID_ASCENSEUR' => false,
+			'ID_BIEN_AMENAGE' => false,
+			'ID_CAVE' => false,
+			'ID_CLIMATISATION' => false,
+			'ID_DIGICODE' => false,
+			'ID_EXCLUSIVITE' => false,
+			'ID_GARDIEN' => false,
+			'ID_IMMEUBLE_RECENT' => false,
+			'ID_NEUF' => false,
+			'ID_INTERNET_HAUT_DEBIT' => false,
+			'ID_INTERPHONE' => false,
+			'ID_PERIODICITE_LOYER' => false,
+			'ID_PISCINE' => false,
+			'ID_REFAIT_NEUF' => false,
+			'ID_STATUT_LISTING' => false,
+			'ID_TRAVAUX' => false,
+			'ID_TYPE_CHAUFFAGE' => false,
+			'ID_TYPE_CUISINE' => false,
+			'ID_UNITE_SURFACE_HABITABLE' => false,
+			'ID_UNITE_SURFACE_TERRAIN' => false,
+			'LATITUDE' => false,
+			'LONGITUDE' => false,
+			'MONTANT_TRAVAUX' => false,
+			'NOM_VISITE' => false,
+			'NOMBRE_PIECE' => false,
+			'NOMBRE_CHAMBRE' => false,
+			'NOMBRE_TERRASSE' => false,
+			'NOMBRE_SALLE_BAIN' => false,
+			'NOMBRE_DEMI_SALLE_BAIN' => false,
+			'NOMBRE_GARAGE' => false,
+			'NOMBRE_ETAGES' => false,
+			'NOMBRE_SALLE_EAU' => false,
+			'NUMERO_ETAGE' => false,
+			'NUMERO_MLS' => false,
+			'ORIENTATION' => false,
+//			'PERIODICITE_LOCATION' => false,
+			'PRIX_BIEN' => false,
+			'REF_DEVISE' => false,
+			'REF_ETAT' => false,
+			'REF_VISITE' => false,
+			'SURFACE_HABITABLE' => false,
+			'SURFACE_SEJOUR' => false,
+			'SURFACE_TERRAIN' => false,
+			'TAXES' => false,
+			'URL_ANNONCE' => false,
+			'VILLE' => false,
+			'VOISINNAGE' => false,
+			'ID_ADRESSE_CACHEE' => false,
+			'ID_LANGUE' => true,
+			'CLASSE_BATIMENT' => false,
+			'DATE_DERNIERE_VERIFICATION' => false,
+			'DUREE_BAIL_MIN' => false,
+			'DUREE_BAIL_MAX' => false,
+			'ID_RAIL' => false,
+			'ID_SOUS_LOCATION' => false,
+			'ID_UNITE_PRIX_SURFACE' => false,
+			'ID_PRIX_NEGOCIABLE' => false,
+			'PRIX_MIN' => false,
+			'PRIX_MAX' => false,
+			'REF_PORTAIL_MASTER' => false,
+			'SURFACE_DISPONIBLE' => false,
+			'SURFACE_TOTALE_BATIMENT' => false,
+			'ID_PRESTIGE' => false,
+			'TAXE_FONCIERE' => false,
+			'TAXE_HABITATION' => false,
+			'ID_MUSIQUE_VIDEO' => false,
+			'REF_VOICE' => false,
+			'DPE_LETTRE' => false,
+			'DPE_VALEUR' => false,
+			'GES_LETTRE' => false,
+			'GES_VALEUR' => false,
+			'CACHER_LOCALISATION' => false,
+			'COMPLEMENTS' => array('FIELD'=>true, 'VALUE'=>false),
+			'OPTIONS' => array('NO_TTS'=> false, 'NO_VIDEO' => false, 'NO_DIFFUSION' => false),
+			'DIFFUSIONS' => array( 'LOGIN'=>false, 'PASSWORD'=>false, 'TITLE'=>false),
+			//field not in db
+			'ID_ANIMAUX' => false,
+			'CAUTION' => false,
+			'DESCRIPTION_VIDEO' => false,
+		),
+		'TRANSACTIONS' => array(
+			'USERCODE' => true,
+			'REF_PORTAIL' => true,
+			'ID_PAYS' => true,
+			'ID_TYPE_BIEN' => true,
+			'ID_TYPE_TRANSACTION' => true,
+			'MD5_TRANSACTION' => true,
+			'ADRESSE' => array('SUBSTITUTE' => array('LONGITUDE','LATITUDE')),
+			'CODE_POSTAL' => array('SUBSTITUTE' => array('LONGITUDE','LATITUDE')),
+			'LATITUDE' => array('REQUIRE'=> 'LONGITUDE', 'SUBSTITUTE' => array('ADRESSE','CODE_POSTAL','VILLE')),
+			'LONGITUDE' => array('REQUIRE'=> 'LATITUDE', 'SUBSTITUTE' => array('ADRESSE','CODE_POSTAL','VILLE')),
+			'NOM_VISITE' => false,
+			'REF_ETAT' => false,
+			'VILLE' => array('SUBSTITUTE' => array('LONGITUDE','LATITUDE'))
+		),
+		'IMAGES' => array('REF_PORTAIL' => true, 'POIDS' => true, 'URL_IMAGE' => true, 'FILE_IMAGE' => false, 'MD5_IMAGE' => true, 'TITRE_IMAGE' => false, 'TYPE' => false, 'KEEP_IMAGE' => false/*, 'APPEND_IMAGES' => false*/),
+		'PLANS' => array('REF_PORTAIL' => true, 'POIDS' => true, 'URL_IMAGE' => true, 'MD5_IMAGE' => true, 'TITRE_IMAGE' => false, 'TYPE' => false, 'KEEP_IMAGE' => false),
+	);
+	
+	if($config['OPTIONS']['IMPORT_NOT_FULL'] == 1){ $model['USERS']['NOM_SCRIPT_COMPLEMENT'] = true;}
+	if($config['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1){ $model['TOURS']['NOM_SCRIPT_COMPLEMENT'] = true;}
+	if($config['OPTIONS']['OPTIONAL_IMPORT_IMAGES'] == 1){ $model['TOURS']['IMPORT_IMAGES'] = array('ALLOWED_VALUES'=>array(true,false));}
+	if($config['OPTIONS']['INCOMPLETE_IMPORT_IMAGES'] == 1){ $model['IMAGES']['NO_UPDATE'] = array('ALLOWED_VALUES' => array(true,false));}
+	if($config['OPTIONS']['DIFFERENTIAL_IMPORT_IMAGE'] == 1){ 
+		$model['IMAGES_DEL'] = array('REF_PORTAIL' => true, 'POIDS' => true);
+		$model['PLANS_DEL'] = array('REF_PORTAIL' => true, 'POIDS' => true);
+	}
+	if($config['OPTIONS']['DIFFERENTIAL_IMPORT_TOUR'] == 1){ 
+		$model['TOURS_DEL'] = array('USERCODE' => true, 'REF_PORTAIL' => true);
+	}
+	if($config['OPTIONS']['DIFFERENTIAL_IMPORT_USER'] == 1){ 
+		$model['USERS_DEL'] = array('USERCODE' => true);
+	}
+	if($config['OPTIONS']['DEFAULT_USER'] == 1){ 
+		$model['DEFAULT_USER'] = $model['USERS'];
+		unset($model['DEFAULT_USER']['USERCODE']);
+	}
+	if($config['OPTIONS']['PART_IMPORT'] == 1){ 
+		$model['NEXT_PART'] = array(
+			'CONTINUE' => array( 'ALLOWED_VALUES' => array( true, false)),
+			'CURRENT_STEP' => true,
+			'DIVERS' => false
+		);
+	}
+	
+	if($config['OPTIONS']['OPTIONAL_TOUR_DIFFUSION'] == 1){
+		$model['TOURS']['DIFFUSIONS']['ALLOWED'] = array('ALLOWED_VALUES'=>array(true, false));
+	}
+	
+	if($config['OPTIONS']['DIFFERENTIAL_TOUR_DIFFUSION'] == 1){
+		$model['TOURS']['DIFFUSIONS']['ONLINE'] = array('ALLOWED_VALUES'=>array(true, false));
+	}
+	
+	if($config['OPTIONS']['IMPORT_NOT_ALWAYS_FULL'] == 1){ 
+		$model['OPTIONS'] = array(
+				'NO_DELETE' => array('ALLOWED_VALUES'=>array(true, false))
+		);
+	}
+
+	if($sample) $model = convert_table_for_sample($model);
+	return $model;
+}
+
+function check_import_data($data, $config, $detail = true){
+	global $model;
+	$return = array();
+	//script
+	$content = file_get_contents(PATH_IMPORT.$config['CODE_IMPORT'].".php");
+
+	$nbParameters = 6;
+	$more_params = array('PART_IMPORT', 'GET_IMPORTED_TOURS', 'GET_DATE_LAST_IMPORT');
+	foreach($more_params as $k){
+		if($config['OPTIONS'][$k] == 1) $nbParameters++;
+	}
+	
+	if(preg_match('/[^\/]function[ \t]+'.$config['CODE_IMPORT'].'\([^,]+(,[^,]+){'.($nbParameters-1).'}\)[ \t]?\{/i', $content) == 0){
+		$return[] = array('field' => "Main function", 'error' => "unfound or missing parameters... ".$nbParameters." arguments are needed", 'type'=>'fatal');
+	}
+	
+	preg_match_all('/(function)[ \t]*'.$config['CODE_IMPORT'].'/i', $content, $result);	
+	preg_match_all('/(function)[ \t]*([^\(]+)/i', $content, $result2);
+	
+	if(count($result) != count($result2)){
+		foreach($result2[2] as $v){
+			if(strpos($v, $config['CODE_IMPORT']) === false){
+				$return[] = array('field' => $v, 'error' => "invalide fonction name...", 'type'=>'fatal');
+			}
+		}
+	}
+
+	$list_options_needed = array(
+		'PART_IMPORT' => 'NEXT_PART',
+		'IMPORT_NOT_ALWAYS_FULL' => 'OPTIONS',
+		'DEFAULT_USER' => 'DEFAULT_USER',
+	);
+	foreach($list_options_needed as $k=>$v){
+		if($config['OPTIONS'][$k] && !isset($data[$v])){
+			$return[] = array('field' => $v, 'error' => "unfound...", 'type'=>'fatal');
+		}
+	}
+	
+
+	if(isset($config['OPTIONS']['DELETE_DELAY'])){
+		if($config['OPTIONS']['DELETE_DELAY'] < 3){
+			$return[] = array('field' => 'DELETE_DELAY', 'error' => "too small value... this option will be ignored..", 'type'=>'');
+		}else if($config['OPTIONS']['IMPORT_NOT_FULL'] != 1){
+			$return[] = array('field' => 'DELETE_DELAY', 'error' => "need IMPORT_NOT_FULL option for work...", 'type'=>'fatal');
+		}
+	}
+
+	if($config['OPTIONS']['NOTIFICATION_EMAIL'] == 1 && $config['OPTIONS']['TEMPLATE_EMAIL'] == ""){
+		$return[] = array('field' => 'config_import->TEMPLATE_EMAIL', 'error' => "empty declaration", 'type'=>'');
+	}
+	
+
+	//data
+	$model = get_import_data_model($config);
+	if(is_array($data) && count($data) > 0){
+		foreach($data as $table => $infos){
+			$fields_needs = array();
+			$fields_needs_found = array();
+			$fields_not_allow_null = array();
+			$fields_not_allow_values = array();
+			$fields_not_treat = array();
+			$diffusion_errors = array();
+			if(is_array($model[$table])){
+				foreach($model[$table] as $k=>$v){ 
+					if($v === true || (is_array($v) && isset($v['SUBSTITUTE']))){ 
+						$fields_needs[$k] = $v;
+					}else if(is_array($v) && isset($v['ALLOWED_VALUES'])){
+						$fields_needs[$k] = true;
+					}
+				}
+			}
+			if(is_array($infos) && count($infos) > 0){
+				foreach($infos as $pos=>$row){
+					$options_needed = false;
+					if(preg_match('/^('.implode('|',$list_options_needed).')$/',$table) > 0){ 
+						$pos = '';
+						$row = $infos;
+						$options_needed = true;
+					}
+					if(is_array($row) && count($row) > 0){
+						foreach($row as $field=>$value){
+							if(!isset($model[$table][$field])){
+								$fields_not_treat[$field] = $field;
+							}else if(is_array($model[$table][$field])){
+								if($model[$table][$field]['REQUIRE'] != ""){
+									if($value != "" && $row[$model[$table][$field]['REQUIRE']] == ""){
+										$return[] = array('field' => $table.'->'.$field, 'error' => " need this field:".$model[$table][$field]['REQUIRE']."(row:".$pos.")", 'type' => 'fatal');
+									}
+								}else if($model[$table][$field]['SUBSTITUTE'] == "" && $model[$table][$field]['ALLOWED_VALUES'] == ""){
+									if(is_array($value) && count($value) > 0){
+										foreach($value as $k=>$v){
+											if(is_array($v)){
+												$keys = array_keys($v);
+												foreach($keys as $key){
+													echo $key.(!isset($model[$table][$field][$key]) ? "true" : "false")."\n";
+													
+													if(!isset($model[$table][$field][$key])){ 
+														$fields_not_treat[$field] = $field."->".$key;
+													}else if(is_array($model[$table][$field][$key]['ALLOWED_VALUES']) && count($model[$table][$field][$key]['ALLOWED_VALUES']) > 0){
+														$allowed_value_found = false;
+														foreach($model[$table][$field][$key]['ALLOWED_VALUES'] as $value_allowed){
+															if($value_allowed === $v[$key]){
+																$allowed_value_found = true;
+																break;
+															}
+														}
+														if(!$allowed_value_found){
+															$fields_not_allow_values[$field."->".$k."->".$key] .= $pos.", ";
+														}
+													}else if($v[$key] == "" && $model[$table][$field][$key] == true && $diffusion_errors[$k."->".$key] != true){
+														$diffusion_errors[$field."->".$k."->".$key] = true;
+													}
+												}
+											}else if(!isset($model[$table][$field][$k])){ 
+												$fields_not_treat[$field] = $field."->".$k;
+											}
+										}
+									}else{
+										$return[] = array('field' => $table.'->'.$field, 'error' => " not contain an array...(row:".$pos.")", 'type' => 'fatal');
+									}
+								}
+								if($model[$table][$field]['SUBSTITUTE'] != ""){
+									if($value == "" && $value !== 0){ /*$fields_not_allow_null[$field] .= $pos.", ";*/}
+									else{ $fields_needs_found[$field] = $value;}	
+								}
+								if($model[$table][$field]['ALLOWED_VALUES'] != "" && is_array($model[$table][$field]['ALLOWED_VALUES']) && count($model[$table][$field]['ALLOWED_VALUES']) > 0){
+									$fields_needs_found[$field] = true;
+									$allowed_value_found = false;
+									foreach($model[$table][$field]['ALLOWED_VALUES'] as $value_allowed){
+										if($value_allowed === $value){ 
+											$allowed_value_found = true;
+											break;
+										}
+									}
+									if(!$allowed_value_found){
+										//$return[] = array('field' => $table.'->'.$field, 'error' => "value not allowed...(row:".$pos.")", 'type' => 'fatal');
+										$fields_not_allow_values[$field] .= $pos.", ";
+									}
+								}
+							}else if($fields_needs[$field] == true){
+								if($value == "" && $value !== 0){ $fields_not_allow_null[$field] .= $pos.", ";}
+								else{ $fields_needs_found[$field] = $value;}
+							}
+						}
+						foreach($fields_needs as $k=>$v){
+							if($v == true && !isset($row[$k]) && !is_array($model[$table][$k])){ $fields_not_allow_null[$k] .= $pos.", ";}
+						}
+					}else{ $return[] = array('field' => $table, 'error' => " not contain an array...");}
+				}
+				
+				if(count($fields_not_treat) > 0){
+					foreach($fields_not_treat as $v){ $return[] = array('field' => $table."->".$v, 'error' => "field not treat", 'type'=>'option');}
+				}
+				
+				if(count($fields_not_allow_null) > 0){
+					foreach($fields_not_allow_null as $k=>$v){ $return[] = array('field' => $table."->".$k, 'error' => "field not allow null value (row:".preg_replace('/, $/','',$v).")", 'type'=>'fatal');}
+				}
+				
+				if(count($fields_not_allow_values) > 0){
+					foreach($fields_not_allow_values as $k=>$v){ $return[] = array('field' => $table."->".$k, 'error' => "value not allowed... (row:".preg_replace('/, $/','',$v).")", 'type'=>'fatal');}
+				}
+
+				if(count($fields_needs_found) != count($fields_needs)){
+					foreach($fields_needs as $k=>$v){
+						if(!isset($fields_needs_found[$k])){
+							if(is_array($v['SUBSTITUTE'])){
+								$sub_error = "";
+								foreach($v['SUBSTITUTE'] as $sub){
+									if(!isset($fields_needs_found[$sub])){ $sub_error .= ", ".$sub;}
+								}
+								if($sub_error != ""){
+									$return[] = array('field' => $table."->".$k, 'error' => " if not present, require this substitute: ".preg_replace('/^, /i', '', $sub_error)."", 'type'=>'fatal');
+								}
+							}else if($v['SUBSTITUTE'] != ""){
+								if(!isset($fields_needs_found[$v['SUBSTITUTE']])){
+									$return[] = array('field' => $table."->".$k, 'error' => " if not present, require this substitute: ".$v['SUBSTITUTE']."", 'type'=>'fatal');
+								}
+							}else{
+								$return[] = array('field' => $table."->".$k, 'error' => "field not found...", 'type'=>'fatal');
+							}
+						}
+					}
+				}	
+								
+				if(count($diffusion_errors) > 0){
+					foreach($diffusion_errors as $k=>$v){
+						$return[] = array('field' => $table."->".$k, 'error' => "Missing field...", 'type'=>'fatal');
+					}	
+				}
+			}else{ 
+				$isFatal = ($table == "USERS" && $config['OPTIONS']['IMPORT_NOT_FULL'] == 1 && count($data['TOURS']) > 0);
+				$isFatal |= ($config['OPTIONS']['DEFAULT_USER'] == 1 || $table == "DEFAULT_USER");
+				$return[] = array('field' => $table, 'error' => "No informations...", 'type'=>($isFatal ? 'fatal': 'option'));	
+			}
+		}
+	}else{ $return[] = array('field' => "Main", 'error' => "out is not an array", 'type'=>'fatal');}
+	
+	if(!$detail){
+		$output = true;
+		if(count($return) > 0){
+			foreach($return as $error){
+				if($error['type'] == 'fatal'){ $output = false;}
+			}
+		}
+		$return = $output;
+	}
+	return $return;
+}
+
+function make_nom_visite($type_transac, $type_bien, $ville, $code_postal, $surface_habitable=0, $prix_bien=0){
+	if($surface_habitable == ''){
+		$surface_habitable = 0;
+	}
+	if($prix_bien == ''){
+		$prix_bien = 0;
+	}
+	$nom_visite = '';
+	$nom_visite .= ($type_transac == '' ? '' : ucfirst($type_transac));
+	$nom_visite .= ($type_bien == '' ? '' : ' - '.$type_bien);
+	$nom_visite .= ($ville == '' ? '' : ' - '.$ville);
+	$nom_visite .= ($code_postal == '' ? '' : ' ('.$code_postal.') ');
+	$nom_visite .= ($surface_habitable == 0 ? '' : ' - '.number_format($surface_habitable,0,' ',' ').'m²');
+	//$nom_visite .= ($prix_bien == 0 ? '' : ' - '.number_format($prix_bien,0,' ',' ').'€');
+	return $nom_visite;
+}
+
+function fixe_nom_visite($type_transac, $type_bien, $ville, $code_postal, $surface_habitable=0, $nb_pieces=0, $langue = 'FR'){
+	if($surface_habitable == ''){
+		$surface_habitable = 0;
+	}
+	if($nb_pieces == ''){
+		$nb_pieces = 0;
+	}
+	$tmp_tt = fix_type_transaction ( $type_transac );
+	$type_transac = $tmp_tt['alpha'];
+	if($langue == 'EN'){
+		$type_transac = ($tmp_tt['num'] == '2') ? 'To Rent' : 'For Sale';
+	}
+	if($langue == 'NL'){
+		$type_transac = ($tmp_tt['num'] == '2') ? 'Te huur' : 'Te koop';
+	}	
+	$nom_visite = '';
+	$nom_visite .= ($type_transac == '' ? '' : ucfirst($type_transac));
+	$nom_visite .= ($type_bien == '' ? '' : ' - '.$type_bien);
+	$nom_visite .= ($ville == '' ? '' : ' - '.$ville);
+	$nom_visite .= ($code_postal == '' ? '' : ' ('.$code_postal.')');
+	if($langue == 'EN'){
+		$nom_visite .= ($nb_pieces == 0 ? '' : ' - '.$nb_pieces.' room').($nb_pieces >1 ? "s" : "");
+	}elseif($langue == 'NL'){
+		$nom_visite .= ($nb_pieces == 0 ? '' : ' - '.$nb_pieces.' kamer').($nb_pieces >1 ? "s" : "");
+	}
+	else{
+	    $nom_visite .= ($nb_pieces == 0 ? '' : ' - '.$nb_pieces.' pièce').($nb_pieces >1 ? "s" : "");
+	}	
+	$nom_visite .= ($surface_habitable == 0 ? '' : ' - '.number_format($surface_habitable,0,' ',' ').'m²');
+	
+	return $nom_visite;
+}
+function fix_type_transaction ( $type_transaction ){
+	$default_return = array('num' => '1', 'alpha' => 'vente');
+	$type_transaction = strtolower($type_transaction);
+	switch($type_transaction){
+		case '1' :
+		case 'vente' :
+		case 'a vendre' :
+			$default_return['num'] = '1';
+			$default_return['alpha'] = 'A vendre';
+			$default_return['alpha2'] = 'vente';
+			break;
+		case '2' :
+		case 'location' :
+		case 'a louer' :
+			$default_return['num'] = '2';
+			$default_return['alpha'] = 'A louer';
+			$default_return['alpha2'] = 'location';
+			break;
+		case '3' :
+		case 'viager' :
+		case 'a vendre viager' :
+			$default_return['num'] = '2';
+			$default_return['alpha'] = 'A vendre viager';
+			$default_return['alpha2'] = 'viager';
+			break;
+		case '4' :
+		case 'location saisonniere' :
+		case 'location vacances' :
+			$default_return['num'] = '4';
+			$default_return['alpha'] = 'Location vacances';
+			$default_return['alpha2'] = 'Locations vacances';
+			break;			
+	}
+	return $default_return;
+}
+
+function fix_type_bien($id_type_bien, $id_type_in = 1){
+	/*
+		si $id_type_in = 1 les entr׳³ֲ³׳’ג€ֲ¢es sont trait׳³ֲ³׳’ג€ֲ¢s comme donn׳³ֲ³׳’ג€ֲ¢es alphabetique
+		sinon (0) => numerique
+	*/
+	
+	$default_type_bien = 0;
+	$match = array();
+	$autres = '/autres/i';
+	$appartement = '/appartement/i';
+	$maison = '/maison/i';
+	$terrain = '/terrain/i';
+	$bureau = '/bureau/i';
+	$immeuble = '/immeuble/i';
+	$loft = '/loft/i';
+	$villa = '/villa/i';
+	$chalet = '/chalet/i';
+	$commerce = '/commerce/i';
+	$chateau = '/chateau/i';
+	$parking = '/parking/i';
+	$ferme = '/ferme/i';
+	$duplex = '/duplex/i';
+
+	$list_biens = array (
+		'0' => $autres,
+		'1' => $appartement,
+		'2' => $maison,
+		'3' => $terrain,
+		'4' => $bureau,
+		'5' => $immeuble,
+		'6' => $loft,
+		'7' => $villa,
+		'8' => $chalet,
+		'9' => $commerce,
+		'10' => $chateau,
+		'11' => $parking,
+		'12'  => $ferme,
+		'27'  => $duplex
+	);
+	
+	if($id_type_in == 1 ){
+		foreach($list_biens as $k => $v){
+			if(preg_match($v,strtolower($id_type_bien),$match)){
+				return $k;
+			}
+		}
+		return $default_type_bien;
+	} else {
+		$r = substr($list_biens[$id_type_bien],0, -1);
+		
+		return str_replace('/', '', $r);
+	}
+}
+
+function fix_type_chauffage($id_type_chauffage){
+	$match = array();
+	$gaz_patern = '/gaz/i';
+	$fuel_patern = '/fuel|fioul/i';
+	$electricite_patern = '/electricite|electrique/i';
+	$sol_patern = '/sol/i';
+	
+	if(preg_match($gaz_patern,strtolower($id_type_chauffage),$match)){
+		return '1';
+	} elseif(preg_match($fuel_patern,strtolower($id_type_chauffage),$match)) {
+		return '4';
+	} elseif(preg_match($electricite_patern,strtolower($id_type_chauffage),$match)){
+		return '2';
+	}elseif(preg_match($sol_patern,strtolower($id_type_chauffage),$match)) {
+		return '3';
+	} else {
+		return '0';
+	}
+}
+
+?>

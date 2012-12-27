@@ -1,0 +1,353 @@
+<?php
+
+require_once 'HTTP/Client.php';
+require_once 'HTTP/Request.php';
+require_once 'HTTP/Client/CookieManager.php';
+
+class PHPDailyMotionAPI{
+	//doc: http://www.dailymotion.com/doc/api/graph-api.html
+	var $api_key = "210eab1f520e9bf9baa2";
+	var $api_key_secret = "c67addc39fabd11f44ffa7ea5b84c318528344e8";
+	var $url_oauth = "https://api.dailymotion.com/oauth/token";
+	var $url_scope = "https://api.dailymotion.com/oauth/authorize";
+	var $url_upload = "https://api.dailymotion.com/file/upload"; 
+	var $url_idMaker = "https://api.dailymotion.com/me/videos";
+	var $url_listVideos = "https://api.dailymotion.com/me/videos";
+	var $url_videoInfo = "https://api.dailymotion.com/video/#ID#";
+	var $url_edit = "https://api.dailymotion.com/video/#ID#";
+	var $url_video = "http://www.dailymotion.com/video/#ID#";
+	var $url_user_playlists = "https://api.dailymotion.com/user/me/playlists";
+	var $url_video_playlists = "https://api.dailymotion.com/video/#ID#/playlists";
+	var $url_add_video_in_playlist = "https://api.dailymotion.com/video/#ID#/playlists/#PLAYLIST#";
+	var $idVideo = "";
+	var $url = "";
+	var $username = "";
+	var $password = "";
+	var $debug = false;
+	var $logged = false;
+	var $error = "";
+	var $access_token = "";
+	var $scopes_needed = array('read', 'write', 'delete');
+	var $id_regexp = '/^http:\/\/www.dailymotion.com\/video\/([A-Z0-9]+)/i';
+	var $default_category = 'lifestyle';
+
+	function getUrlFormat(){
+		return $this->url_video;
+	}
+
+	function PHPDailyMotionAPI($username = "", $password = "", $debug = false) {
+		$this->username = $username;
+		$this->password = $password;
+		$this->debug = $debug;
+		$this->connexion();
+	}
+	
+	function connexion(){
+		if($this->username != "" && $this->password != ""){
+			$params = array(
+				'grant_type' => 'password',
+				'client_id' => $this->api_key,
+				'client_secret' =>  $this->api_key_secret,
+				'username' => $this->username,
+				'password' => $this->password,
+			);
+			$response = $this->getRequestResult($this->url_oauth, $params, "POST");
+			if($response['code'] == 200 && $response['body'] != ""){
+				$json = json_decode($response['body'],true);
+				if($json['access_token'] != ""){
+					$this->access_token = $json['access_token'];
+
+					$params = array(
+						'response_type' => 'code',
+					    'client_id' => $this->api_key,
+    					'redirect_uri' => 'http://api.previsite.com/diffusion/notify.php',
+					    'scope'=> implode(' ', $this->scopes_needed),
+					    'access_token' => $this->access_token,
+						'accepted_scope[]' => $this->scopes_needed,
+						'dm_username' => $this->username,
+						'dm_password' => $this->password,
+						'accept' => 'Accepter',
+					);
+					$response = $this->getRequestResult($this->url_scope, $params, "POST");
+					if($response['code'] == 302 && preg_match('/\?code=([^\&]*)\&scope=([^\&]*)/i', $response['header']['location'], $result) > 0){
+
+						return true;
+					}else{
+						if($response['code'] == 302 && preg_match('/\?error=([^\&]+)\&error_description=([^\&]+)/i',$response['header']['location'], $result) > 0){
+							$this->error = urldecode($result[1]).': '.urldecode($result[2]);
+						}else{
+							$this->error = "Get authorization error";
+						}
+					}
+				}else if($json['error'] != ""){
+					$this->error = $json['error']." (".$json['error_description'].")";
+				}
+			}
+		}else{ $this->error = "missing login informations";}
+		if($this->debug){ print_r($response);}
+		$this->access_token = '';
+		return false;
+	}
+		
+	function deleteVideo($idVideo){
+		$return = false;
+		if($this->access_token != ""){
+			if($idVideo !=""){
+				if($this->checkVideo($idVideo)){
+					$url = str_replace('#ID#', $idVideo, $this->url_edit);
+					$response = $this->getRequestResult($url."?access_token=".urlencode($this->access_token), array(), "DELETE");
+					if($response['code'] == 200){
+						return true;
+					}else{
+						if($response['body']!= ""){
+							$json = json_decode($response['body'], true);
+							$this->error = $json['error']['code'].". ".$json['error']['message']." (".$json['error']['type'].")";
+						}else{ $this->error = "Delete video failed";}
+					}
+				}else{ return true;}
+			}else{ $this->error = "Missing id video";}
+		}else{ $this->error = "Login failed: ".$this->error;}
+		if($this->debug){ print_r($response);}
+		return false;
+	}
+	
+	function uploadFile($file = "",$title = "",$tags = "",$description = "", $category =""){
+		$return = "";
+		if($this->access_token !=""){
+			if(strlen($title) >= 5){
+				$response = $this->getRequestResult($this->url_upload, array('access_token'=>$this->access_token), "GET");
+				if($response['code'] == 200 && $response['body'] != ""){
+					$json = json_decode($response['body'], true);
+					if($json['upload_url'] != ""){
+						//echo "curl -F 'file=@".$file."' ".$json['upload_url'];
+						$response = $this->getRequestResult($json['upload_url'], array(), "POST", $file);
+						if($response['code'] == 200 && $response['body'] != ""){
+							$json = json_decode($response['body'] , true);
+							if($json['url'] != ""){
+								$response = $this->getRequestResult($this->url_idMaker, array('url'=> $json['url'], 'access_token'=>$this->access_token), "POST");
+								$json = json_decode($response['body'], true);
+								if($json['id'] != ""){
+									$this->idVideo = $json['id'];
+									$return = $this->edit($this->idVideo, $title, $tags, $description, $category);
+									if($return !== true && !$this->deleteVideo($this->idVideo) !== true){
+										$this->url = str_replace('#ID#', $this->idVideo, $this->url_video);
+										return true;
+									}
+									return $return;
+								}else if($json['error'] != ""){ $return = $json['error']['code'].". ".$json['error']['message']." (".$json['error']['type'].")"; }
+								else{	$return = "Get video id error";}
+							}else{	$return = "Upload file error: ".$json['error'];}
+						}else{ $return = "Post file error";}
+					}else{ $return = "Upload url not found";}
+				}else if($response['body'] != ""){
+					$json = json_decode($response['body'], true);
+					$return = $json['error']['code'].". ".$json['error']['message']." (".$json['error']['type'].")";
+				}else{ $return = "Get upload url failed";}
+				if($this->debug){ print_r($response);}
+			}else{ $return = "Too short value (".$title."), min len is `5' for `title' parameter";}
+		}else{ $return = "Login failed: ".$this->error;}
+		return $return;
+	}
+
+	function edit($idVideo, $title, $tags, $description, $category){
+		$return = "";
+		if($category == ""){ $category =$this->default_category;}
+		if($this->access_token != ""){
+			$idVideo = $this->getIdVideo($idVideo);
+			if($idVideo !=""){
+				$params = array(
+					'title' => $title, 
+					'tags' => $tags, 
+					'description' => $description, 
+					'channel' => $category, 
+					'published' => true,
+					'access_token' => $this->access_token
+				);
+				$url = str_replace('#ID#', $idVideo, $this->url_edit);
+				$response = $this->getRequestResult($url, $params, "POST");
+				if($response['code'] == 200){
+					$this->idVideo = $idVideo;
+					$this->url = str_replace('#ID#', $idVideo, $this->url_video);
+					return true;
+				}else{
+					if($response['body']!= ""){
+						$json = json_decode($response['body'], true);
+						$return = $json['error']['code'].". ".$json['error']['message']." (".$json['error']['type'].")";
+					}else{ $return = "Edit video informations failed";}
+				}
+			}else{ $return = "Missing id video";}
+		}else{ $return = "Login failed: ".$this->error;}
+		if($this->debug){ print_r($response);}
+		return $return;
+	}
+	
+	function diffuseOnPlaylist($playlist){
+		$return = array();
+		$limit = 100;
+		if($this->idVideo != "" && count($playlist) > 0){
+			$playlist = array_map('strtolower', $playlist);
+			$playlist_online = $this->getAllPlaylists(str_replace('#ID#', urlencode($this->idVideo), $this->url_video_playlists), $limit);
+			$tmp = array();
+			for($i=0;$i < count($playlist_online); $i++){
+				$tmp[] = strtolower($playlist_online[$i]['name']);
+				$return = $tmp;
+			}
+			$playlist = array_diff($playlist, $tmp);
+			if(count($playlist) > 0){
+				$playlist_online = $this->getAllPlaylists($this->url_user_playlists, $limit);
+				//print_r($playlist);
+				//print_r($playlist_online);
+				for( $i=0; $i < count($playlist_online); $i++){
+					if(in_array(strtolower($playlist_online[$i]['name']), $playlist)){
+						$replace = array(
+							'search' =>  array('#ID#', '#PLAYLIST#'),
+							'replace' => array(urlencode($this->idVideo), urlencode($playlist_online[$i]['id'])),
+						);
+						$url_add = str_replace( $replace['search'], $replace['replace'], $this->url_add_video_in_playlist);
+
+						$params = array( 'access_token'  => $this->access_token);				
+						$response = $this->getRequestResult($url_add, $params, "POST");
+						if($response['code'] == '200'){
+							$return[] = $playlist_online[$i]['name'];
+						}else if($response['code'] == '500' && $response['body'] != ""){
+							$json = json_decode($response['body'], true);
+							$json['error']['type'] == 'video_already_exists';
+							$return[] = $playlist_online[$i]['name'];
+						}
+					}
+				}
+			}
+		}
+		if($this->debug){ print_r($response);}
+		return (count($return) == 0 ? false : implode(", ",$return));
+	}
+		function getAllPlaylists($url, $limit){
+			$playlist_online = array();
+			$i = 1;
+			do{
+				$params = array(
+					'page'			=> $i++,
+					'limit'			=> $limit,
+					'access_token'  => $this->access_token,
+				);				
+				$response = $this->getRequestResult( $url, $params);
+				if($response['code'] == '200' && $response['body']!= ""){
+					$json = json_decode($response['body'], true);
+					$playlist_online = array_merge($playlist_online, $json['list']);
+				}
+			}while($response['code'] == '200' && is_array($json) && $json['has_more'] == '1');
+			return $playlist_online;
+		}
+
+	function getIdVideo($url = ""){
+		$return = $url;
+		if($url == ""){ $url = $this->url;}
+		if($url != "" && preg_match($this->id_regexp, $url, $result) > 0){
+			$return = $result[1];
+		}
+		return $return;
+	}
+	
+	function checkVideo($idVideo){
+		$return = false;
+		if($this->access_token != ""){
+			$idVideo = $this->getIdVideo($idVideo);
+			if($idVideo !=""){
+				$url = str_replace('#ID#', $idVideo, $this->url_edit);
+				$response = $this->getRequestResult($url, $params, "GET");
+				if($response['code'] == 200){
+					return true;
+				}else{
+					$return =  false;
+				}
+			}else{ $return = "Missing id video";}
+		}else{ $return = "Login failed: ".$this->error;}
+		if($this->debug){ print_r($response);}
+		return $return;
+	}
+	
+	function getAllVideos($nolimit = false){
+		$return = array();
+		if($this->access_token != ""){
+			$json = array('has_more' => true);
+			$page = 1;
+			$limit = 100;
+			$too_recent = true;
+			while($json['has_more']){
+				$json = array();
+				$params = array(
+					'page'			=> $page++,
+					'limit'			=> $limit,
+					'access_token' 	=> $this->access_token
+				);
+				$response = $this->getRequestResult($this->url_listVideos, $params);
+				if($response['code'] == 200){
+					$json = json_decode($response['body'], true);
+					if(count($json['list']) > 0){
+						foreach($json['list'] as $k=>$r){
+							if($too_recent && !$nolimit){
+								$params = array(
+									'access_token' 	=> $this->access_token,
+									'fields' 		=> 'created_time'
+								);
+								$url = str_replace('#ID#', $r['id'], $this->url_videoInfo);
+								$response = $this->getRequestResult($url, $params);
+								if($response['code'] == 200 && $response['body'] != ""){
+									$infos = json_decode($response['body'], true);
+									$too_recent = (((mktime()-$infos['created_time'])/60/10) < 1);
+								}
+								if($too_recent){ continue;}
+							}
+							$return[] = str_replace('#ID#', $r['id'], $this->url_video);
+						}	
+					}
+				}else{ 
+					$return = "Request error";
+					break;
+				}
+			}
+		}else{ $return = "Login failed: ".$this->error;}
+		if($this->debug){ print_r($response);}
+		return $return;
+	}
+	
+	function sendRequest(&$req){
+//		$this->mgr->passCookies($req);
+		$req->sendRequest();
+//		$this->mgr->updateCookies($req);
+	}
+	
+	function getRequestResult($url, $data = array(), $method = "GET", $file = "", $follow = false){
+		if(is_array($data) && count($data) > 0 && $method == "GET"){
+			$params = "";
+			foreach($data as $k=>$v){ $params .= "&".$k."=".urlencode($v);}
+			if(preg_match('/\?/i', $url) > 0){ $url .= $params;}
+			else{ $url .= "?".substr($params,1);}
+		}
+		$req = new HTTP_Request($url);
+		$req->setMethod($method);
+		if(is_array($data) && count($data) > 0 && $method == "POST"){
+			foreach($data as $k=>$v){ 
+				if(!is_array($v)){
+					$req->addPostData($k,$v);
+				}else{
+					for($i=0;$i < count($v); $i++){
+						$req->addPostData($k,$v[$i]);
+					}
+				}
+			}	
+		}
+		if(file_exists($file)){ $req->addFile( "file", $file);}
+		$this->sendRequest($req);
+		while($follow && $req->getResponseCode() == "302"){
+			$header = $req->getResponseHeader();
+			if(preg_match('/^http:\/\//i', $header['location']) == 0){
+				$header['location'] = $url.$header['location'];
+			}
+			return $this->getRequestResult($header['location']);
+		}
+		return array('body'=>$req->getResponseBody(), 'header'=>$req->getResponseHeader(), 'code'=>$req->getResponseCode(), 'url'=>$url);
+	}
+
+}
+?>

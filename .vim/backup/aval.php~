@@ -1,0 +1,387 @@
+<?php
+//function aval($script_name="", $allowed_users = array(), $workPath="", $archive_path="", $archive_file="", $prefixe_archive="", $partial_import = false){
+function aval($script_name="", $allowed_users = array(), $workPath="", $archive_path="", $archive_file="", $prefixe_archive=""){
+	global $_REQUEST;
+	global $import;
+	
+	$import_only_user = ($import['STEPS']['IMPORT_TOURS']=== 0 && $import['STEPS']['IMPORT_IMAGES'] === 0);
+	//$data = array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array(), 'NEXT_PART' => array());
+	$data = array();
+	$debug = ($_REQUEST['test'] != "");
+	$disabled_users = array();
+	$isCorpImport = ($script_name == "aval_corp");
+//	$filename = $workPath.'#DATE#_annonces_part.xml';
+	$pathCache = PATH_CACHE.'aval'.($isCorpImport ? "_corp" : "").'/';
+	if(!file_exists($pathCache)){ mkdir($pathCache);}
+	$filename = '#DATE#-#USER#_annonces_part.xml';
+	$files = glob($pathCache.str_replace(array('#DATE#', '#USER#'), "*", $filename));
+	//if($partial_import === true){
+	$file_agencies = $pathCache."xml_agences.xml";
+	if(count($files) == 0 || !file_exists($file_agencies)){
+//		if(file_exists($file_config)){ $data['NEXT_PART']['DIVERS']['ALLOWED_USERS'] = aval_parse_config($file_config);}
+		$file = $workPath."xml_agences_annonces.zip";
+		//$file = PATH_FTP."aval/xml_agences_annonces.zip";
+		//if(file_exists($file)){
+		if(get_content("ftp://Previsite@lsih.com:15Show48@ftp.avendre.fr/", $workPath, array("zip"), false, true) > 0){
+			if(file_exists($file)){
+				$cmd = 'cd '.$workPath.' && unzip -o '.$file;
+				exec($cmd);
+				rename( $file, $file.".wait");
+				//$file_xml = $workPath."xml_agences.xml";
+				$file_xml = str_replace($pathCache, $workPath, $file_agencies);
+//				$file_xml = PATH_FTP."aval/xml_agences.xml";
+				$tmp = aval_parse_xml_agences( $file_xml, $allowed_users, $isCorpImport);
+				if(count($tmp['USERS']) > 0){			
+					exec('mv '.$file_xml.' '.str_replace($workPath, $pathCache, $file_xml));
+					if($debug) exec('rm '.$file_agencies);
+					$data['USERS'] = $tmp['USERS'];
+					$disabled_users = $tmp['DISABLED_USERS'];
+					//$data['NEXT_PART']['DIVERS']['DISABLED_USERS'] = $tmp['DISABLED_USERS'];
+					exec('rm '.$pathCache.'*_annonces_part.xml');
+					$file_xml = $workPath."xml_annonces.xml";
+//					$file_xml = PATH_FTP."aval/xml_annonces.xml";
+					import_log('[SPLIT_XML][START] '.$count.' agency tour import' , $script_name);
+					$count = aval_split_xml_annonces($file_xml, $pathCache, $workPath, $filename, $allowed_users, $isCorpImport, $debug);
+					//exec('mv '.$file_xml.' '.str_replace($workPath, $pathCache, $file_xml));
+					@unlink($file_xml);
+					import_log('[SPLIT_XML][END] '.$count.' agency tour import' , $script_name);
+					//exit;
+				}
+				if($archive_file){ rename($file.".wait", $archive_path.$prefixe_archive.basename($file));}
+				else{ rename($file.".wait", $file);}
+			}
+		}
+		$partial_import = $data['NEXT_PART'];
+		$partial_import['CURRENT_STEP'] = 0;
+	}else{
+		$tmp = aval_parse_xml_agences( $file_agencies, $allowed_users, $isCorpImport);
+		if(count($tmp['USERS']) > 0){
+			$data['USERS'] = $tmp['USERS'];
+			$disabled_users = $tmp['DISABLED_USERS'];
+		}
+	}
+
+	$partial_import['CONTINUE'] = false;
+	if(count($allowed_users) > 0){
+		$data['TOURS'] = array();
+		$data['IMAGES'] = array();
+		//$data['NEXT_PART'] = $partial_import;
+		$xml_files = glob($pathCache.str_replace(array('#DATE#', '#USER#'), array("*", "*"), $filename));
+		if(count($xml_files) > 0){
+			sort($xml_files);
+			$msg = '[INFO] '.count($xml_files).' agencies '.($isCorpImport ? 'allowed' : '').' to update'; 
+			if($debug) echo $msg."<br />";
+			else import_log( $msg, $script_name);
+			foreach($xml_files as $file){
+				$msg = '[LOAD][FILE] '.basename($file);
+				if($debug) echo $msg."<br />";
+				else import_log( $msg, $script_name);
+
+				$part = aval_parse_xml_annonces($file, $allowed_users, $disabled_users, $workPath, $pathCache, $isCorpImport, $debug);
+				$data['TOURS'] = array_merge($data['TOURS'], $part['TOURS']);
+				$data['IMAGES'] = array_merge($data['IMAGES'], $part['IMAGES']);
+				if(!$debug) @unlink($file);
+				if($debug || (count($data['TOURS']) > ($isCorpImport ? 20000 : 10000)){ 
+					//$data['NEXT_PART']['CURRENT_STEP']++;
+					//$data['NEXT_PART']['CONTINUE'] = true;						
+					break;
+				}
+			}
+		}
+	}
+	//if($import_only_user){ $data['NEXT_PART']['CONTINUE'] = false;}
+	return $data;
+}
+
+function aval_parse_config($file){
+	$return = array();
+	$keys == array();
+	$row = 0;
+	$diffusions = array( 'twitter', 'facebook', 'youtubefr', 'dailymotion');
+	$path_logo = PATH_IMPORT_LOGOS."aval/";
+	if (($handle = fopen($file, "r")) !== FALSE){
+		while(($data = fgetcsv($handle, 0, "|")) !== FALSE) {
+			if($row++ == 0){
+				foreach($data as $v){ $keys[] = $v;}
+			}else{
+				$data = array_combine( $keys, $data);
+				$tmp = array();
+				$tmp['USERCODE'] = $data['usercode'];
+				if($data['telephone'] != ""){ $tmp['TELEPHONE'] = $data['telephone'];}
+				if($data['nom_agence'] != ""){ $tmp['NOM_AGENCE'] = $data['nom_agence'];}
+				$tmp['DIFFUSIONS'] = array();
+				foreach($diffusions as $v){
+					if($data[$v] != ""){ $tmp['DIFFUSIONS'][strtoupper($v)] = array('LOGIN'=>$data[$v], "PASSWORD"=>$data[$v.'_pwd']);}
+				}
+				if($data['url_logo'] != "" && file_exists($path_logo.$data['url_logo'])){
+					$tmp['URL_LOGO'] = $path_logo.$data['url_logo'];
+				}
+				$return[$data['usercode']] = $tmp;
+			}
+		}
+		fclose($handle);
+	}
+	return $return;
+}
+
+function aval_parse_xml_agences($file, $allowed_users, $isCorpImport){
+	$return = array('USERS'=> array(), 'DISABLED_USERS' => array());
+	if(file_exists($file)){
+		if($xml_content = simplexml_load_file($file)){
+			foreach($xml_content->agence as $xml){
+				$tmp = array();
+				$tmp['USERCODE'] = $xml->code_agence.'';
+				if($xml->nom_agence.'' == '')  continue;
+				//if(preg_match('/^(20179|22265)$/', $tmp['USERCODE']) == 0) continue;
+				$tmp['NOM_UTILISATEUR'] = $xml->nom_agence.'';
+				$tmp['NOM_SOCIETE'] = $xml->nom_agence.'';
+				$tmp['TELEPHONE_UTILISATEUR'] = $xml->telephone_agence.'';
+				$tmp['FAX'] = $xml->fax_agence.'';
+				$tmp['EMAIL_UTILISATEUR'] = $xml->email_agence.'';
+				if(preg_match('#123webimmo.com#i', $xml->url_agence.'') > 0){
+					$xml->url_agence = preg_replace('#/([^/]+)$#e', '"/".urlencode("$1")', $xml->url_agence.'');
+				}
+				$tmp['SITEWEB_SOCIETE'] = $xml->url_agence.'';
+		//		$tmp['ID_PAYS'] = $xml->nom_pays_agence.'';
+				$tmp['VILLE'] = $xml->ville_agence.'';
+				$tmp['CODE_POSTAL'] = $xml->code_postal_agence.'';
+				$tmp['ADRESSE'] = $xml->adresse_agence.'';
+				if($allowed_users[$tmp['USERCODE']]['URL_LOGO'] != ""){
+					$tmp['URL_LOGO'] = PATH_IMPORT_LOGOS."aval/".$allowed_users[$tmp['USERCODE']]['URL_LOGO'];
+					$tmp['MD5_LOGO'] = md5(file_get_contents($tmp['URL_LOGO']));
+				}
+				if($allowed_users[$tmp['USERCODE']]['TELEPHONE'] != ""){
+					$tmp['TELEPHONE'] = $allowed_users[$tmp['USERCODE']]['TELEPHONE'];
+				}
+				if($allowed_users[$tmp['USERCODE']]['NOM_SOCIETE'] != ""){
+					$tmp['NOM_UTILISATEUR'] = $allowed_users[$tmp['USERCODE']]['NOM_SOCIETE'];
+					$tmp['NOM_SOCIETE'] = $allowed_users[$tmp['USERCODE']]['NOM_SOCIETE'];
+				}
+				$tmp['MD5_USER'] = md5(implode("", $tmp));
+
+				if(!(count($allowed_users[$tmp['USERCODE']]) > 0)){
+					$tmp['OPTIONS'] = array('DISABLED' => 1);
+					$return['DISABLED_USERS'][$tmp['USERCODE']] = true;
+				}
+				$return['USERS'][] = $tmp;
+			}
+		}
+	}
+	return $return;
+}
+
+
+function aval_split_xml_annonces($file, $cachePath, $workPath, $filename, $allowed_users, $isCorpImport, $debug = false){
+	$return = 0;
+	if(file_exists($file)){
+		$handle = @fopen($file, "r");
+		$filename = str_replace('#DATE#', date('Y-m-d_H:i:s'), $filename);
+		$content = "";
+		$nb_files = 0;
+		if($handle){
+			$start = false;
+			$save = false;
+			$user = "";
+			$nb_annonces = 0;
+			while (($buffer = fgets($handle)) !== false) {
+				if(!$start && preg_match('/<bien id="[^"]+">/i',$buffer) > 0){ 
+					$start = true;
+					$save = false;
+					$user = "";
+					$content = "";
+				}
+				if(preg_match('#<code_agence><!\[CDATA\[([^\]]+)\]\]></code_agence>#i', $buffer, $match) > 0){
+					$user = $match[1];
+					if(count($allowed_users[$user]) > 0) $save = !$isCorpImport;
+					else $save = $isCorpImport;
+				}
+				$content .= $buffer;
+				if(strpos($buffer,"</bien>") !== false){
+					$start = false;
+					if($save){
+						$file_part = $workPath.str_replace('#USER#', $user, $filename);
+						$content = str_replace('',' ',$content);
+						if(!file_exists($file_part)) file_put_contents( $file_part, "<biens>\n");
+						file_put_contents($file_part,$content, FILE_APPEND);
+						if($debug && ++$nb_files > 10){ break;}
+					}
+				}
+			}
+			fclose($handle);
+			$xml_files = glob($workPath.str_replace('#USER#', "*", $filename));
+			$return = count($xml_files);
+			foreach($xml_files as $filename){
+				file_put_contents($filename, "\n</biens>", FILE_APPEND);
+				$cmd = 'mv '.$filename.' '.str_replace($workPath, $cachePath, $filename); 
+				exec($cmd);
+			}
+		}
+	}
+	return $return;
+}
+
+function aval_split_xml($source, $workPath, $cachePath){
+	$files = array();
+	if(file_exists($source)){
+		$cmd = "cp ".$source." ".str_replace($cachePath, $workPath, $source); 
+		exec($cmd);
+		$source =  str_replace($cachePath, $workPath, $source);
+		$handle = @fopen($source, "r");
+		$filename = preg_replace('/.xml/i', '_#PART#.xml', $source);
+		$content = "";
+		if($handle){
+			$start = false;
+			$nb_annonces = 0;
+			$part = 1;
+			while (($buffer = fgets($handle)) !== false) {
+				if(!$start && preg_match('/<bien id="[^"]+">/i',$buffer) > 0){ 
+					$start = true;
+					$content = "";
+				}
+				$content .= $buffer;
+				if(strpos($buffer,"</bien>") !== false){
+					$start = false;
+					if(++$nb_annonces > 1000){ 
+						$files[] = $file_part; 
+						file_put_contents($file_part, "\n</biens>", FILE_APPEND);
+						$nb_annonces = 0;
+						$part++;
+					}
+					$file_part = str_replace('#PART#', $part, $filename);
+					$content = str_replace('',' ',$content);
+					if(!file_exists($file_part)) file_put_contents( $file_part, "<biens>\n");
+					file_put_contents($file_part,$content, FILE_APPEND);
+				}
+			}
+			if($nb_annonces > 0) file_put_contents($file_part, "\n</biens>", FILE_APPEND);
+			$files[] = $file_part;
+			fclose($handle);
+			@unlink($source);
+		}
+	}
+	return $files;
+}
+
+function aval_parse_xml_annonces($source, $allowed_users, $disabled_users, $workPath, $cachePath, $isCorpImport, $debug = false){
+	$return = array('TOURS' => array(), 'IMAGES' => array());
+	$list_images = array();
+	$list_refs = array();
+	if(file_exists($source)){
+		if(filesize($source)/1024/1024 > 10){
+			$files = aval_split_xml($source, $workPath, $cachePath);
+		}else{
+			$files = array($source);
+		}
+		foreach($files as $file){
+			if($xml = simplexml_load_file($file)){
+				foreach($xml->bien as $bien){
+					$tmp = array();
+					$tmp['USERCODE'] = $bien->code_agence.'';
+					$user_validate = (count($allowed_users[$tmp['USERCODE']]) > 0);		
+					$user_disabled = ($disabled_users[$tmp['USERCODE']] === true);	
+					if(($user_disabled || $user_validate) && preg_match('/([0-9_]+)$/i', $bien->reference.'',$result) > 0){
+						$tmp['REF_PORTAIL'] = $result[1];
+						//					if($tmp['REF_PORTAIL'] != "9290295"){ continue;}
+						//				if(preg_match('/^(0038_09798_201)$/i', $tmp['REF_PORTAIL']) <= 0){ continue;}
+						$list_refs[] = $tmp['REF_PORTAIL'];
+						$tmp['URL_ANNONCE'] = $bien->url_annonce.'';
+						//				if($tmp['URL_ANNONCE'] == "http://www.avendrealouer.fr/"){ continue;}
+						$tmp['CODE_POSTAL'] = $bien->code_postal.'';
+						$tmp['VILLE'] = $bien->ville.'';
+						$tmp['NOM_VISITE'] = $bien->titre.'';
+						$tmp['ID_TYPE_TRANSACTION'] = (strtolower($bien->type_transaction.'') == 'location' ? 2 : 1);
+						$tmp['NOMBRE_PIECE'] = $bien->nb_piece.'';
+						$tmp['SURFACE_HABITABLE'] = $bien->surface.'';
+						$tmp['PRIX_BIEN'] = aval_expToFloat($bien->prix.'');
+						//				$tmp['PRIX_BIEN_SOURCE'] = $bien->prix.'';
+						$tmp['FRAIS_AGENCE'] = $bien->honoraires.'';
+						$tmp['ID_NEUF'] = (strtolower($bien->neuf.'') == 'true' ? '1': '0');
+						$tmp['ID_ASCENSEUR'] = (strtolower($bien->ascenseur.'') == 'true' ? '1': '0');
+						$tmp['NOMBRE_TERRASSE'] = (strtolower($bien->terrasse.'') == 'true' ? '1': '0');
+						$tmp['ID_PISCINE'] = (strtolower($bien->piscine.'') == 'true' ? '1': '0');
+						$tmp['VOISINNAGE'] = $bien->proximite.'';
+						$tmp['ID_PAYS'] = 'FR';
+						$tmp['ID_LANGUE'] = 'FR';
+						$tmp['DESCRIPTION'] = $bien->description.'';
+						//					$tmp['DESCRIPTION_VIDEO'] = preg_replace('/AVENDREALOUER-([A-Z0-9]+)/i', 'A VENDRE A LOUER-$1', $tmp['DESCRIPTION']);
+						$tmp['DESCRIPTION_VIDEO'] = preg_replace('/Réf[ \t]*:[ \t]*AVENDREALOUER-[^\.]+\./i', '', $tmp['DESCRIPTION']);
+
+						switch(strtolower($bien->type_bien.'')){
+						case "appartement": $tmp['ID_TYPE_BIEN'] = 1;break;
+						case "maison": $tmp['ID_TYPE_BIEN'] = 2;break;
+						case "terrain": $tmp['ID_TYPE_BIEN'] = 3;break;
+						case "château": $tmp['ID_TYPE_BIEN'] = 10;break;
+						case "immeuble": $tmp['ID_TYPE_BIEN'] = 5;break;
+						case "parking": $tmp['ID_TYPE_BIEN'] = 11;break;
+						case "ferme": $tmp['ID_TYPE_BIEN'] = 12;break;
+						case "bureau et commerce": 
+							$tmp['ID_TYPE_BIEN'] = 9;
+							if(preg_match('/(location)/i', $tmp['URL_ANNONCE']) > 0){
+								$tmp['ID_TYPE_TRANSACTION'] = 2;
+							}
+							break;
+						case "duplex-triplex-loft":
+						case "autre":
+						case "viager":
+						default:
+							$tmp['ID_TYPE_BIEN'] = 0;
+							break;
+						}
+
+						//					if($tmp['NOM_VISITE'] == ""){
+						$tmp['NOM_VISITE'] = fixe_nom_visite(strtolower($bien->type_transaction.''), $bien->type_bien.'', $tmp['VILLE'], $tmp['CODE_POSTAL'], $tmp['SURFACE_HABITABLE'], $tmp['NOMBRE_PIECE']);
+						//					}
+						if(!$user_validate){
+							$tmp['OPTIONS'] = array('NO_VIDEO' => true, 'NO_TTS' => true);
+						}
+						$tmp['MD5_TOUR'] = md5(implode('', $tmp));
+						$tmp['NOM_SCRIPT_COMPLEMENT'] = $tmp['USERCODE'];
+						$return['TOURS'][] = $tmp;
+						if($user_validate){
+							$poids = 0;
+							if(count($bien->images) > 0){
+								$list_images = array();
+								foreach($bien->images->image as $img){
+									$image = array();
+									$image['REF_PORTAIL'] = $tmp['REF_PORTAIL'];
+									$image['POIDS'] = ++$poids;
+									$image['URL_IMAGE'] = $img->image.'';
+									$image['TITRE_IMAGE'] = '';
+									$image['MD5_IMAGE'] = md5(implode('', $image));
+									if(in_array($image['URL_IMAGE'], $list_images)){ continue;}
+									$return['IMAGES'][] = $image;
+									$list_images[] = $image['URL_IMAGE'];
+								}
+							}
+						}
+					}
+				}
+				if(!$debug) @unlink($file);
+			}else{
+				copy($file, PATH_FTP."aval/".basename($file).".bug");
+			}
+		}
+		if(!$debug) @unlink($source);
+	}
+	return $return;
+}
+
+function aval_expToFloat($exp){
+	//echo $exp.'<br/>';
+	$pattern='/([0-9]*[\.|,]?[0-9]*)\s?[E|e]\s?([+|\-])([0-9]*)/';
+	$matches = array();
+	$res = $exp;
+	if(is_numeric($exp)){
+		$res = (int)$exp;
+	} else if(preg_match($pattern, $exp, $matches )){
+		$res = (float) str_replace(',','.',$matches[1]);
+		if($matches[2]=='+') {
+			$res *= pow(10, (int)$matches[3]);
+		} else {
+			$res /= pow(10, (int)$matches[3]);
+		}
+	}
+	return (int)$res;
+}
+
+?>

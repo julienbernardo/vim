@@ -1,0 +1,134 @@
+" PLUGINS
+"smipMates : http://www.vim.org/scripts/script.php?script_id=2715 // snippets Ts languages
+"auto close hmtl tags : http://www.vim.org/scripts/script.php?script_id=2591 // html fermeture automatique des tags
+"matchit.vim : http://www.vim.org/scripts/script.php?script_id=39 // amelioration du racourci %
+"surround : http://www.vim.org/scripts/script.php?script_id=1697 // habillage d'une chaîne de caractére avec un tag html par exemple
+" syntax
+"php.wim : http://www.vim.org/scripts/script.php?script_id=1571 // amélioration de la prise en charge de la syntaxe php
+" colorscheme
+"solarized : http://www.vim.org/scripts/script.php?script_id=3520
+" refresh browser
+" https://github.com/mkitt/browser-refresh.vim
+" plugin toggle
+" http://www.vim.org/scripts/script.php?script_id=895
+
+" .vimrc des tones d'exemples en ligne ' ultimate vimrc ' notamment.
+
+" vim bab: https://github.com/odolbeau/vim-config/blob/master/_vimrc#L69
+" mon vimrc
+
+" GLOBAL SETTINGS"
+filetype on					" filetype detection
+filetype plugin on
+filetype indent on
+
+set nocp					" sets vi compatible mode : (nocp|cp)
+set wrap					" long lines wrap : (nowrap|wrap)
+set nu						" line numbering : (nu\nonu)
+set ch=3					" number of lines used for the command-line
+set	ru						" ruler : show cursor position below each window (noru|ru)
+set	vb						" visualbell : use a visual bell instead of beeping (novb|vb)
+" set noeb					errorbells : ring the bell for error messages (noeb|eb)"
+
+" SEARCH"
+set ignorecase				" ignorecase : ignore case when using a search pattern (noic|ic)
+set smartcase				" smartcase : override 'ignorecase' when pattern has upper case characters (noscs|scs)
+set	hls						" hlsearch : highlight all matches for the last used search pattern (nohls|hls)""
+
+" DISPLAY"
+set foldenable				" set to display all folds open
+set foldmethod=marker		" folding type: (manual|indent|expr|marker|syntax)
+set lsp=10					" linespace : number of pixel lines to use between characters
+set ts=4					" tabstop: number of spaces a <Tab> in the text stands for
+set sw=4					" shiftwidth : number of spaces used for each step of (auto)indent
+set ai						" autoindent : automatically set the indent of a new line
+set si						" do clever autoindenting
+set scrolloff=1000			" number of screen lines to show around the cursor
+set enc=utf-8
+set showcmd					" Affiche la commande en cours de saisie en bas à droite
+set cursorline 				"Soulignement de la ligne courante
+highlight CursorLine guibg=grey "Surligne la ligne courante en gris
+
+if has("gui_running")		" hidding the tool bar
+set guioptions-=T
+endif
+
+" Activer la sauvegarde
+set backup
+" Backup dans ~/.vim/backup
+if filewritable(expand("~/.vim/backup")) == 2
+    " comme le répertoire est accessible en écriture,
+    " on va l'utiliser.
+	set backupdir=$HOME/.vim/backup
+else
+	if has("unix") || has("win32unix")
+        " C'est c'est un système compatible UNIX, on
+        " va créer le répertoire et l'utiliser.
+		call system("mkdir $HOME/.vim/backup -p")
+		set backupdir=$HOME/.vim/backup
+	endif
+endif
+set noswapfile 
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" => Moving around, tabs, windows and buffers
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Treat long lines as break lines (useful when moving around in them)
+map k gk
+map j gj
+map <Down> gj
+map <Up> gk
+
+"define leader
+:let mapleader = ","
+
+" PLUGINS"
+syntax enable
+set background=light                    " dark background is better!
+let php_sql_query = 1                   " SQL queries
+let php_htmlInStrings = 1               " HTML
+if has('gui_running')
+	set guifont=Monospace\ 8
+    let g:solarized_style="light"
+    let g:solarized_contrast="high"
+    colorscheme solarized
+else
+	colorscheme desertEx
+endif
+
+"NERDTree
+"nnoremap <silent> <F9> :NERDTreeToggle<CR>
+
+" HTML AUTO CLOSE TAG
+au FileType xhtml,xml so ~/.vim/ftplugin/html_autoclosetag.vim		" hmtl_autoclosetag.vim
+
+" KEY MAPINGS
+" parenthesis / bracket expanding
+""inoremap ( ()<ESC>i
+""inoremap [ []<ESC>i
+""inoremap { {}<ESC>i
+""inoremap " ""<ESC>i
+""inoremap ' ''<ESC>i
+
+" Smart way to move btw. windows
+map <C-j> <C-W>j
+map <C-k> <C-W>k
+map <C-h> <C-W>h
+map <C-l> <C-W>l"
+
+"relaod snippet
+map ,n :call ReloadSnippets(snippets_dir, &filetype)<CR>
+
+"use full file
+:command Myconf tabe /home/julien/.vimrc
+:command Myvar tabe /home/julien/Documents/Dev/variables\ utiles.php 
+:command MyTest tabe /home/julien/ftp/cron.previsite.net/manual/test_julien.php
+
+:command Go Ex /home/julien/ftp/
+:command Goapi Ex /home/julien/ftp/api.previsite.com/
+:command Govid Ex /home/julien/ftp/video.previsite.net/
+:command Gogat Ex /home/julien/ftp/gateway2.previsite.net/
+:command Gosms Ex /home/julien/ftp/sms.previsite.net/
+:command Gocron Ex /home/julien/ftp/cron.previsite.net/
+
+

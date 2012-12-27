@@ -1,0 +1,500 @@
+<?php
+
+//main function
+function create_stupeflix_xml_LIMANGO(&$options){
+	$xml = "";
+	$tab_tour = $options['INFOS']['TOUR'];
+	print_r($options);
+	if(count($options['IMAGES']) == 3){
+		if(preg_match('/^(\d{4})-0?(\d{1,2})-0?(\d{1,2})/i', $tab_tour['COMPLEMENTS']['LIMANGO_START_DATE'], $result) > 0){
+			$days = array( 'So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa');
+			$start_date = "Ab ".$days[date('w',mktime(0,0,0,$result[3],$result[2],$result[1]))]." ".$result[3].".".$result[2];
+		}
+		$infos = array(
+			'DESCRIPTION' => $tab_tour['DESCRIPTION'],
+			'NOM' => $tab_tour['NOM_VISITE'],
+			'REF' => $tab_tour['REF_VISITE'],
+			'TAGS' => $tab_tour['COMPLEMENTS']['LIMANGO_TAGS'],
+			'PRICE' => $tab_tour['COMPLEMENTS']['LIMANGO_PRICE'].$tab_tour['SYMBOLEBRUT_DEVISE'],
+			'PRICE_RETAIL' => $tab_tour['COMPLEMENTS']['LIMANGO_PRICE_RETAIL'].$tab_tour['SYMBOLEBRUT_DEVISE'],
+			'START_DATE' => $start_date,
+			'DISCOUNT' => $tab_tour['COMPLEMENTS']['LIMANGO_DISCOUNT'],
+			'MUSIC' => '11111129-8F9D-4405-9FFB-FCF00658E9F7',
+		);
+		$images_names = array( 'LOGO', 'HEADER', 'OVERVIEW');
+		for( $i=0; $i<count($tab_images); $i++){
+			$infos[$images_names[$i]] = $options['IMAGES'][$i];
+		}
+		$options = array_merge($options, $infos);			
+
+		$xml = write_stupeflix_xml_content_limango($options);
+	}
+	return $xml;
+}
+
+//xml function
+function write_stupeflix_xml_content_limango($infos){
+	$url_template 	= str_replace('#TEMPLATE#' , "LIMANGO", URL_VIDEO_TEMPLATE);
+	$path_template 	= str_replace('#TEMPLATE#' , "LIMANGO", PATH_VIDEO_TEMPLATE);
+
+	$no_user_logo = true;
+	$no_overview = false;
+	
+	$url_logo = $url_template."logo_limango.jpg";
+	$url_logo_sozioo = $url_template."logo_sozioo.jpg";
+	$url_video = $url_template."end.mov";
+	$url_overline = $url_template."overline.png";
+	
+	$profile = $infos['PROFIL'];
+//	$profile = 'youtube';
+	$profile_dimension = $infos['PROFIL_SIZE'];
+	$tmp_img = PATH_TEMP.rand().".jpg";
+	//logo	
+	file_put_contents($tmp_img, file_get_contents($infos['LOGO']));
+	if(preg_match('/.png$/i',$infos['LOGO']) > 0){ $img_src = @imagecreatefrompng($tmp_img);}
+	else{ $img_src = @imagecreatefromjpeg($tmp_img);}
+	list($width, $height) = getimagesize($tmp_img);
+	@unlink($tmp_img);
+	$logo_position = get_image_position(array(	
+				'x' => 0.10, 'y' => 0.55,
+				'width' => $width,  'height' => $height, 
+				'width_max' => 0.80, 'height_max' => 0.45,
+				'width_min' => 0.40, 'height_min' => 0.35,
+				'image_width' => $profile_dimension['WIDTH'], 'image_height' => $profile_dimension['HEIGHT'],
+			));
+
+	//header	
+	file_put_contents($tmp_img, file_get_contents($infos['HEADER']));
+	if(preg_match('/.png$/i',$infos['HEADER']) > 0){ $img_src = @imagecreatefrompng($tmp_img);}
+	else{ $img_src = @imagecreatefromjpeg($tmp_img);}
+	list($width, $height) = getimagesize($tmp_img);
+	@unlink($tmp_img);
+	$header_position = get_image_position(array(	
+				'x' => 0.05, 'y' => 0.17,
+				'width' => $width,  'height' => $height, 
+//				'width_max' => 0.70, 'height_max' => 0.42,
+				'width_max' => 0.90, 'height_max' => 0.42,
+				'width_min' => 0.35, 'height_min' => 0.30,
+				'image_width' => $profile_dimension['WIDTH'], 'image_height' => $profile_dimension['HEIGHT'],
+			));
+
+	//overview
+	file_put_contents($tmp_img, file_get_contents($infos['OVERVIEW']));
+	if(preg_match('/.png$/i',$infos['OVERVIEW']) > 0){ $img_src = @imagecreatefrompng($tmp_img);}
+	else{ $img_src = @imagecreatefromjpeg($tmp_img);}
+	list($width, $height) = getimagesize($tmp_img);
+	@unlink($tmp_img);
+	$overview_position = get_image_position(array(	
+		'x' => 0.01, 'y' => 0.06,
+		'width' => $width,  'height' => $height, 
+		'width_max' => 0.34, 'height_max' => 0.75,
+		'width_min' => 0.225, 'height_min' => 0.50,
+		'image_width' => $profile_dimension['WIDTH'], 'image_height' => $profile_dimension['HEIGHT'],
+	));
+
+	$duration_banner = 6.5;
+	$duration_overview = 6;
+	$nb_overview = 1;
+	$duration_end = 11;
+	$duration_totale = $duration_overview*$nb_overview+$duration_banner+$duration_end+0.5;
+	
+	$filter_separator_width = 1/$profile_dimension['WIDTH'];
+	$filter_top = $header_position['y']-0.005;
+	$filter_width = ($header_position['width']-4*($filter_separator_width))/4;
+	$filter_height = $header_position['height']+0.005*2;
+
+	$font_limit_startdate 	= getAdvancedTextFontSize(500, fix_xml($infos['START_DATE']), false, true);
+	$font_limit_description = getAdvancedTextFontSize(420, fix_xml($infos['DESCRIPTION']), false, true);
+	$font_limit_nom 		= getAdvancedTextFontSize(420, fix_xml($infos['NOM']), false, true);
+	
+	$xml = array();
+	$xml[] = '		<stack>';
+	$xml[] = '			<effect type="none">';
+	$xml[] = '				<image color="#FFFFFF" />';
+	$xml[] = '			</effect>';
+	$xml[] = '			<sequence>';
+	// banner price start
+	$xml[] = '				<!-- banner and price start -->';
+	$xml[] = '				<stack>';
+	$xml[] = '					<stack>';
+	$xml[] = '						<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '							<sequence>';
+	$xml[] = '								<effect type="none" duration="'.$duration_banner.'">';
+	$xml[] = '									<image color="#FFFFFF" />';
+	$xml[] = '								</effect>';
+	$xml[] = '								<transition type="crossfade" duration="0.5" />';
+	$xml[] = '								<effect type="none" duration="7">';
+	$xml[] = '									<image color="#000000" />';
+	$xml[] = '								</effect>';
+	$xml[] = '							</sequence>';
+	$xml[] = '						</filter>';
+	$xml[] = '						<stack>';
+	$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '								<stack>';
+	$xml[] = '									<effect type="none" duration="7">';
+	$xml[] = '										<image color="#FFFFFF" />';
+	$xml[] = '									</effect>';
+	for($i = 0;$i < 4 ;$i++){
+		$filter_position = $header_position['x']+($filter_width+$filter_separator_width)*$i;
+		
+		$xml[] = '									<overlay top="'.$filter_top.'" left="'.$filter_position.'" width="'.$filter_width.'" height="'.$filter_height.'">';
+		$xml[] = '										<effect type="none" duration="0.6">';
+		$xml[] = '											<image color="#000000" />';
+		$xml[] = '										</effect>';
+		$xml[] = '										<animator type="custom">';
+		$xml[] = '											<key pos="0,0,0" time="3"/>';
+		$xml[] = '											<key pos="0,'.($i%2 == 0 ? "" : "-" ).'1,0" time="3.5"/>';
+		$xml[] = '										</animator>';
+		$xml[] = '									</overlay>';
+		$xml[] = '									<overlay top="'.$filter_top.'" left="'.($filter_position+$filter_width).'" width="'.$filter_separator_width.'" height="'.$filter_height.'">';
+		$xml[] = '										<effect type="none" duration="0.6">';
+		$xml[] = '											<image color="#000000" />';
+		$xml[] = '										</effect>';
+		$xml[] = '									</overlay>';
+	}
+	$xml[] = '								</stack>';
+	$xml[] = '							</filter>';
+	$xml[] = '							<overlay top="'.$header_position['y'].'" left="'.$header_position['x'].'" width="'.$header_position['width'].'" height="'.$header_position['height'].'" duration="'.$duration_banner.'">';
+	$xml[] = '								<image filename="'.fix_xml($infos['HEADER']).'" />';
+	$xml[] = '							</overlay>';
+	$xml[] = '						</stack>';
+	$xml[] = '						<stack>';
+	$xml[] = '							<sequence>';
+	$xml[] = '								<text type="zone" duration="3.55"></text>';
+	$xml[] = '								<transition type="crossfade" duration="0.5" />';
+	$xml[] = '								<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" fontname="calibri" duration="'.$duration_banner.'" '.$font_limit_description.'><![CDATA['.$infos['DESCRIPTION'].']]>';
+	$xml[] = '								<animator type="custom">';
+	$xml[] = '									<key pos="-1.5,-0.35,0" time="0" />';
+	$xml[] = '								</animator>';
+	$xml[] = '								</text>';
+	$xml[] = '								<transition type="crossfade" duration="0.2" />	';
+	$xml[] = '								<text type="zone"></text>';
+	$xml[] = '							</sequence>';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="0,-1.65,0" time="0" />';
+	$xml[] = '								<key pos="0,-1.65,0" time="3" />';
+	$xml[] = '								<key pos="0,-0.1,0" time="3.3" />';
+	$xml[] = '								<key pos="0,0,0" time="3.5" />';
+	$xml[] = '							</animator>';
+	$xml[] = '						</stack>';
+	$xml[] = '						<stack>';
+	$xml[] = '							<sequence>';
+	$xml[] = '								<text type="zone" duration="3.85"></text>';
+	$xml[] = '								<transition type="crossfade" duration="0.5" />';
+	$xml[] = '								<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" fontsize="45" duration="'.$duration_banner.'" weight="bold" fontname="calibri"><![CDATA['.$infos['DISCOUNT'].'*]]>';
+	$xml[] = '									<animator type="custom">';
+	$xml[] = '										<key pos="0.5,-0.70,0" time="0" />';
+	$xml[] = '									</animator>';
+	$xml[] = '								</text>';
+	$xml[] = '								<transition type="crossfade" duration="0.2" />	';
+	$xml[] = '								<text type="zone"></text>';
+	$xml[] = '							</sequence>';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="0,0,1" time="0" />';
+	$xml[] = '								<key pos="0,0,1" time="3.3" />';
+	$xml[] = '								<key pos="0,0,0.1" time="3.6" />';
+	$xml[] = '								<key pos="0,0,0" time="3.8" />';
+	$xml[] = '							</animator>';
+	$xml[] = '						</stack>';
+	$xml[] = '					</stack>';
+	$xml[] = '					<sequence>';
+	$xml[] = '						<text type="zone" duration="3.8"></text>';
+	$xml[] = '						<transition type="crossfade" duration="0.5" />';
+	$xml[] = '						<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" fontsize="9" duration="'.($duration_banner - 2.8).'" fontname="calibri">*ggù.UVP des Herstellers';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key pos="-1.75,-0.84,0" time="0" />';
+	$xml[] = '						</animator>';
+	$xml[] = '						</text>';
+	$xml[] = '					</sequence>';
+	$xml[] = '				</stack>';
+	$xml[] = '				<!-- banner and price end -->';
+	//banner end
+	//infos start
+	for($i =0;$i < $nb_overview;$i++){
+		$xml[] = '				<!-- infos start -->';
+		$xml[] = '				<stack>';
+		$pos_overview_text = "0.5";
+		$pos_overline_x = ($i%2==0 ? '0.45' : '0.32');
+		if($no_overview){
+			$pos_overview_text = "1.1";
+			$pos_overline_x = ($i%2==0 ? '0.620' : '0.32');
+		}else{
+			$xml[] = '						<sequence>';
+			$xml[] = '							<text type="zone" duration="0.1"></text>';
+			$xml[] = '							<transition type="crossfade" duration="0.5" />';
+			$xml[] = '							<overlay bottom="'.$overview_position['y'].'" '.($i%2 == 0 ? 'right' : 'left').'="'.$overview_position['x'].'" width="'.$overview_position['width'].'" height="'.$overview_position['height'].'" duration="'.($duration_overview+0.5).'"> ';
+			$xml[] = '								<image filename="'.fix_xml($infos['OVERVIEW']).'" />';
+			$xml[] = '							</overlay>';
+			$xml[] = '							<transition type="crossfade" duration="0.5" />';
+			$xml[] = '							<text type="zone" duration="1.0"></text>';
+			$xml[] = '						</sequence>';
+//			$xml[] = '					</overlay>';
+		}
+		$xml[] = '					<stack>';
+		$xml[] = '						<sequence>';
+		$xml[] = '							<text type="zone" duration="0.8"></text>';
+		$xml[] = '							<transition type="crossfade" duration="0.5" />';
+		$xml[] = '							<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" align="'.($i%2 == 0 ? 'right' : 'left').'" weight="bold" duration="'.$duration_overview.'" '.$font_limit_nom.'><![CDATA['.$infos['NOM'].']]>';
+		$xml[] = '								<animator type="custom">';
+//		$xml[] = '									<key pos="'.($i%2==0 ? '' : '-').$pos_overview_text.',0.35,0" time="0" />';
+		$xml[] = '									<key pos="'.($i%2==0 ? '' : '-').$pos_overview_text.',0.25,0" time="0" />';
+		$xml[] = '								</animator>';
+		$xml[] = '							</text>';
+		$xml[] = '						</sequence>';
+		$xml[] = '						<stack>';
+		$xml[] = '							<sequence>';
+		$xml[] = '								<text type="zone" duration="2.2"></text>';
+		$xml[] = '								<transition type="crossfade" duration="0.5" />';
+		$xml[] = '								<text type="advanced" fontcolor="#0e437c" stretch="condensed" align="'.($i%2 == 0 ? 'right' : 'left').'" vector="true" fontsize="20"><![CDATA['.$infos['PRICE_RETAIL'].']]>';
+		$xml[] = '									<animator type="custom">';
+//		$xml[] = '										<key pos="'.($i%2==0 ? '' : '-').$pos_overview_text.',-0.35,0" time="0" />';
+		$xml[] = '										<key pos="'.($i%2==0 ? '' : '-').$pos_overview_text.',-0.25,0" time="0" />';
+		$xml[] = '									</animator>';
+		$xml[] = '								</text>';
+		$xml[] = '							</sequence>';
+		$xml[] = '						</stack>';
+		$xml[] = '						<overlay top="0.5625" left="'.($pos_overline_x+0.01).'" width="0.205" height="0.068">';
+		$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+		$xml[] = '								<overlay top="0" left="'.$pos_overline_x.'" right="0" bottom="0">';
+		$xml[] = '									<stack>';
+		$xml[] = '										<effect type="none" duration="10">';
+		$xml[] = '											<image color="#FFFFFF" />';
+		$xml[] = '										</effect>';
+		$xml[] = '										<effect type="none" duration="10">';
+		$xml[] = '											<image color="#000000" />';
+		$xml[] = '											<animator type="custom">';
+		$xml[] = '												<key pos="0,0,0" time="2.3"/>';
+		$xml[] = '												<key pos="2,0,0" time="2.8"/>';
+		$xml[] = '											</animator>';
+		$xml[] = '										</effect>';
+		$xml[] = '									</stack>';
+		$xml[] = '								</overlay>';
+		$xml[] = '							</filter>';
+		$xml[] = '							<image filename="'.fix_xml($url_overline).'" />';
+		$xml[] = '						</overlay>';
+		$xml[] = '						<stack>';
+		$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+		$xml[] = '								<overlay top="0.6" left="0" right="0" bottom="0.06">';
+		$xml[] = '									<stack>';
+		$xml[] = '										<effect type="none" duration="10">';
+		$xml[] = '											<image color="#FFFFFF" />';
+		$xml[] = '										</effect>';
+		$xml[] = '										<effect type="none" duration="..">';
+		$xml[] = '											<image color="#000000" />';
+		$xml[] = '											<animator type="custom">';
+		$xml[] = '												<key pos="0,0,0" time="2.8"/>';
+		$xml[] = '												<key pos="0,-1,0" time="3.3"/>';
+		$xml[] = '											</animator>';
+		$xml[] = '										</effect>';
+		$xml[] = '									</stack>';
+		$xml[] = '								</overlay>';
+		$xml[] = '							</filter>';
+		$xml[] = '							<text type="advanced" fontcolor="#a41977" stretch="condensed" align="'.($i%2 == 0 ? 'right' : 'left').'" vector="true" fontsize="23" duration="'.($duration_overview+0.3).'" weight="bold" style="italic"><![CDATA['.$infos['PRICE'].']]>';
+		$xml[] = '								<animator type="custom">';
+//		$xml[] = '									<key pos="'.($i%2==0 ? '' : '-').$pos_overview_text.',-0.60,0" time="0" />';
+		$xml[] = '									<key pos="'.($i%2==0 ? '' : '-').$pos_overview_text.',-0.50,0" time="0" />';
+		$xml[] = '								</animator>';
+		$xml[] = '							</text>';
+		$xml[] = '						</stack>';
+		$xml[] = '						<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+		$xml[] = '							<sequence>';
+		$xml[] = '								<effect type="none" duration="'.($duration_overview+0.2).'">';
+		$xml[] = '									<image color="#FFFFFF" />';
+		$xml[] = '								</effect>';
+		$xml[] = '								<transition type="crossfade" duration="0.2" />';
+		$xml[] = '								<effect type="none" duration="5">';
+		$xml[] = '									<image color="#000000" />';
+		$xml[] = '								</effect>';
+		$xml[] = '							</sequence>';
+		$xml[] = '						</filter>';
+		$xml[] = '						<animator type="custom">';
+		$xml[] = '							<key pos="0,0,0" time="'.($duration_overview).'" />';
+		$xml[] = '							<key pos="0,3,0" time="'.($duration_overview+0.3).'" />';
+		$xml[] = '						</animator>';
+		$xml[] = '					</stack>';
+		$xml[] = '					<stack>';
+		$xml[] = '						<sequence>';
+		if($i > 0){
+			$xml[] = '							<text type="zone" duration="0.2"></text>';
+			$xml[] = '							<transition type="crossfade" duration="0.2" />';
+		}
+		$xml[] = '							<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" fontsize="9" duration="'.$duration_overview.'" >*ggù.UVP des Herstellers';
+		$xml[] = '								<animator type="custom">';
+		$xml[] = '									<key pos="'.($i%2 == 0 ? '-1.75' : '0.8').',-0.84,0" time="0" />';
+		$xml[] = '								</animator>';
+		$xml[] = '							</text>';
+		$xml[] = '							<transition type="crossfade" duration="0.5" />';
+		$xml[] = '							<text type="zone"></text>';
+		$xml[] = '						</sequence>';
+		$xml[] = '					</stack>';
+		$xml[] = '				</stack>';
+		$xml[] = '				<!-- infos end -->';
+	}
+	//infos end
+	// last part start
+	$xml[] = '				<!-- last part start-->';
+	$xml[] = '				<stack>';
+	$xml[] = '					<sequence>';
+	$xml[] = '						<text type="zone" duration="1.5"></text>';
+	$xml[] = '						<transition type="crossfade" duration="0.5" />';
+	$xml[] = '						<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" fontsize="30" weight="bold" align="center" reference="AAAAAAAAAAAAA&#10;AAAAAAAAAAAA" duration="1.5">Verpasse kein Schnäppchen!';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="0,0.15,0" time="0" />';
+	$xml[] = '							</animator>';
+	$xml[] = '						</text>';
+	$xml[] = '						<transition type="crossfade" duration="0.2" />	';
+	$xml[] = '						<text type="zone" duration="0.9"></text>';
+	$xml[] = '						<transition type="crossfade" duration="0.5" />';
+	$xml[] = '						<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" fontsize="30" weight="bold" align="center" reference="AAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAA&#10;AAAAAAAAAAAAAA" duration="2.0"><![CDATA[Jeden Tag neue Marken bis '.$infos['DISCOUNT'].' reduziert]]>';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="0,0.3,0" time="0" />';
+	$xml[] = '							</animator>';
+	$xml[] = '						</text>';
+	$xml[] = '						<transition type="crossfade" duration="0.2" />	';
+	$xml[] = '						<text type="zone" duration="0.2"></text>  ';
+	$xml[] = '					</sequence>';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key pos="0,-1.65,0" time="0.8" />';
+	$xml[] = '						<key pos="0,-0.1,0" time="1.1" />';
+	$xml[] = '						<key pos="0,0,0" time="1.3" />';
+	$xml[] = '						<key pos="0,0,0" time="2.4" />';
+	$xml[] = '						<key pos="0,1.65,0" time="2.6" />';
+	$xml[] = '						<key pos="0,-1.65,0" time="2.61" />';
+	$xml[] = '						<key pos="0,-0.1,0" time="2.9" />';
+	$xml[] = '						<key pos="0,0,0" time="3.6" />';
+	$xml[] = '						<key pos="0,0,0" time="4.6" />';
+	$xml[] = '						<key pos="0,1.65,0" time="4.8" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</stack>';
+	$xml[] = '				<!-- last part end-->';
+	//last part end
+	$xml[] = '				<overlay duration="5">';
+	$xml[] = '				  <video filename="'.$url_video.'" speed="1.0" audio="false"/>';
+	$xml[] = '				</overlay> ';
+	$xml[] = '			</sequence>';
+	//start (logo sozioo)	
+	$xml[] = '			<!-- logo sozioo start -->';
+	$xml[] = '			<sequence>';
+	$xml[] = '				<text type="zone" duration="'.($duration_totale-3).'"></text>';
+	$xml[] = '				<transition type="crossfade" duration="0.5" />';
+	$xml[] = '				<stack>';
+	$xml[] = '					<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" fontsize="10" fontname="calibri">Video erstellt von';
+	$xml[] = '						<animator type="custom">';
+	$xml[] = '							<key scale="1,1,1" pos="0.60,-0.83,0" time="0" />';
+	$xml[] = '						</animator>';
+	$xml[] = '					</text>';
+	$xml[] = '					<overlay bottom="0.07" right="0.02" width="0.12" height="0.07" >';
+	$xml[] = '						<image filename="'.$url_logo_sozioo.'" />';
+	$xml[] = '					</overlay>';
+	$xml[] = '				</stack>';
+	$xml[] = '			</sequence>';
+	$xml[] = '			<!-- logo sozioo end -->';
+	//end (logo sozioo)
+	//font start (logo limango)
+	$xml[] = '			<!-- fond start (logo limango) -->';
+	$xml[] = '			<sequence>';
+	$xml[] = '				<text type="zone" duration="0.4"></text>';
+	$xml[] = '				<transition type="crossfade" duration="0.2"/>';
+	$xml[] = '				<overlay top="0.025" left="0.02" width="0.17" height="0.153"  duration="'.$duration_totale.'">';
+	$xml[] = '					<image filename="'.fix_xml($url_logo).'" />';
+	$xml[] = '					<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.4" />';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="0.8,1.6,1" time="0" />';
+	$xml[] = '						<key scale="1,1,1" time="0.4" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</overlay>';
+	$xml[] = '			</sequence>';
+	$xml[] = '			<!-- fond end (logo limango) -->';
+	// font end (logo limango)
+	//logo start
+	$xml[] = '			<!-- logo start-->';
+	$xml[] = '			<stack>';
+	$xml[] = '				<sequence>';
+	$xml[] = '					<text type="zone" duration="1.0"></text>';
+	$xml[] = '					<transition type="crossfade" duration="0.5" />';
+	$xml[] = '					<text type="advanced" fontcolor="#666666"  stretch="condensed" vector="true" align="center" duration="2.0" fontname="calibri" '.$font_limit_startdate.'><![CDATA['.$infos['START_DATE'].']]></text>';
+	$xml[] = '					<transition type="crossfade" duration="0.2" />	';
+	$xml[] = '					<text type="zone" duration="1"></text>';
+	$xml[] = '				</sequence>';
+	$xml[] = '				<animator type="custom">';
+	$xml[] = '					<key pos="-3,0.18,0" time="0.5" />';
+	$xml[] = '					<key pos="-0.05,0.18,0" time="0.8" />';
+	$xml[] = '					<key pos="0,0.18,0" time="1.0" />';
+	$xml[] = '					<key pos="0,0.18,0" time="2.35" />';
+	$xml[] = '					<key pos="-4,0.18,0" time="2.65" />';
+	$xml[] = '				</animator>	';
+	$xml[] = '			</stack>';
+	if(!$no_user_logo){
+		$xml[] = '			<stack>';
+		$xml[] = '				<sequence>';
+		$xml[] = '					<text type="zone" duration="1.1"></text>';
+		$xml[] = '					<transition type="crossfade" duration="0.7" />';
+		$xml[] = '					<overlay top="'.$logo_position['y'].'" left="'.$logo_position['x'].'" width="'.$logo_position['width'].'" height="'.$logo_position['height'].'" duration="'.($duration_totale-0.4).'">';
+		$xml[] = '						<image filename="'.fix_xml($infos['LOGO']).'" />';
+		$xml[] = '						<filter type="alpha" alphaStart="0" alphaEnd="1" duration="0.6" />';
+		$xml[] = '					</overlay>';
+		$xml[] = '				</sequence>';
+		$xml[] = '				<animator type="custom">';
+		$xml[] = '					<key pos="3,0.18,0" time="0.6" />';
+		$xml[] = '					<key pos="0.05,0.18,0" time="0.9" />';
+		$xml[] = '					<key pos="0,0.18,0" time="1.1" />';
+		$xml[] = '					<key pos="0,0.18,0" time="2.35" />';
+		$xml[] = '					<key pos="0,0,0" time="2.55" />';
+		$xml[] = '					<key pos="1.325,1,0" time="2.95" />';
+		$xml[] = '				</animator>';
+		$xml[] = '				<animator type="custom">';
+		$xml[] = '					<key scale="1,1,1" time="2.55" />';
+		$xml[] = '					<key scale="0.30,0.30,0.30" time="2.95" />';
+		$xml[] = '				</animator>';
+		$xml[] = '			</stack>';
+	}
+	$xml[] = '			<!-- logo end -->';
+	//logo end
+	// font start (border down)	
+	$xml[] = '			<!-- font start (border down) -->';
+	$xml[] = '			<stack>';
+	$xml[] = '				<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+	$xml[] = '					<stack>';
+	$xml[] = '						<effect type="none" duration="'.($duration_totale+4).'">';
+	$xml[] = '							<image color="#FFFFFF" />';
+	$xml[] = '						</effect>';
+	$xml[] = '						<effect type="none" duration="0.6">';
+	$xml[] = '							<image color="#000000" />';
+	$xml[] = '							<animator type="custom">';
+	$xml[] = '								<key pos="0,0,0" time="0"/>';
+	$xml[] = '								<key pos="5,0,0" time="0.6"/>';
+	$xml[] = '							</animator>';
+	$xml[] = '						</effect>';
+	$xml[] = '					</stack>';
+	$xml[] = '				</filter>';
+	$xml[] = '				<overlay bottom="0" left="0" width="1" height="0.06" duration="'.$duration_totale.'">';
+	$xml[] = '					<image color="#a1d562" />';
+	$xml[] = '				</overlay>';
+	$xml[] = '				<text type="advanced" fontcolor="#FFFFFF"  stretch="condensed" vector="true" fontsize="11" fontname="calibri" weight="bold" align="center">www.limango.de';
+	$xml[] = '					<animator type="custom">';
+	$xml[] = '						<key scale="1,1,1" pos="0,-0.97,0" time="0" />';
+	$xml[] = '					</animator>';
+	$xml[] = '				</text>';
+	$xml[] = '			</stack>';
+	$xml[] = '			<!-- font end (border down) -->';
+	//font end (border down)
+	//fading start
+	$xml[] = '			<!-- fading start -->';
+	$xml[] = '			<effect type="none">';
+	$xml[] = '				<image color="#FFFFFF">';
+	$xml[] = '					<filter type="alpha" alphaStart="1" alphaEnd="0" duration="0.5" />';
+	$xml[] = '				</image>';
+	$xml[] = '			</effect>';
+	$xml[] = '			<!-- fading end -->';
+	//fading end
+	$volume_sound = "1.0";
+	if($infos['MUSIC'] != ""){
+//		$xml[] = ChooseSoundDuration($duration_totale-1, $volume_sound, $infos['MUSIC']);
+	}
+	$xml[] = '		</stack>';
+	//return array('profile'=> $profile, 'xml'=>implode("\n",$xml));
+	return implode("\n",$xml);
+}
+
+
+?>

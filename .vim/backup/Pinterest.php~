@@ -1,0 +1,266 @@
+<?php
+
+require_once 'HTTP/Client.php';
+require_once 'HTTP/Request.php';
+require_once 'HTTP/Client/CookieManager.php';
+
+class Pinterest{
+	var $url_login = "https://pinterest.com/login/?next=%2F";
+	var $url_home = "http://pinterest.com/";
+	var $url_findImages = "http://pinterest.com/pin/create/find_images/";
+	var $url_pinIt = "http://pinterest.com/pin/create/";
+	var $url_edit = "http://pinterest.com/pin/#ID#/edit/";
+	var $url_delete = "http://pinterest.com/pin/#ID#/delete/";
+	var $url_final = "http://pinterest.com/pin/#ID#/";
+	
+	var $id = null;
+	
+	var $mgr = null;
+	var $req = null;
+	var $error = "";
+	
+	var $login = "";
+	var $password = "";
+	var $debug = false;
+	var $connected = false;
+	
+	function Pinterest($login, $password, $debug = false){
+		$this->login = $login;
+		$this->password = $password;
+		$this->debug = $debug;
+		$this->mgr = new HTTP_Client_CookieManager();
+		$this->connected = false;
+	}
+	
+	private function truncateDescription($description){
+		if(strlen($description) > 500){
+			$description = mb_substr($description, 0, 497)."...";
+		}
+		return $description;
+	}
+
+	private function connexion(){
+		if($this->login != "" && $this->password != ""){
+			if(!$this->connected){
+				$response = $this->getRequestResult($this->url_login);
+				if($response['code'] == 200 && preg_match('/name=\'csrfmiddlewaretoken\'[^>]+value=\'([^\']+)/i', $response['body'], $token) > 0){
+					$params = array(
+						'email' => $this->login,
+						'password' => $this->password,
+						'next' => '/',
+						'csrfmiddlewaretoken' => $token[1],
+					);
+					$headers = array('Referer'=>$this->url_login);
+					$response = $this->getRequestResult($this->url_login, "POST", $params, $headers);
+					if($response['code'] == "302"){
+						$this->connected = true;
+						return true;
+					}else{ $this->error = "Wrong login/password";}
+				}else{ $this->error = "Token not found";}
+			}else{ return true;}
+		}else{ $this->error = "Missing login or password";}
+		if($this->debug){ print_r($response);}
+		return false;
+	}
+	
+	private function getBoardAndToken($url = ""){
+		$return = array('token' => '', 'board' => '');
+		if($url == ""){ $url = $this->url_home;}
+		$response = $this->getRequestResult($url);
+	 	if($response['code'] == 200){
+			$getBoardList = '/<ul[^>]class="BoardListUl">([\s\S]+)<\/ul>/Ui';
+			$getBoardName = '/<li[^>]*data="([0-9]+)">\s*<span>([^<]*)<\/span>\s*<\/li>/i';
+			$isError == false;
+			if(preg_match( $getBoardList, $response['body'], $tmp) > 0 
+		 		&& preg_match_all( $getBoardName, $tmp[1], $board) > 0){
+				for($i =0; $i < count($board[1]);$i++){
+				 	$return['board'][] = array('id' => $board[1][$i], 'name' => $board[2][$i]);
+				 }
+			}else $isError = true;
+			if(preg_match('/name=\'csrfmiddlewaretoken\'[^>]+value=\'([^\']+)/i', $response['body'], $token) > 0){
+				$return['token'] = $token[1];
+			}else $isError = true;
+			if($isError){
+				if($this->debug) print_r($response);
+				return false;
+			}
+		}
+		return $return;
+	}
+
+	private function getTheRightBoard( $boards, $rightBoards){
+		if(is_array($boards) && count($boards) > 0){
+			if(is_array($rightBoards) && count($rightBoards) > 0){
+				for($i=0;$i < count($rightBoards); $i++){
+					for($j=0; $j < count($boards); $j++){
+						if(strtolower($rightBoards[$i]) == strtolower($boards[$j]['name'])){
+							return $boards[$j]['id'];
+						}
+					}
+				}
+			}
+			return $boards[0]['id'];
+		}
+		return "";
+	}
+
+	function getBoardList(){
+		$return = array();
+		if($this->connexion()){
+			$tmp = $this->getBoardAndToken();	
+			if(is_array($tmp)) $return = $tmp['board'];
+		}
+		return $return;
+	}
+
+	function pinIt($url, $description, $boards, $url_image = "", $price = ""){
+		if($url != "" && $description != ""){
+			if($this->connexion()){
+				$fields = $this->getBoardAndToken();
+				if(count($fields['board']) >0 && $fields['token'] != ""){
+					$params = array("url" => $url);
+					$headers = array("X-Requested-With" => "XMLHttpRequest");
+					$response = $this->getRequestResult($this->url_findImages, "GET", $params, $headers);
+					if($response['code'] == "200" && $json = json_decode($response['body'] , true) ){
+						if($url_image == "" && count($json['images']) > 0){
+							$url_image =  $json['images'][0];
+						}
+					}else{
+						$url_image = "";
+					}
+					if($url_image != ""){
+						if($json['status'] == "success"){
+							$params = array(
+								"board" => $this->getTheRightBoard($fields['board'], $boards),
+								"details" => $this->truncateDescription($description),
+								"link" => $url,
+								"img_url" => $url_image,
+								"tags" => "",
+								"replies" => "",
+								"buyable" => $price,
+								"csrfmiddlewaretoken" => $fields['token'],
+							);
+							$response = $this->getRequestResult($this->url_pinIt, "POST", $params);
+							if($response['code'] == "200" && $json = json_decode($response['body'] , true)){
+								if($json['status'] == "success" && preg_match('#^/pin/([^/]+)/$#i', $json['url'], $id) > 0){
+									$this->id = $id[1];
+									return true;
+								}else $this->error = "Pin id not found".($json['message'] != "" ? " - ".$json['message'] : "");
+							}else $this->error = "Post failed";
+						}else $this->error = "JSON parse failed";
+					}else $this->error = "Url parse failed";
+				}else $this->error = "Board or Token not found";
+				if($this->debug) print_r($response);
+			}else $this->error = "Login failed - ".$this->error;
+		}else $this->error = "Missing Url or description";
+		return false;
+	}
+	
+	function pinEdit($ref, $url, $description, $boards){
+		if($ref != ""){
+			if($url != "" && $description != ""){
+				$url_final = str_replace('#ID#', $ref, $this->url_final);
+				$response = $this->getRequestResult($url_final);
+				if($response['code'] == '200'){
+					$this->id = $ref;
+					if($this->connexion()){
+						$fields = $this->getBoardAndToken();
+						if(count($fields['board']) >0 && $fields['token'] != ""){
+							$params = array(
+								'details' => $this->truncateDescription($description),
+								'link'	=> $url,
+								'board' =>	$this->getTheRightBoard($fields['board'], $boards),
+								'csrfmiddlewaretoken' => $fields['token'],
+								'pin_replies' => '',
+								'buyable' => '',
+							);
+							$response = $this->getRequestResult( str_replace('#ID#', $ref, $this->url_edit), "POST", $params);
+							if($response['code'] == '302'){
+								return true;
+							}else{ $this->error = "Edit failed";}
+						}else{ $this->error = "Board or token not found";}
+					}else{ $this->error = "Login failed - ".$this->error;}
+				}else{ $this->error = "Pin not found";}
+			}else{ $this->error = "Missing Url or description";}			
+		}else{ $this->error = "Id Pin not found";}
+		if($this->debug){ print_r($response);}
+		return false;
+	}
+	
+	function delete($ref){
+		if($ref != ""){
+			$url_final = str_replace('#ID#', $ref, $this->url_final);
+			$response = $this->getRequestResult($url_final);
+			if($response['code'] == '200'){
+				if($this->connexion()){
+					$url_edit = str_replace('#ID#', $ref, $this->url_edit);
+					$fields = $this->getBoardAndToken($url_edit);
+					
+					if($fields['token'] != ""){
+						$headers = array(
+							'X-CSRFToken' => $fields['token'],
+							'X-Requested-With' => 'XMLHttpRequest',
+						);
+						$url_delete = str_replace('#ID#', $ref, $this->url_delete);
+						$response = $this->getRequestResult( $url_delete, "POST", array('post' => ''), $headers);
+						if($response['code'] == '200' && preg_match('/"status"[^"]*:[^"]*"success"/i', $response['body']) > 0){
+							return true;
+						}else{ $this->error = "Delete failed";}
+					}else{ $this->error = "Token not found";}
+				}else{ $this->error = "Login failed - ".$this->error;}
+			}else{ return true;}
+		}else{ $this->error = "Id Pin not found";}
+		if($this->debug){ print_r($response);}
+		return false;
+	}
+	
+	function getId(){
+		return $this->id;
+	}
+	
+	function getUrl(){
+		if(!empty($this->id)){
+			return str_replace('#ID#', $this->id, $this->url_final);
+		}
+		return false;
+	}
+	
+	function getError(){
+		return $this->error;
+	}
+	
+	private function sendRequest(&$req){
+		$this->mgr->passCookies($req);
+		$req->sendRequest();
+		$this->mgr->updateCookies($req);
+	}
+	
+	private function getRequestResult($url, $method = "GET", $params = array(), $headers = array(), $follow = false){
+		$req = new HTTP_Request($url);
+		$req->setMethod($method);
+		if(is_array($params) && count($params) > 0){
+			if($method == "POST"){
+				foreach($params as $k=>$v){ $req->addPostData( $k, $v);}
+			}else{
+				$tmp = "";
+				foreach($params as $k=>$v){ $tmp .= "&".urlencode($k)."=".urlencode($v);}
+				$url .= preg_replace('/^&/i', '?', $tmp);
+				$req->setURL($url);
+			}
+		}
+		if(is_array($headers) && count($headers) > 0){
+			foreach($headers as $k => $v){ $req->addHeader( $k, $v);}
+		}
+//		if(file_exists($file)){ $req->addFile( "file", $file);}
+		$this->sendRequest($req);
+		while($follow && $req->getResponseCode() == "302"){
+			$header = $req->getResponseHeader();
+			if(preg_match('/^http:\/\//i', $header['location']) == 0){
+				$header['location'] = $url.$header['location'];
+			}
+			return $this->getRequestResult($header['location']);
+		}
+		return array('body'=>$req->getResponseBody(), 'header'=>$req->getResponseHeader(), 'code'=>$req->getResponseCode(), 'url'=>$url, 'params' => $params, 'headers' => $headers);
+	}
+}
+?>

@@ -1,0 +1,151 @@
+<?php
+$_dico = array();
+
+$_dico['INFOS'] = array(
+	'ID_TYPE_BIEN', 'ID_TYPE_TRANSACTION', 'SQUARE_FEET', 'PRICE', 'ID_PERIODICITE_LOYER',
+	'NB_ROOM', 'NB_BEDROOM', 'NB_BATHROOM', 
+	'NOMBRE_PARKING_INT', 'NOMBRE_PARKING_EXT', 
+	'CAVE', 'BALCON', 'TERRASSE',
+	'BIEN_AMENAGE', 'JARDIN',
+	'LUMIERE', 'GARAGE', 'PISCINE', 'NEUF',
+	'ID_TYPE_CUISINE', 'ID_TYPE_CHAUFFAGE',
+	'ASCENSEUR', 'TRAVAUX', 'NOMBRE_ETAGES', 'ETAGE',
+	'AGREABLE'
+);
+
+$_dico['catch'] = array(
+//Le terrain a une superficie de 5000 m².
+//Cet appartement comporte 1 cuisine indépendante ; il y a 1 salle de bains. Il comprend 1 séjour.
+//
+	//5
+	'#ID_TYPE_BIEN# de #SQUARE_FEET#, disposant de #NB_BEDROOM# et #NB_BATHROOM# est disponible à la #ID_TYPE_TRANSACTION#.',
+//	'#ID_TYPE_TRANSACTION# de #ID_TYPE_BIEN# de #NB_ROOM# répartient sur #SQUARE_FEET# pour #PRICE#.',
+	'#ID_TYPE_BIEN# de #SQUARE_FEET# est disponible à la #ID_TYPE_TRANSACTION# pour un prix de #PRICE#',
+	//4
+	'#ID_TYPE_BIEN# a une surface habitable de #SQUARE_FEET# et possède #NB_ROOM# dont #NB_BEDROOM#.',
+	'#ID_TYPE_BIEN# possède #NB_ROOM# dont #NB_BEDROOM# et #NB_BATHROOM#.',
+	'#ID_TYPE_BIEN# de #SQUARE_FEET# avec #NB_BEDROOM# est disponible à la #ID_TYPE_TRANSACTION#.',
+	//3
+	'#ID_TYPE_BIEN# possède #NB_ROOM# dont #NB_BEDROOM#.',
+	'#ID_TYPE_TRANSACTION# de #ID_TYPE_BIEN# de #NB_ROOM#.',
+	'#ID_TYPE_BIEN# à la #ID_TYPE_TRANSACTION# possède une surface de #SQUARE_FEET#.',
+	'#ID_TYPE_BIEN# proposé à la #ID_TYPE_TRANSACTION# fait #SQUARE_FEET#.',
+	'#ID_TYPE_BIEN# a une surface habitable de #SQUARE_FEET# et possède #NB_ROOM#.',
+	//2
+	'#ID_TYPE_BIEN# à la #ID_TYPE_TRANSACTION#.',
+	'#ID_TYPE_BIEN# a une surface de #SQUARE_FEET#.',
+	//1
+	'#TRAVAUX# à prévoir.',
+	'Des #TRAVAUX# sont à prévoir.',
+	'Le prix est de #PRICE#.',
+	'Ce bien est proposé au prix de #PRICE#.',
+);
+
+$_dico['ID_TYPE_BIEN'][0] 	= 'ce bien';
+$_dico['ID_TYPE_BIEN'][1] 	= 'cet appartement';
+$_dico['ID_TYPE_BIEN'][2] 	= 'cette maison';
+$_dico['ID_TYPE_BIEN'][3] 	= 'ce terrain';
+$_dico['ID_TYPE_BIEN'][4] 	= 'ce bureau';
+$_dico['ID_TYPE_BIEN'][5] 	= 'cet immeuble';
+$_dico['ID_TYPE_BIEN'][6] 	= 'ce loft';
+$_dico['ID_TYPE_BIEN'][7]	= 'cette villa';
+$_dico['ID_TYPE_BIEN'][8] 	= 'ce chalet';
+$_dico['ID_TYPE_BIEN'][9] 	= 'ce commerce';
+$_dico['ID_TYPE_BIEN'][10] 	= 'ce château';
+$_dico['ID_TYPE_BIEN'][11] 	= 'ce parking';
+$_dico['ID_TYPE_BIEN'][12] 	= 'cette ferme';
+$_dico['ID_TYPE_BIEN'][27] 	= 'ce duplex';
+$_dico['ID_TYPE_BIEN'][29] 	= 'cette maisonnette';
+$_dico['ID_TYPE_BIEN'][40] 	= 'ce studio';
+
+$_dico['ID_TYPE_TRANSACTION'][1] = 'vente';
+$_dico['ID_TYPE_TRANSACTION'][2] = 'location';
+$_dico['ID_TYPE_TRANSACTION'][3] = 'viager';
+$_dico['ID_TYPE_TRANSACTION'][4] = 'location saisonnière';
+
+$_dico['ID_PERIODICITE'][1] = 'par mois';
+$_dico['ID_PERIODICITE'][2] = 'par semaine';
+$_dico['ID_PERIODICITE'][3] = 'par jour';
+$_dico['ID_PERIODICITE'][4] = 'par an';
+
+$_dico['ID_TYPE_CUISINE']['1'] = 'cuisine américaine';
+$_dico['ID_TYPE_CUISINE']['2'] = 'cuisine séparée';
+$_dico['ID_TYPE_CUISINE']['3'] = 'cuisine industrielle';
+$_dico['ID_TYPE_CUISINE']['4'] = 'coin cuisine';
+
+$_dico['ID_TYPE_CHAUFFAGE']['1'] = 'chauffage au gaz';
+$_dico['ID_TYPE_CHAUFFAGE']['2'] = 'chauffage électrique';
+$_dico['ID_TYPE_CHAUFFAGE']['3'] = 'chauffage au sol';
+$_dico['ID_TYPE_CHAUFFAGE']['4'] = 'chauffage au fuel';
+$_dico['ID_TYPE_CHAUFFAGE']['5'] = 'chauffage collectif au gaz';
+$_dico['ID_TYPE_CHAUFFAGE']['6'] = 'chauffage collectif au fuel';
+$_dico['ID_TYPE_CHAUFFAGE']['7'] = 'chauffage collectif au sol';
+$_dico['ID_TYPE_CHAUFFAGE']['8'] = 'chauffage collectif radiateur';
+
+//ADJ
+$_dico['ADJ']['TEXT'] = array('SEPARATOR' => ', ', 'LAST' => ' et ');
+$_dico['ADJ']['SENTENCE'] = array(
+	'Ce bien est #ADJ#.',
+	'Ce logement est #ADJ#.',
+);
+$_dico['ADJ']['FIELDS'] = array(
+	'NEUF' => 'neuf',
+	'BIEN_AMENAGE' => array('meublé', 'équipé', 'meublé'),
+	'LUMIERE' => array('lumineux', 'éclairé', 'ensoleillé', 'très lumineux'),
+	'AGREABLE' => array( 'agréable', 'sympathique', 'adorable'),
+);
+
+//Liste
+$_dico['LIST']['SENTENCE'] = array(
+	'#ID_TYPE_BIEN# comprend #LIST#.',
+	'#ID_TYPE_BIEN# bénéficie de #LIST#.',
+	'#ID_TYPE_BIEN# possède #LIST#.',
+	'#ID_TYPE_BIEN# comporte #LIST#.',
+);
+
+$_dico['LIST']['TEXT'] = array('SEPARATOR' => ', ', 'LAST' => ' et ');
+$_dico['LIST']['FIELDS'] = array(
+	'NB_ROOM' => array('SINGLE' => 'pièce', 'MORE' => 'pièces'),
+	'NB_BEDROOM' => array('SINGLE' => 'chambre', 'MORE' => 'chambres'),
+	'NB_BATHROOM' => array('SINGLE' => 'salle de bain', 'MORE' => 'salles de bain'),
+	'NOMBRE_PARKING_INT' => array('SINGLE' => 'parking couvert', 'MORE' => 'parkings couverts'),
+	'NOMBRE_PARKING_EXT' => array('SINGLE' => 'parking extérieur', 'MORE' => 'parkings extérieurs'),
+	'CAVE' => 'une cave',
+	'BALCON' => array('SINGLE' => 'balcon', 'MORE' => 'balcons'),
+	'TERRASSE' => array('SINGLE' => 'terrasse', 'MORE' => 'terrasses'),
+	'GARAGE' => array('SINGLE' => 'garage', 'MORE' => 'garages'),
+	'PISCINE' => 'une piscine',
+	'ASCENSEUR' => 'un ascenseur',
+	'JARDIN' => 'un jardin',
+	'TRAVAUX' => 'travaux',
+	'ID_TYPE_CHAUFFAGE' => '#ID_TYPE_CHAUFFAGE#',
+	'ID_TYPE_CUISINE' => '#ID_TYPE_CUISINE#'
+);
+
+$_dico['KEYWORD']  = array (
+	'BALCON' => array('search' => 'balcon', 'value' => 1),
+	'PARKING' => array('search' => 'parking', 'value' => 1),
+	'TERRASSE' => array('search' => 'terrasse', 'value' => 1),
+	'TRAVAUX' => array('search' => '(travaux|travaux à prévoir)', 'value' => 1),
+	'GARAGE' => array('search' => '(garage)', 'value' => 1),
+	'NB_BATHROOM' => array('search' => '(salle d\'eau|salle de bain)', 'value'=> 1),
+	'JARDIN' => array('search' => 'jardin', 'value'=>'1'),
+	'ASCENSEUR' => array('search' => 'ascenseur', 'value'=>'1'),
+	'AGREABLE' => array('search' => '(agréable|sympathique|adorable)', 'value' => 1),
+);
+
+//arrondissement
+
+$_dico['complements']['adj'] = array(
+	'quality' => array(
+		'S' => array( 'agréable', 'aimable', 'sympathique', 'adorable'),
+		'P' => array( 'agréables', 'aimables', 'sympathiques', 'adorables'),
+		'M' => array('joli', 'gracieux', 'séduisant', 'plaisant', 'ravissant', 'attrayant', 'merveilleux', 'intéressant', 'accueillant', 'élégant'),
+		'MP' => array('jolis', 'gracieux', 'séduisants', 'plaisants', 'ravissants', 'attrayants', 'merveilleux', 'intéressants', 'accueillants', 'élégants'),
+		'F' => array('jolie', 'gracieuse', 'séduisante', 'plaisante', 'ravissante', 'attrayante', 'merveilleuse', 'intéressante', 'accueillante', 'élégante'),
+		'FP' => array('jolies', 'gracieuses', 'séduisantes', 'plaisantes', 'ravissantes', 'attrayantes', 'merveilleuses', 'intéressantes', 'accueillantes', 'élégantes'),
+	),
+	'near' => array('alentours', 'proche', 'environs', 'voisinage'),
+);
+?>
+

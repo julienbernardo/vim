@@ -1,0 +1,632 @@
+<?php
+require_once('DB.php');
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('include/global.php');
+require_once('include/function.php');
+require_once('include/function.db.php');
+require_once('include/function.cron.php');
+require_once('include/function.ws.php');
+require_once('previsite/GetDsn.php');
+
+$db_data['name'] = 'gateway';
+$db_data['pool'][$db_data['name']]['NAME'] = $db_data['name']; 
+$db_data['pool'][$db_data['name']]['DSN'] = DSN_GATEWAY; 
+
+$todo 	 = $_REQUEST['todo'];
+$partner = $_REQUEST['partner'];
+$script  = $_REQUEST['script'];
+
+$db_data['name'] = "gateway";
+
+$out = "false";
+switch($todo){
+	case "update_data":
+		$do = $_REQUEST['do'];
+		$usercode = $_REQUEST['usercode'];
+		$ref_portail = $_REQUEST['ref_portail'];
+		$tables = explode(';', $_REQUEST['tables']);
+		if($script != ""){
+			$config = getConfigImport($script);
+			if( count($config) > 0 && $usercode != ""){
+				$ref_portail = str_replace(';', "', '", $ref_portail);
+				$usercode = str_replace(';', "', '", $usercode);
+				$out = "UserCode:<b>".$usercode."</b><br />";
+				$getDsn = new GetDsn(false);
+				db_close();
+				$db_data['name'] = "import";
+				$db_data['pool'][$db_data['name']]['DSN'] = preg_replace('/(REALESTATE|SOFTWARE)\?/i', 'IMPORT?', $getDsn->byPartner($config['ID_PORTAIL']));
+				if($config['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1 || $config['OPTIONS']['IMPORT_NOT_FULL'] == 1){
+					$nom_script = "NOM_SCRIPT LIKE '".$config['CODE_IMPORT']."_%'";
+				}else{
+					$nom_script = "NOM_SCRIPT='".$config['CODE_IMPORT']."'";
+				}
+				if($do == "user"){
+					$tables_available = array('USERS', 'TOURS', 'IMAGES');
+					$result = array();
+					$nb_result = 0;
+					foreach($tables as $table){
+						if($table != "" && in_array(strtoupper($table), $tables_available)){
+							if(strtoupper($table) == "USERS" && $ref_portail !=""){ continue;}
+							$sql = "SELECT COUNT(*) FROM ".$config['NOM_TABLE_IMPORT']."_".$table;
+							if(strtoupper($table) != "IMAGES"){ 
+								$sql .= " WHERE USERCODE in ('".$usercode."')";
+								if(strtoupper($table) != "USERS" && $ref_portail != ""){ $sql .= " AND REF_PORTAIL in ('".$ref_portail."')";}
+							}else{ 
+								$sql .= " WHERE REF_PORTAIL IN (SELECT REF_PORTAIL FROM ".$config['NOM_TABLE_IMPORT']."_TOURS WHERE USERCODE='".fix_text($usercode)."' AND ".$nom_script." ".($ref_portail != "" ? " AND REF_PORTAIL in ('".$ref_portail."')" : "").")";
+							}
+							$sql .= " AND ".$nom_script." AND ID_STATUT_".preg_replace('/S$/i','',$table).">0";
+		//					echo $sql."|";
+							$nb = db_getOne($sql, 'import');
+							if($nb > 0){ $nb_result++;}
+							$out .= "<b>".$nb."</b> ".$table." found<br />";
+						}
+					}
+					if($nb_result == 0){ $out = "Error:Usercode:".$usercode." not found";}
+				}else{
+					$sql = "select count(*) from (SELECT DISTINCT ".$config['NOM_TABLE_IMPORT']."_TOURS.REF_PORTAIL FROM ".$config['NOM_TABLE_IMPORT']."_TOURS INNER JOIN ".$config['NOM_TABLE_IMPORT']."_IMAGES ON ".$config['NOM_TABLE_IMPORT']."_IMAGES.REF_PORTAIL=".$config['NOM_TABLE_IMPORT']."_TOURS.REF_PORTAIL WHERE ID_STATUT_TOUR > 0 AND ID_STATUT_IMAGE > 0 AND ".$config['NOM_TABLE_IMPORT']."_TOURS.".$nom_script." AND USERCODE in ('".$usercode."') ".($ref_portail!= "" ? " AND REF_PORTAIL in ('".$ref_portail."')" : "").") AS TAB";
+					$nb = db_getOne($sql, 'import');
+					$out .= "<b>".$nb."</b> tours with images found<br />";
+					if($nb > 0){
+						$video_portail = array();
+						if(count($config['DIFFUSIONS']) > 0){
+							foreach($config['DIFFUSIONS'] as $k=>$v){
+								if($v['NB_IMAGES_LIMIT'] == 0){
+									$users = explode(';', $_REQUEST['usercode']);
+									for($i=0;$i < count($users); $i++){
+										if($users[$i] != "" && $v['USERS'][$users[$i]]['NB_IMAGES_LIMIT'] > 0){
+											$v['NB_IMAGES_LIMIT'] = $v['USERS'][$users[$i]]['NB_IMAGES_LIMIT'];
+										}
+									}
+								}	
+								if($v['NB_IMAGES_LIMIT'] > 0){ 
+									$video_portail[] = $v['NOM_PORTAIL'];
+								}
+							}
+						}
+						if(count($video_portail) > 0){ $out .= "<b>".count($video_portail)."</b> video portail found (".implode(', ',$video_portail).")<br/>";}
+						else{ $out = "Error:No portail video";}
+					}else{ $out = "Error:Tours with images not found";}
+				}
+				if(preg_match('/^error:/i', $out) == 0){
+					$out .= '<br /><br/><input type="button" value="make update" onclick="updateData(\'make\');" /><br />';
+				}
+			}
+		}
+		break;
+		
+	case "make_update_data":
+		$do = $_REQUEST['do'];
+		$usercode = $_REQUEST['usercode'];
+		$ref_portail = $_REQUEST['ref_portail'];
+		$tables = explode(';', $_REQUEST['tables']);
+		if($script != ""){
+			$config = getConfigImport($script);
+			if(count($config) > 0){
+				$out = "true";
+				db_close();
+				$getDsn = new GetDsn(false);
+				$db_data['name'] = "import";
+				$db_data['pool'][$db_data['name']]['DSN'] = preg_replace('/(REALESTATE|SOFTWARE)\?/i', 'IMPORT?', $getDsn->byPartner($config['ID_PORTAIL']));
+				if($config['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1 || $config['OPTIONS']['IMPORT_NOT_FULL'] == 1 ){
+					$nom_script = "NOM_SCRIPT LIKE '".$config['CODE_IMPORT']."_%'";
+				}else{
+					$nom_script = "NOM_SCRIPT='".$config['CODE_IMPORT']."'";
+				}
+				if($do == "user"){
+					$tables_available = array('USERS', 'TOURS', 'IMAGES');
+					$ref_portail = str_replace(';', "', '", $ref_portail);
+					$usercode = str_replace(';', "', '", $usercode);
+					$result = array();
+					$nb_result = 0;
+					foreach($tables as $table){
+						if($table != "" && in_array(strtoupper($table), $tables_available)){
+							if(strtoupper($table) == "USERS" && $ref_portail !=""){ continue;}
+							$sql = "UPDATE ".$config['NOM_TABLE_IMPORT']."_".$table." set md5_".substr($table,0,strlen($table)-1)."='need update (user update)'";
+							if(strtoupper($table) != "IMAGES"){ 
+								$sql .= " WHERE USERCODE in ('".$usercode."')";
+								if(strtoupper($table) != "USERS" && $ref_portail != ""){ $sql .= " AND REF_PORTAIL in('".$ref_portail."')";}
+							}else{ 
+								$sql .= " WHERE REF_PORTAIL IN (SELECT REF_PORTAIL FROM ".$config['NOM_TABLE_IMPORT']."_TOURS WHERE USERCODE='".fix_text($usercode)."' AND ".$nom_script." ".($ref_portail != "" ? " AND REF_PORTAIL in ('".$ref_portail."')" : "").")";
+							}
+							$sql .= " AND ".$nom_script." AND ID_STATUT_".preg_replace('/S$/i','',$table).">0";
+							db_query($sql, 'import');
+						}
+					}
+				}else{
+					$script_name = "gateway_reprocess";
+					$debug = true;
+					import_log('--------------------------',  $script_name);
+					import_log('----------START-----------',  $script_name);
+					import_log('--------------------------',  $script_name);
+					$logs = array();
+					$video_portail = array();
+					if(count($config['DIFFUSIONS']) > 0){
+						foreach($config['DIFFUSIONS'] as $k=>$v){
+							if($v['NB_IMAGES_LIMIT'] == 0){
+								$users = explode(';', $_REQUEST['usercode']);
+								for($i=0;$i < count($users); $i++){
+									if($users[$i] != "" && $v['USERS'][$users[$i]]['NB_IMAGES_LIMIT'] > 0){
+										$v['NB_IMAGES_LIMIT'] = $v['USERS'][$users[$i]]['NB_IMAGES_LIMIT'];
+									}
+								}
+							}	
+							if($v['NB_IMAGES_LIMIT'] > 0){ 
+								$video_portail[$k] = $v;
+								$logs[$v['NOM_PORTAIL']] = array('diffusion_done'=> 0, 'diffusion_failed'=>0);
+							}
+						}
+					}
+					if(count($video_portail) > 0){
+						$rows = array();
+						$sql = "SELECT DISTINCT USERCODE, ".$config['NOM_TABLE_IMPORT']."_TOURS.REF_PORTAIL, NOM_VISITE FROM ".$config['NOM_TABLE_IMPORT']."_TOURS INNER JOIN ".$config['NOM_TABLE_IMPORT']."_IMAGES ON ".$config['NOM_TABLE_IMPORT']."_IMAGES.REF_PORTAIL=".$config['NOM_TABLE_IMPORT']."_TOURS.REF_PORTAIL WHERE ID_STATUT_TOUR > 0 AND ID_STATUT_IMAGE > 0 AND ".$config['NOM_TABLE_IMPORT']."_TOURS.".$nom_script." AND USERCODE in ('".$usercode."') ".($ref_portail!= "" ? " AND REF_PORTAIL in ('".$ref_portail."')" : "");
+						$result = db_query($sql, 'import');
+						while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $rows[] = $r;}
+						if(count($rows) > 0){
+							import_log(count($rows)." tours to rediffuse on ".count($video_portail)." portail video", $script_name);
+							foreach($rows as $r){
+								$tour_infos = get_tour_infos($r['REF_PORTAIL'], $config['ID_PORTAIL'], $config['PASSWORD_WS']);
+								if(is_guid($tour_infos['id'])){
+									foreach($video_portail as $k=>$v){
+										if(count($v['USERS'][$r['USERCODE']]) > 0){
+											$v = array_merge($v, $v['USERS'][$r['USERCODE']]);
+										}
+										if($v['NB_IMAGES_LIMIT'] > 0){
+											$replace = array(
+												'search' => array('#PARTNER#', '#TOUR#', '#USER#'),
+												'replace' => array(urlencode($v['ID_PORTAIL']), urlencode($tour_infos['id']), urlencode($tour_infos['user']))
+											);
+											$url_base = str_replace($replace['search'], $replace['replace'], URL_UNPUBLISH);
+											$result = file_get_contents($url_base);
+											if($result != "true"){
+												import_log('[UNPUBLICATION][ERROR] tour:'.$r['REF_PORTAIL'].' portail:'.$k.' return:'.$result.' ('.$url_base.')', $script_name);
+											}else{
+												import_log('[UNPUBLICATION] tour:'.$r['REF_PORTAIL'].' portail:'.$k.' return:'.$result.' ('.$url_base.')', $script_name);
+											}
+											$replace = array( 
+												'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#REF#', '#TITLE#', '#NEW#', '#MODE#'),
+												'replace' => array(urlencode($v['ID_PORTAIL']), urlencode($tour_infos['id']), urlencode($tour_infos['user']), urlencode($r['REF_PORTAIL']), urlencode($r['NOM_VISITE']), 'true', 'auto')
+											);
+											$url_base = str_replace( $replace['search'], $replace['replace'], URL_PUBLISH);
+											$result = file_get_contents($url_base);
+											if($result != "true"){
+												import_log('[PUBLICATION][ERROR] tour:'.$r['REF_PORTAIL'].' portail:'.$k.' return:'.$result.' ('.$url_base.':'.$result.')', $script_name);
+												$logs[$v['NOM_PORTAIL']]['diffusion_failed']++;
+											}else{
+												//import_log('[PUBLICATION] tour:'.$r['REF_PORTAIL'].' portail:'.$k.' return:'.$result.' ('.$url_base.':'.$result.')', $script_name);
+												$logs[$v['NOM_PORTAIL']]['diffusion_done']++;
+											}
+										}
+									}
+								}else{ import_log('[GET_INFOS][ERROR] tour:'.$r['REF_PORTAIL'].' not found ('.get_tour_infos($r['REF_PORTAIL'], $config['ID_PORTAIL'], $config['PASSWORD_WS']).')', $script_name);}
+							}
+							$out = "";
+							foreach($logs as $k=>$log){
+								foreach($log as $title => $val){
+									if($val > 0){
+										import_log('[RESUME] '.$val.' '.$title.' on '.$k, $script_name);
+										$out .= $val." ".$title." on ".$k."<br />";
+									}
+								}
+							}
+						}else{ 
+							import_log('[ERROR] no tour found',  $script_name);
+							$out = "[ERROR] no tour found";
+						}
+					}else{ 
+						import_log('[ERROR] portail video not found',  $script_name);
+						$out = "[ERROR] portail video not found";
+					}
+					import_log('--------------------------',  $script_name);
+					import_log('-----------END------------',  $script_name);
+					import_log('--------------------------',  $script_name);
+				}
+			}
+		}
+		break;
+
+	case "kill":
+		$pid = $_REQUEST['pid'];
+		print_p($_REQUEST);
+		if($script != "" && $pid != ""){
+			$infos = getImportInfos($script);
+			if($infos['ID_STATUT_CRON_EXECUTION'] == 4){ $infos['SERVER_CRON'] = "dev";}
+			$cmd = 'sudo '.($list_srv[$infos['SERVER_CRON']] != "" ? 'ssh root@'.$list_srv[$infos['SERVER_CRON']].' ' : '').'kill -9 '.$pid;
+			echo "\n\n".$cmd."\n\n\n";
+			pclose(popen($cmd,'r'));
+		}else{ break;}
+	case "force_reset":
+		if($script != ""){
+			$infos = getImportInfos($script);
+			if(is_guid($infos['ID_CRON_EXECUTION'])){
+				if($infos['ID_STATUT_CRON_EXECUTION'] > -1 && $infos['ID_STATUT_CRON_EXECUTION'] < 3){
+					update_cron_error($infos['ID_CRON_EXECUTION'], $script);
+				}else if($infos['ID_STATUT_CRON_EXECUTION'] == 4){
+					debug_end_import($infos['ID_CRON_EXECUTION'], $script);
+				}
+			}
+			$out = "true";
+		}
+		break;
+		
+	case "force_execute":
+		if($script != ""){
+			$infos = getImportInfos($script);
+			$cmd = 'sudo '.($list_srv[$infos['SERVEUR_IMPORT']] != "" ? 'ssh root@'.$list_srv[$infos['SERVEUR_IMPORT']].' ' : '').'php '.PATH_MAIN.'cron.php '.$script.' > '.PATH_LOG.'_'.$script.'.log &';
+			pclose(popen($cmd,'r'));
+			$out = "true";
+		}
+		break;
+
+	case 'get_log':
+		$file = $_REQUEST['file'];
+		$short = ($_REQUEST['short'] == 'true');
+		if($file != "" && $script != ""){
+			switch($file){
+				case "errorphp.cmd": $file = str_replace('#SCRIPT#', $script.".cmd", ERROR_LOG_FILE);break;
+				case "errorphp": $file = str_replace('#SCRIPT#', $script, ERROR_LOG_FILE);break;
+				default: $file = PATH_LOG.$script."-".$file.".log";break;
+			}
+			if(file_exists($file)){ 
+				$out = file_get_contents($file);
+				if(false && $short && strlen($out) > 50000){
+					$out = substr($out, 0, 50000);
+				}
+			}else{ $out = "[ERROR] File: ".$file." not found";}
+		}
+		break;
+
+	case "import_config":
+		$server = $_REQUEST['server'];
+		if(in_array($server, array_keys($list_srv))){
+			$file = PATH_IMPORT_OLD_CONFIG."config_import_".$server.".php";
+			if(file_exists($file)){
+				include($file);
+				if(count($config_import[$script]) > 0){
+					$import = $config_import[$script];
+					
+					$out = array('fields' => array(), 'portals' => array(), 'select' => array(), 'options'=> array(), 'steps' => array(), 'logs' => array(), 'users' => array(), 'last_exec' => array());
+					$out['fields']['import_code'] = $script;
+					$out['fields']['import_server'] = $server;
+					$out['fields']['import_name'] = $import['SCRIPT_NAME'];
+					$out['fields']['db_partner'] = $import['PARTNERID'];
+					$out['fields']['db_table'] = $import['TABLE_NAME'];
+					$out['fields']['execution_time'] = $import['TIME_MAX'];
+					$out['fields']['execution_period'] = $import['PERIOD'];
+					$out['fields']['execution_archive'] = $import['ARCHIVE_DELAY'];
+					
+					if(isset($import['TYPE_VIDEO'])){ 
+						$out['options']['TYPE_VIDEO'] = array(
+							'REF_CATEGORIE_IMPORT_OPTION' => 'IMPORT',
+							'REF_IMPORT_OPTION' => 'TYPE_VIDEO',
+							'VALEUR_IMPORT_OPTION' => $import['TYPE_VIDEO'],
+							'CODE_IMPORT' => $script
+						);
+						
+					}
+					if(isset($import['TEMPLATE_EMAIL'])){ 
+						$out['options']['TEMPLATE_EMAIL'] = array(
+							'REF_CATEGORIE_IMPORT_OPTION' => 'IMPORT',
+							'REF_IMPORT_OPTION' => 'TEMPLATE_EMAIL',
+							'VALEUR_IMPORT_OPTION' => $import['TEMPLATE_EMAIL'],
+							'CODE_IMPORT' => $script
+						);
+					}
+					
+					if(count($import['STEPS']) > 0){
+						$steps = array('ARCHIVE_SOURCE_FILE',
+							'IMPORT_DATA', 'IMPORT_SOFTWARE', 'IMPORT_USERS', 'IMPORT_TOURS', 'IMPORT_TRANSACTIONS', 'IMPORT_IMAGES',  
+							'DELETE_USERS', 'DELETE_TOURS', 'DELETE_TRANSACTIONS', 'DELETE_IMAGES',
+							'FORCE_UPDATE_USERS', 'FORCE_UPDATE_TOURS', 'FORCE_UPDATE_TRANSACTIONS', 'FORCE_UPDATE_IMAGES', 'FORCE_UPDATE_PLANS', 'FORCE_UPDATE_TTS',
+							'GENERATION_VIDEO', 'GENERATION_TTS',
+						);
+
+						foreach($import['STEPS'] as $k=>$v){
+							if($k == 'REDIFFUSE_VIDEO'){ continue;}
+							$title = 'options';
+							if(in_array($k, $steps)){ 
+								$cat = "STEPS";
+								$title = 'steps';
+								if($v === false){ continue;} 
+							}
+							else{ $cat = "IMPORT";}
+							if($v === true){ $v = 1;}
+							else if($v === false){ $v = 0;}
+							$out[$title][$k] = array(
+								'REF_CATEGORIE_IMPORT_OPTION' => $cat,
+								'REF_IMPORT_OPTION' => $k,
+								'VALEUR_IMPORT_OPTION' => $v,
+								'CODE_IMPORT' => $script
+							);
+						}
+					}
+					
+					if(is_guid($import['PARTNERID'])){
+						$listTables = getListTables($import['PARTNERID']);
+						$out['fields']['db_dsn'] = $listTables['dsn'];
+						if(count($listTables['options']) > 0){
+							foreach($listTables['options'] as $v){
+								$tmp .= '<option value="'.$v.'">'.$v.'</option>';
+							}
+							$out['select']['db_table'] = $tmp;
+						}
+					}
+					
+					if(count($import['DIFFUSIONS']) > 0){
+						foreach($import['DIFFUSIONS'] as $k=>$v){
+							if(is_guid($v['ID'])){
+								$tmp = array(
+									'ID_PORTAIL' => $v['ID'],
+									'PREFIXE_PORTAIL' => $v['CLIENT_PORTAIL']['PREFIXE_PORTAIL'],
+									'PASSWORD_PORTAIL' => $v['CLIENT_PORTAIL']['PASSWORD'],
+									'NB_IMAGES_LIMIT' => 0,
+									'ID_STATUT_IMPORT' => 1,
+								);
+								$sql = "SELECT NOM_PORTAIL FROM PORTAIL WHERE ID_PORTAIL='".$v['ID']."'";
+								$tmp['NOM_PORTAIL'] = db_getOne($sql, $db_data['name']);
+								if($v['NEED_IMAGES'] === true){
+									$tmp['NB_IMAGES_LIMIT'] = (isset($v['LIMIT_IMAGES']) ? $v['LIMIT_IMAGES'] :  1);
+								}
+								$tmp['OPTIONS'] = array();
+								if($v['CLIENT_PORTAIL']['PREFIXE_DIFFUSION'] != ""){ $tmp['OPTIONS']['PREFIXE_DIFFUSION'] = $v['CLIENT_PORTAIL']['PREFIXE_DIFFUSION'];}
+								if($v['CLIENT_PORTAIL']['DSN_IMAP'] != ""){ $tmp['OPTIONS']['DSN_IMAP'] = $v['CLIENT_PORTAIL']['DSN_IMAP'];}
+								
+								if($v['DIFFUSION_PORTAIL']['REF_PORTAIL'] != ""){ $tmp['OPTIONS']['REF_PORTAIL'] = $v['DIFFUSION_PORTAIL']['REF_PORTAIL'];}
+								if(is_array($v['DIFFUSION_PORTAIL']['FILTERS']) && count($v['DIFFUSION_PORTAIL']['FILTERS']) > 0){ $tmp['OPTIONS']['FILTERS'] = json_encode($v['DIFFUSION_PORTAIL']['FILTERS']);}
+								if($v['DIFFUSION_PORTAIL']['LIMIT'] != ""){ $tmp['OPTIONS']['DIFFUSION_LIMIT'] = $v['DIFFUSION_PORTAIL']['LIMIT'];}
+
+								if($v['CLIENT_PORTAIL']['LIMIT'] != ""){ $tmp['OPTIONS']['LIMIT'] = $v['CLIENT_PORTAIL']['LIMIT'];}
+								if($v['CLIENT_PORTAIL']['LIMIT_ORDER'] != ""){ $tmp['OPTIONS']['LIMIT_ORDER'] = $v['CLIENT_PORTAIL']['LIMIT_ORDER'];}
+								
+								if(is_array($import['STEPS']['REDIFFUSE_VIDEO']) && in_array($k, $import['STEPS']['REDIFFUSE_VIDEO'])){ 
+									$tmp['OPTIONS']['REDIFFUSE_VIDEO'] = "1";
+								}
+								$out['portals'][] = $tmp;
+							}
+						}
+					}
+					include(PATH_IMPORT_OLD_CONFIG.'config_import.php');
+					$out['fields']['import_activate'] = (in_array( $script, $list_activated_script) ? "1" : "0");
+					
+					$out = json_encode($out);
+				}
+			}
+		}
+		break;
+		
+	case "get_import":
+		$server = $_REQUEST['server'];
+		if(in_array($server, array_keys($list_srv))){
+			$file = PATH_IMPORT_OLD_CONFIG."config_import_".$server.".php";
+			if(file_exists($file)){
+				include($file);
+				$out = '<option value="">--- select an import --</option>';
+				$imports = array_keys($config_import);
+				sort($imports);
+				foreach($imports as $v){
+					$out .= '<option value="'.$v.'">'.$v.'</option>';
+				}
+			}
+		}
+		break;
+		
+	case "get_old_script":
+		if(count($list_srv) > 0){
+			$out = '<option value="">-- select a script --</option>';
+			foreach($list_srv as $server=>$v){
+				$file = PATH_IMPORT_OLD_CONFIG."config_import_".$server.".php";
+				if(file_exists($file)){
+					$config_import = array();
+					include($file);
+					if(count($config_import) > 0 ){
+						$out .= '<optgroup label="'.$server.'">';
+						$tmp = array_keys($config_import);
+						sort($tmp);					
+						foreach($tmp as $v){
+							$out .= '<option value="'.$v.'">'.$v.'</option>';
+						}
+						$out .= '</optgroup>';
+					}
+				}
+			}
+		}
+		
+		break;
+		
+	case "check_scriptName":
+		if(count(getImportInfos($script)) > 0){ $out == "true";}
+		break;
+		
+	case "get_portail":
+		if(is_guid($partner)){
+			$infos = getPortailInfos($partner, $script);
+			if(count($infos) > 0){
+				//TODO
+				$out = json_encode($infos);
+			}
+		}		
+		break;
+		
+	case "get_tables":
+		if(is_guid($partner)){
+			$result = getListTables($partner);
+			
+			$tmp = "";			
+			for($i=0; $i< count($result['options']); $i++){
+				$tmp .= '<option value="'.$result['options'][$i].'">'.$result['options'][$i].'</option>';
+			}
+			$result['options'] = $tmp;
+			$out = json_encode($result);
+		}
+		break;
+		
+	case "save_import":
+		$fields = array(
+			'db_partner', 'db_table', 
+			'execution_archive', 'execution_period', 'execution_steps', 'execution_time', 
+			'import_activate', 'import_code', 'import_code_old', 'import_name', 'import_server',
+			'options', 'portals', 'import_description'
+		);
+		$infos = array();
+		foreach($fields as $v){ $infos[$v] = $_REQUEST[$v];}
+
+		$isNew = ($_REQUEST['new'] == 'true');
+		$infos['portals'] = json_decode($infos['portals'], true);
+		$infos['options'] = json_decode($infos['options'], true);
+		$infos['execution_steps'] = explode(';', $infos['execution_steps']);
+		if(count($infos['execution_steps']) > 0){
+			foreach($infos['execution_steps'] as $v){
+				$infos['options'][] = array('cat'=>'STEPS', 'ref'=>$v, 'value'=>'1');
+			}
+		}
+		$fieldsNotEmpty = array(
+			'import_code', 'import_name', 'import_server',
+			'db_partner', 'db_table',
+			'execution_archive', 'execution_period', 'execution_steps', 'execution_time',
+		);
+		$isOk = true;
+		$error = array();
+		foreach($fieldsNotEmpty as $v){
+			if($infos[$v] === ""){ 
+				$isOk = false;
+				$error[] = $v;
+			}
+		}
+		if(!is_guid($infos['db_partner'])){
+			$isOk = false;
+			$error[] = $v;
+		}
+		
+	
+		if($isOk){
+			if($infos['import_code'] == 'exec_cron'){
+				$out = json_encode(array('error' => array('import_code'), 'text' => 'Reserved script name:'.$infos['import_code']));
+			}else if(($isNew || (!$isNew && $infos['import_code_old'] !=  $infos['import_code'])) && count(getImportInfos($infos['import_code']))  > 0){
+				$out = json_encode(array('error' => array('import_code'), 'text' => 'Script name:'.$infos['import_code'].' already exists'));
+			}else{
+				updateImportInfos($infos);
+				$out = "true";
+			}
+		}else{ $out = json_encode(array('error' => $error, 'text' => 'An error has occured. Check your fields'));}
+		if($out != "true"){ break;}
+		$script = $infos['import_code'];
+		
+	case "load_import":
+		$out = "false";
+		if($script != ""){ 
+			$infos = getImportInfos($script);
+			if(count($infos) > 0){
+				$out = array('fields' => array(), 'portals' => array(), 'select' => array(), 'options'=> array(), 'steps' => array(), 'logs' => array(), 'users' => array(), 'last_exec' => array());
+			
+				$fields = array('CODE_IMPORT' => 'import_code', 'NOM_IMPORT' => 'import_name', 'ID_PORTAIL' => 'db_partner', 'TEMPS_MAX_IMPORT' => 'execution_time', 'PERIODE_IMPORT' => 'execution_period', 'ARCHIVE_DELAI_IMPORT' => 'execution_archive', 'ID_STATUT_IMPORT' => 'import_activate', 'DATE_MODIFICATION_IMPORT' => 'import_update', 'SERVEUR_IMPORT' => 'import_server', 'NOM_TABLE_IMPORT' => 'db_table', 'DESCRIPTION_IMPORT' => 'import_description');
+				foreach($fields as $k=>$v){ $out['fields'][$v] = $infos[$k];}
+				$out['fields']['import_update'] = 'Last update: '.$out['fields']['import_update'];
+				
+				$listTables = getListTables($infos['ID_PORTAIL']);
+				$out['fields']['db_dsn'] = $listTables['dsn']." (".$infos['ID_PORTAIL'].")";
+				if(count($listTables['options']) > 0){
+					foreach($listTables['options'] as $v){
+						$tmp .= '<option value="'.$v.'">'.$v.'</option>';
+					}
+					$out['select']['db_table'] = $tmp;
+				}
+				$out['fields']['execution_state'] = "images/icon_";
+				if($infos['ID_STATUT_CRON_EXECUTION'] > -1 && $infos['ID_STATUT_CRON_EXECUTION'] < 3){
+					$out['fields']['execution_state'] .= "working.gif";
+				}else if($infos['ID_STATUT_CRON_EXECUTION'] == 4){ 
+					$out['fields']['execution_state'] .= "error.gif";
+				}else if($infos['ID_STATUT_IMPORT'] == 1){ 
+					$out['fields']['execution_state'] .= "waiting.gif";
+				}else{	
+					$out['fields']['execution_state'] .= "stop.gif";
+				}
+				
+				$tmp = getImportOptions($script);
+				if(count($tmp) > 0){ 
+					foreach($tmp as $cat=>$tab){
+						foreach($tab as $k=>$v){
+							$out[($cat == "STEPS" ? 'steps' : 'options')][$k] = $v;
+						}
+					}
+				}
+				$hasCommand = ($tmp['IMPORT']['EXEC_COMMAND_AFTER_IMPORT'] != '');
+				
+				$out['portals'] = array_values(getScriptDiffusions($script));
+				
+				$out['users'] = array_values(getScriptUsers($script));
+				
+				$out['last_exec'] = getLastExecution($script, "import");
+				for($i= 0;$i < count($out['last_exec']); $i++){
+					if($out['last_exec'][$i]['ID_STATUT_CRON_EXECUTION'] == 4){
+						$out['last_exec'][$i]['DATE_DEBUT_CRON'] = "launch in debug";
+					}
+					if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $out['last_exec'][$i]['DATE_DEBUT_CRON'], $date_start) > 0 
+					&& preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $out['last_exec'][$i]['DATE_FIN_CRON'], $date_end) > 0 ){
+						$out['last_exec'][$i]['DURATION'] =	mktime($date_end[4],$date_end[5],$date_end[6],$date_end[2],$date_end[3],$date_end[1]) - mktime($date_start[4], $date_start[5], $date_start[6], $date_start[2], $date_start[3], $date_start[1]);
+						$out['last_exec'][$i]['DURATION'] = convert_duration_for_print($out['last_exec'][$i]['DURATION']);
+						if($out['last_exec'][$i]['RESUME_CRON'] != ""){
+							$tmp = explode(';', $out['last_exec'][$i]['RESUME_CRON']);
+							foreach($tmp as $v){
+								if(preg_match('/^([^:]+):(.*)$/i', $v, $result) > 0){
+									$out['last_exec'][$i][$result[1]] = $result[2];
+								}
+							}
+						}
+					}
+				}
+				
+				$cmd = "ls ".PATH_LOG.$script."-*";
+				exec($cmd, $files);
+				rsort($files);
+				foreach($files as $k=>$file){
+					if($k == 0 && (($infos['ID_STATUT_CRON_EXECUTION'] > -1 && $infos['ID_STATUT_CRON_EXECUTION'] < 3) || $infos['ID_STATUT_CRON_EXECUTION'] == 4)){
+						$pid = "";
+						if($infos['PID_CRON'] != ""){
+							$pid = $infos['PID_CRON'];
+						}else{
+							$f = fopen( $file, "r");
+							do{
+								$l = fgets($f);
+								if(preg_match('/ - \(PID ([\d]+) ram usage: [^\)]*\)/i', $l, $result) > 0){
+									$pid = $result[1];
+									break;
+								}
+							}while(!feof($f));
+							fclose($f);
+						}
+						if($pid != ""){
+							if($infos['ID_STATUT_CRON_EXECUTION'] == 4){ $infos['SERVER_CRON'] = "dev";}
+							$ps = shell_exec('sudo '.($list_srv[$infos['SERVER_CRON']] != "" ? 'ssh root@'.$list_srv[$infos['SERVER_CRON']].' ' : '')." ps ax | grep ".$pid);
+							if(preg_match_all("/(.*)\n/", $ps, $result) > 0){
+								$ps = $result[1];
+								foreach($ps as $k => $v){
+									if(preg_match('/^ *([0-9]+)/im', $v, $result) > 0 && $result[1] == $pid){
+										$out['pid'] = $pid;
+										break;
+									}
+								}
+							}
+						}
+					}
+					$out['logs'][] = str_replace($script.'-', '', basename($file,".log"));
+				}
+				$cmd = "ls ".str_replace('#SCRIPT#', $script, ERROR_LOG_FILE);
+				$files = array();
+				exec($cmd, $files);
+				if(count($files) > 0){ $out['logs'][] = 'errorphp';}
+				
+				if($hasCommand != ""){
+					$cmd = "ls ".str_replace('#SCRIPT#', $script.".cmd", ERROR_LOG_FILE);
+					$files = array();
+					exec($cmd, $files);
+					if(count($files) > 0){	$out['logs'][] = 'errorphp.cmd';}
+				}		
+
+				$out = json_encode($out);
+			}
+		}
+		break;
+}
+echo $out;
+exit;
+
+?>

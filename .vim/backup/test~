@@ -1,0 +1,288 @@
+11-02 16:03:24.249: D/dalvikvm(3302): GC_EXPLICIT freed 261K, 49% free 3415K/6599K, external 2357K/2773K, paused 94ms
+11-02 16:03:24.374: I/ActivityManager(1389): Starting: Intent { act=android.intent.action.VIEW dat=market://details?id=com.previsite.android&referrer=utm_source%3Dapps.facebook.com%26utm_campaign%3Dfb4a%26utm_content%3D%257B%2522app%2522%253A381463778601019%252C%2522t%2522%253A1351868596%257D cmp=com.android.vending/com.google.android.finsky.activities.LaunchUrlHandlerActivity (has extras) } from pid 2572
+11-02 16:03:25.788: E/Finsky(3346): [1] LaunchUrlHandlerActivity.handleUrl: Launch URL without continue URL
+11-02 16:03:25.796: I/ActivityManager(1389): Starting: Intent { act=android.intent.action.VIEW dat=http://market.android.com/details?id=com.previsite.android&referrer=utm_source%3Dapps.facebook.com%26utm_campaign%3Dfb4a%26utm_content%3D%257B%2522app%2522%253A381463778601019%252C%2522t%2522%253A1351868596%257D cmp=com.android.vending/com.google.android.finsky.activities.MainActivity (has extras) } from pid 3346
+11-02 16:03:26.022: D/dalvikvm(2572): GC_EXTERNAL_ALLOC freed 831K, 34% free 8494K/12743K, external 4010K/4809K, paused 154ms
+11-02 16:03:26.022: I/dalvikvm(3346): Could not find method android.accounts.AccountManager.newChooseAccountIntent, referenced from method com.google.android.finsky.activities.AuthenticatedActivity.chooseAccount
+11-02 16:03:26.022: W/dalvikvm(3346): VFY: unable to resolve static method 10: Landroid/accounts/AccountManager;.newChooseAccountIntent (Landroid/accounts/Account;Ljava/util/ArrayList;[Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;[Ljava/lang/String;Landroid/os/Bundle;)Landroid/content/Intent;
+11-02 16:03:26.046: D/dalvikvm(3346): VFY: replacing opcode 0x77 at 0x0021
+11-02 16:03:26.046: D/dalvikvm(3346): VFY: dead code 0x0024-0029 in Lcom/google/android/finsky/activities/AuthenticatedActivity;.chooseAccount (Z)V
+11-02 16:03:26.053: I/dalvikvm(3346): Could not find method com.google.android.finsky.activities.AuthenticatedActivity.recreate, referenced from method com.google.android.finsky.activities.AuthenticatedActivity.restart
+11-02 16:03:26.053: W/dalvikvm(3346): VFY: unable to resolve virtual method 3577: Lcom/google/android/finsky/activities/AuthenticatedActivity;.recreate ()V
+11-02 16:03:26.053: D/dalvikvm(3346): VFY: replacing opcode 0x6e at 0x0009
+11-02 16:03:26.452: D/ResourceType(3346): calling getConfigurations
+11-02 16:03:26.475: D/ResourceType(3346): called getConfigurations size=130
+11-02 16:03:26.530: D/dalvikvm(4298): GC_EXPLICIT freed 221K, 47% free 2989K/5639K, external 2357K/2773K, paused 39ms
+11-02 16:03:27.077: D/dalvikvm(1389): GC_EXPLICIT freed 1442K, 33% free 8911K/13255K, external 8427K/10475K, paused 161ms
+11-02 16:03:27.296: I/dalvikvm(3346): Could not find method android.app.Activity.getActionBar, referenced from method com.google.android.finsky.layout.CustomActionBarFactory.getInstance
+11-02 16:03:27.296: W/dalvikvm(3346): VFY: unable to resolve virtual method 120: Landroid/app/Activity;.getActionBar ()Landroid/app/ActionBar;
+11-02 16:03:27.296: D/dalvikvm(3346): VFY: replacing opcode 0x6e at 0x0006
+11-02 16:03:27.296: D/dalvikvm(3346): VFY: dead code 0x0009-0010 in Lcom/google/android/finsky/layout/CustomActionBarFactory;.getInstance (Landroid/app/Activity;)Lcom/google/android/finsky/layout/CustomActionBar;
+11-02 16:03:27.296: D/dalvikvm(3346): VFY: dead code 0x0012-0017 in Lcom/google/android/finsky/layout/CustomActionBarFactory;.getInstance (Landroid/app/Activity;)Lcom/google/android/finsky/layout/CustomActionBar;
+11-02 16:03:27.358: E/EventHandler(1591): Unexpected value for status: 3; using tentative.
+11-02 16:03:27.491: W/InputManagerService(1389): Starting input on non-focused client com.android.internal.view.IInputMethodClient$Stub$Proxy@40abf1c0 (uid=10105 pid=2572)
+11-02 16:03:27.569: I/ActivityManager(1389): Displayed com.android.vending/com.google.android.finsky.activities.MainActivity: +1s710ms (total +2s841ms)
+11-02 16:03:27.710: D/RadioSignalLevel(1459): Gsm Radio Signal level: 5
+11-02 16:03:28.084: D/Finsky(3346): [1] SelfUpdateScheduler.checkForSelfUpdate: Skipping self-update. Local Version [8015016] >= Server Version [0]
+11-02 16:03:28.624: I/global(3346): Loaded time zone names for en_US in 375ms.
+11-02 16:03:28.696: D/Finsky(3346): [1] MainActivity.initializeBilling: Optimistically initializing billing parameters.
+11-02 16:03:28.936: D/dalvikvm(3346): GC_EXTERNAL_ALLOC freed 869K, 50% free 3729K/7367K, external 2445K/2773K, paused 35ms
+11-02 16:03:29.913: I/global(3346): Loaded time zone names for en_US in 433ms.
+11-02 16:03:30.233: D/dalvikvm(3346): GC_EXTERNAL_ALLOC freed 314K, 51% free 3668K/7367K, external 3858K/4818K, paused 71ms
+11-02 16:03:30.538: E/Volley(3346): [14] BasicNetwork.performRequest: Unexpected response code 500 for https://android.clients.google.com/fdfe/details?doc=com.previsite.android
+11-02 16:03:32.975: D/dalvikvm(2572): GC_EXPLICIT freed 309K, 34% free 8519K/12743K, external 4866K/6076K, paused 261ms
+11-02 16:03:34.656: W/KeyCharacterMap(3346): Can't open keycharmap file
+11-02 16:03:34.656: W/KeyCharacterMap(3346): Error loading keycharmap file '/data/usr/keychars/qtouch-touchscreen.kcm.bin'. hw.keyboards.65537.devname='qtouch-touchscreen'
+11-02 16:03:34.688: W/KeyCharacterMap(3346): Can't open keycharmap file
+11-02 16:03:34.688: W/KeyCharacterMap(3346): Error loading keycharmap file '/system/usr/keychars/qtouch-touchscreen.kcm.bin'. hw.keyboards.65537.devname='qtouch-touchscreen'
+11-02 16:03:34.688: W/KeyCharacterMap(3346): Can't open keycharmap file
+11-02 16:03:34.694: W/KeyCharacterMap(3346): Using default keymap: /system/usr/keychars/qwerty.kcm.bin
+11-02 16:03:36.038: D/AudioHardwareMot(1234): Output bufSize from kernel = 8192
+11-02 16:03:38.108: D/dalvikvm(2572): JIT code cache reset in 4 ms (1048488 bytes 1/0)
+11-02 16:03:38.116: D/dalvikvm(2572): GC_EXTERNAL_ALLOC freed 654K, 33% free 8564K/12743K, external 4015K/5093K, paused 98ms
+11-02 16:03:38.991: W/Finsky(3346): [1] CarrierParamsAction.run: Saving carrier billing params failed.
+11-02 16:03:39.038: D/Finsky(3346): [1] GetBillingCountriesAction.run: Skip getting fresh list of billing countries.
+11-02 16:03:39.100: E/Finsky(3346): [33] FileBasedKeyValueStore.delete: Attempt to delete 'paramszLFvqnyKR7-OBBd1OHXBhA' failed!
+11-02 16:03:39.874: D/dalvikvm(2572): GC_EXTERNAL_ALLOC freed 108K, 33% free 8550K/12743K, external 4754K/4813K, paused 120ms
+11-02 16:03:41.717: D/dalvikvm(3666): GC_EXPLICIT freed 206K, 58% free 3263K/7751K, external 2357K/2773K, paused 738ms
+11-02 16:03:42.288: I/ActivityManager(1389): Starting: Intent { act=com.facebook.application.323595464361460 flg=0x10000000 cmp=air.com.freshplanet.games.WaM/.AppEntry (has extras) } from pid 2572
+11-02 16:03:43.092: D/RadioSignalLevel(1459): Gsm Radio Signal level: 5
+11-02 16:03:43.233: I/ActivityManager(1389): Start proc air.com.freshplanet.games.WaM for activity air.com.freshplanet.games.WaM/.AppEntry: pid=4565 uid=10128 gids={3003}
+11-02 16:03:43.835: D/dalvikvm(2572): GC_EXTERNAL_ALLOC freed 530K, 34% free 8510K/12743K, external 4029K/4834K, paused 172ms
+11-02 16:03:44.694: I/StartupTime1(4565): :1351868624700
+11-02 16:03:44.835: D/dalvikvm(4565): Trying to load lib /data/data/air.com.freshplanet.games.WaM/lib/libCore.so 0x404d5578
+11-02 16:03:45.350: D/dalvikvm(4565): Added shared lib /data/data/air.com.freshplanet.games.WaM/lib/libCore.so 0x404d5578
+11-02 16:03:45.421: I/dalvikvm(4565): Failed resolving Lcom/adobe/air/AIRWindowSurfaceView$3; interface 233 'Landroid/view/View$OnSystemUiVisibilityChangeListener;'
+11-02 16:03:45.421: W/dalvikvm(4565): Link of class 'Lcom/adobe/air/AIRWindowSurfaceView$3;' failed
+11-02 16:03:45.428: E/dalvikvm(4565): Could not find class 'com.adobe.air.AIRWindowSurfaceView$3', referenced from method com.adobe.air.AIRWindowSurfaceView.DoSetOnSystemUiVisibilityChangeListener
+11-02 16:03:45.428: W/dalvikvm(4565): VFY: unable to resolve new-instance 328 (Lcom/adobe/air/AIRWindowSurfaceView$3;) in Lcom/adobe/air/AIRWindowSurfaceView;
+11-02 16:03:45.428: D/dalvikvm(4565): VFY: replacing opcode 0x22 at 0x0000
+11-02 16:03:45.428: D/dalvikvm(4565): VFY: dead code 0x0002-0008 in Lcom/adobe/air/AIRWindowSurfaceView;.DoSetOnSystemUiVisibilityChangeListener ()V
+11-02 16:03:45.428: I/dalvikvm(4565): Could not find method android.view.View.setSystemUiVisibility, referenced from method com.adobe.air.AIRWindowSurfaceView.clearFullScreen
+11-02 16:03:45.428: W/dalvikvm(4565): VFY: unable to resolve virtual method 869: Landroid/view/View;.setSystemUiVisibility (I)V
+11-02 16:03:45.428: D/dalvikvm(4565): VFY: replacing opcode 0x6e at 0x001a
+11-02 16:03:45.444: I/dalvikvm(4565): Could not find method android.view.MotionEvent.getToolType, referenced from method com.adobe.air.AIRWindowSurfaceView.onTouchEvent
+11-02 16:03:45.444: W/dalvikvm(4565): VFY: unable to resolve virtual method 815: Landroid/view/MotionEvent;.getToolType (I)I
+11-02 16:03:45.444: D/dalvikvm(4565): VFY: replacing opcode 0x6e at 0x00f9
+11-02 16:03:45.444: D/dalvikvm(4565): VFY: dead code 0x00fc-010d in Lcom/adobe/air/AIRWindowSurfaceView;.onTouchEvent (Landroid/view/MotionEvent;)Z
+11-02 16:03:45.444: D/dalvikvm(4565): VFY: dead code 0x01b2-01b9 in Lcom/adobe/air/AIRWindowSurfaceView;.onTouchEvent (Landroid/view/MotionEvent;)Z
+11-02 16:03:45.444: I/dalvikvm(4565): Could not find method android.view.View.setSystemUiVisibility, referenced from method com.adobe.air.AIRWindowSurfaceView.setFullScreen
+11-02 16:03:45.444: W/dalvikvm(4565): VFY: unable to resolve virtual method 869: Landroid/view/View;.setSystemUiVisibility (I)V
+11-02 16:03:45.444: D/dalvikvm(4565): VFY: replacing opcode 0x6e at 0x0020
+11-02 16:03:45.460: I/global(3346): Loaded time zone names for en_US in 1251ms.
+11-02 16:03:45.475: I/dalvikvm(4565): Could not find method android.view.ScaleGestureDetector.getCurrentSpanX, referenced from method com.adobe.air.gestures.AIRGestureListener.onScale
+11-02 16:03:45.475: W/dalvikvm(4565): VFY: unable to resolve virtual method 824: Landroid/view/ScaleGestureDetector;.getCurrentSpanX ()F
+11-02 16:03:45.475: D/dalvikvm(4565): VFY: replacing opcode 0x74 at 0x0040
+11-02 16:03:45.475: I/dalvikvm(4565): Could not find method android.view.ScaleGestureDetector.getPreviousSpanX, referenced from method com.adobe.air.gestures.AIRGestureListener.onScale
+11-02 16:03:45.475: W/dalvikvm(4565): VFY: unable to resolve virtual method 829: Landroid/view/ScaleGestureDetector;.getPreviousSpanX ()F
+11-02 16:03:45.475: D/dalvikvm(4565): VFY: replacing opcode 0x74 at 0x009a
+11-02 16:03:45.475: D/dalvikvm(4565): VFY: dead code 0x0043-0067 in Lcom/adobe/air/gestures/AIRGestureListener;.onScale (Landroid/view/ScaleGestureDetector;)Z
+11-02 16:03:45.475: D/dalvikvm(4565): VFY: dead code 0x009d-0115 in Lcom/adobe/air/gestures/AIRGestureListener;.onScale (Landroid/view/ScaleGestureDetector;)Z
+11-02 16:03:45.475: D/dalvikvm(4565): VFY: dead code 0x0136-013a in Lcom/adobe/air/gestures/AIRGestureListener;.onScale (Landroid/view/ScaleGestureDetector;)Z
+11-02 16:03:50.202: I/dalvikvm(4565): Total arena pages for JIT: 11
+11-02 16:03:50.952: D/dalvikvm(4565): GC_CONCURRENT freed 1261K, 52% free 3378K/6919K, external 2357K/2773K, paused 24ms+7ms
+11-02 16:03:51.233: D/StartupTime2(4565): :1351868630029
+11-02 16:03:52.514: W/ActivityManager(1389): Launch timeout has expired, giving up wake lock!
+11-02 16:03:53.585: I/ActivityManager(1389): Process com.motorola.blur.conversations (pid 3450) has died.
+11-02 16:03:54.147: W/ActivityManager(1389): Activity idle timeout for HistoryRecord{40528048 air.com.freshplanet.games.WaM/.AppEntry}
+11-02 16:03:54.538: I/ActivityManager(1389): Process com.motorola.blur.provider.suggestions (pid 4070) has died.
+11-02 16:03:54.780: I/ActivityManager(1389): Displayed air.com.freshplanet.games.WaM/.AppEntry: +12s190ms
+11-02 16:03:55.444: W/IInputConnectionWrapper(2572): showStatusIcon on inactive InputConnection
+11-02 16:03:55.444: W/InputManagerService(1389): Starting input on non-focused client com.android.internal.view.IInputMethodClient$Stub$Proxy@40abf1c0 (uid=10105 pid=2572)
+11-02 16:03:55.803: D/AirChartboost(4565): Extension.initialize
+11-02 16:03:55.837: D/AirChartboost(4565): Extension.createContext extId: 
+11-02 16:03:55.837: D/[AirChartboost](4565): Creating Extension Context
+11-02 16:03:55.837: D/[AirChartboost](4565): Registering Extension Functions
+11-02 16:03:56.314: I/STRING(4565): controller:api;action:install;auid:android-a2776e2789ae40709abb7feb3aca9817;bundle:1.3.54;country:FR;h:854;language:français;model:MB526;os:Android 2.3.5;scale:1.5;sdk:2.0.1;uuid:4059b82ba689088e;w:480;app:505722af16ba473e69000029;signature:fee791ca8a32f26055a93206be846c4bd6dc8356;
+11-02 16:03:57.053: I/STRING(4565): controller:api;action:get;auid:android-a2776e2789ae40709abb7feb3aca9817;bundle:1.3.54;country:FR;h:854;language:français;location:Prod Interstitial;model:MB526;os:Android 2.3.5;scale:1.5;sdk:2.0.1;uuid:4059b82ba689088e;w:480;app:505722af16ba473e69000029;signature:fee791ca8a32f26055a93206be846c4bd6dc8356;
+11-02 16:03:57.092: D/c2dmExtension(4565): C2DMExtension.initialize
+11-02 16:03:57.092: D/c2dmExtension(4565): C2DMExtension.createContext extId: 
+11-02 16:03:57.100: D/c2dmContext(4565): C2DMExtensionContext.C2DMExtensionContext
+11-02 16:03:57.100: D/c2dmContext(4565): C2DMExtensionContext.getFunctions
+11-02 16:03:57.116: D/c2dmRegister(4565): C2DMRegisterFunction.call 683355491925
+11-02 16:03:57.116: D/c2dmRegister(4565): intent with extras PendingIntent{404e5780: android.os.BinderProxy@405b5e10} ... 683355491925
+11-02 16:03:57.296: D/dalvikvm(4565): GC_CONCURRENT freed 1109K, 54% free 3202K/6919K, external 2357K/2773K, paused 2ms+6ms
+11-02 16:03:57.358: D/Flurry(4565): Extension initialized.
+11-02 16:03:57.374: D/Flurry - Context(4565): Context created.
+11-02 16:03:57.631: D/FlurryAgent(4565): Initializing Flurry session
+11-02 16:03:57.639: D/FlurryAgent(4565): New session
+11-02 16:03:57.671: D/FlurryAgent(4565): Initializing Flurry Ads
+11-02 16:03:57.678: D/FlurryAgent(4565): Flurry Ads initialized
+11-02 16:03:57.678: I/FlurryAgent(4565): Init'ing ads.
+11-02 16:03:57.678: D/Flurry - StartSessionFunction(4565): Started session and initalized ads
+11-02 16:03:57.710: W/Settings(4565): Setting android_id has moved from android.provider.Settings.System to android.provider.Settings.Secure, returning read-only value.
+11-02 16:03:57.710: I/FlurryAgent(4565): loading persistent data: /data/data/air.com.freshplanet.games.WaM/files/.flurryagent.-32b03b62
+11-02 16:03:57.710: D/as3fb(4565): initialize
+11-02 16:03:57.710: D/as3fb(4565): createContext 
+11-02 16:03:57.710: D/as3fb(4565): Context.FBExtensionContext
+11-02 16:03:57.717: D/as3fb(4565): Context.getFunctions
+11-02 16:03:57.725: D/FlurryAgent(4565): Loading API key: ****************HLN7
+11-02 16:03:57.725: D/FlurryAgent(4565): Loading phoneId: AND4059b82ba689088e
+11-02 16:03:57.725: D/FlurryAgent(4565): Loading session reports
+11-02 16:03:57.725: D/FlurryAgent(4565): Persistent file loaded
+11-02 16:03:57.733: D/FlurryAgent(4565): generating report
+11-02 16:03:57.733: D/FlurryAgent(4565): Sending report to: http://data.flurry.com/aap.do
+11-02 16:03:57.780: D/as2fb(4565): acces null
+11-02 16:03:58.116: D/dalvikvm(4565): GC_FOR_MALLOC freed 498K, 59% free 2887K/6919K, external 2357K/2773K, paused 38ms
+11-02 16:03:58.124: I/dalvikvm-heap(4565): Grow heap (frag case) to 7.460MB for 87396-byte allocation
+11-02 16:03:58.163: D/dalvikvm(4565): GC_FOR_MALLOC freed <1K, 58% free 2973K/7047K, external 2357K/2773K, paused 30ms
+11-02 16:03:58.358: D/dalvikvm(4565): GC_FOR_MALLOC freed 0K, 58% free 2973K/7047K, external 2357K/2773K, paused 173ms
+11-02 16:03:58.382: I/dalvikvm-heap(4565): Grow heap (frag case) to 7.544MB for 87396-byte allocation
+11-02 16:03:58.561: D/dalvikvm(4565): GC_FOR_MALLOC freed 0K, 58% free 3058K/7175K, external 2357K/2773K, paused 182ms
+11-02 16:03:58.991: D/FlurryAgent(4565): Report successful
+11-02 16:03:58.991: D/FlurryAgent(4565): Done sending initial agent report
+11-02 16:03:59.022: D/LogEventFunction(4565): log event without params
+11-02 16:03:59.022: D/FlurryAgent(4565): Event count incremented: New Install
+11-02 16:03:59.022: D/FlurryAgent(4565): Logged event: New Install
+11-02 16:03:59.514: I/ActivityManager(1389): Process com.android.settings (pid 1981) has died.
+11-02 16:03:59.514: W/ActivityManager(1389): Scheduling restart of crashed service com.android.settings/.KbdLayoutSetter$KbdLayoutBootService in 5000ms
+11-02 16:04:00.280: D/dalvikvm(4565): GC_FOR_MALLOC freed 594K, 56% free 3179K/7175K, external 2357K/2773K, paused 79ms
+11-02 16:04:00.577: D/dalvikvm(4565): GC_FOR_MALLOC freed 5K, 54% free 3359K/7175K, external 2357K/2773K, paused 191ms
+11-02 16:04:00.577: I/dalvikvm-heap(4565): Grow heap (frag case) to 7.921MB for 87396-byte allocation
+11-02 16:04:00.608: D/dalvikvm(4565): GC_FOR_MALLOC freed <1K, 53% free 3444K/7303K, external 2357K/2773K, paused 21ms
+11-02 16:04:00.655: I/ActivityManager(1389): Process com.motorola.bookmarkswidget (pid 4016) has died.
+11-02 16:04:00.882: D/dalvikvm(4565): GC_FOR_MALLOC freed 9K, 53% free 3459K/7303K, external 2357K/2773K, paused 65ms
+11-02 16:04:00.882: I/dalvikvm-heap(4565): Grow heap (frag case) to 8.019MB for 87396-byte allocation
+11-02 16:04:00.936: D/dalvikvm(4565): GC_FOR_MALLOC freed <1K, 53% free 3545K/7431K, external 2357K/2773K, paused 49ms
+11-02 16:04:01.171: D/dalvikvm(4565): GC_EXTERNAL_ALLOC freed 6K, 51% free 3642K/7431K, external 2357K/2773K, paused 61ms
+11-02 16:04:01.413: I/FlurryAgent(4565): Request successful
+11-02 16:04:01.452: I/ChartBoost(4565): Request response received: Interstitial returned.
+11-02 16:04:01.553: I/ActivityManager(1389): Process com.motorola.mediashare (pid 2606) has died.
+11-02 16:04:01.561: I/ChartBoost(4565): Request response received: Success
+11-02 16:04:02.019: D/c2dmBdcastRcvr(4565): Broadcast receiver started!!!!!
+11-02 16:04:02.116: D/c2dmBdcastRcvr(4565): Registered successfully
+11-02 16:04:02.171: I/JSON(4565): {"message":"Success","status":200}
+11-02 16:04:02.194: I/JSON(4565): {"bgColor":"00000099","to":"4f762e1ef776590e0b0000c6","message":"Interstitial returned.","creative":"LUH7HXGY","ad_id":"8c2bb0de6edd228fc927c52573b5da27d8fd0fbe","location":"Prod Interstitial","status":200,"condition_set":"mP6tQFOI0z","html":"<!DOCTYPE html PUBLIC \"-\/\/W3C\/\/DTD XHTML 1.0 Strict\/\/EN\"\n\t\"http:\/\/www.w3.org\/TR\/xhtml1\/DTD\/xhtml1-strict.dtd\">\n<html xmlns=\"http:\/\/www.w3.org\/1999\/xhtml\" xml:lang=\"en\" lang=\"en\">\n<head>\n\t<meta http-equiv=\"Content-Type\" content=\"text\/html; charset=utf-8\"\/>\n\t<meta name=\"viewport\" content=\"width=device-width; user-scalable=no; maximum-scale=1.0;\"\/>\n\t<title>ChartBoost - Interstitial<\/title>\n\t<style type=\"text\/css\">\n\t\tbody { \n\t\t\tmargin:0;\n\t\t\tpadding:0; \n\t\t} \n\t\t* {\n\t\t\t-webkit-user-select: none; \n\t\t\t-webkit-touch-callout:none;\n\t\t}\n\t\t.button, a { \n\t\t\t-webkit-tap-highlight-color: rgba(0, 0, 0, 0.5); \n\t\t}\n\t\t#wrapper {\n\t\t\tposition:relative;\n\t\t}\n\t\t#app {\n\t\t\tdisplay:block;\n\t\t\tposition:absolute;\n\t\t}\n\t\t#closeButton {\n\t\t\tdisplay:block;\n\t\t\tposition:absolute;\n\t\t\twidth:32px;\n\t\t\theight:32px;\n\t\t\tz-index:9999;\n\t\t}\n\t\t#inner {\n\t\t\tposition:relative;\n\t\t}\n\t<\/style>\n\t<script type=\"text\/javascript\">\n\t\tdocument.ontouchmove = function(e){ e.preventDefault(); }\n\t<\/script>\n<\/head>\n<body>\n\t\n<div id=\"wrapper\" class=\"portrait\">\n\t\t\t\t<div><a href=\"chartboost:\/\/close\" id=\"closeButton\"><\/a><\/div>\t\n\t\t\t\n\t\n\t<a href=\"#\" id=\"app\"><\/a>\n\t<\/div>\n\n<style type=\"text\/css\">\n\t#closeButton {\n\t\tbackground:transparent url('http:\/\/chartboost.s3.amazonaws.com\/static-assets\/interstitials\/close.png') 0 0 no-repeat;\n\t\tbackground-size:100% 100%;\n\t\t\t\twidth:40px;\n\t\theight:47px;\n\t}\n\t\n\t\t\t\n\t\t.portrait #app {\n\t\t\t\t\t\twidth:240px;\n\t\t\theight:415px;\n\t\t}\n\t\t\n\t\t\t#wrapper.portrait {\n\t\t\t\tbackground:transparent url('http:\/\/chartboost.s3.amazonaws.com\/static-assets\/interstitials\/frames\/iphone-portrait-frame.png') 0 0 no-repeat;\n\t\t\t\tbackground-size:100% 100%;\n\t\t\t\t\t\t\t\twidth:320px;\n\t\t\t\theight:569px;\n\t\t\t}\n\t\t\t.portrait #closeButton {\n\t\t\t\t\t\t\t\ttop:28px;\n\t\t\t\tleft:258px;\n\t\t\t}\n\t\t\t.portrait #app {\n\t\t\t\tbackground-color:transparent;\n\t\t\t\tbackground-position:0 0;\n\t\t\t\tbackground-repeat: no-repeat;\n\t\t\t\tbackground-size:100% 100%;\n\t\t\t\t\t\t\t\ttop:77px;\n\t\t\t\tleft:40px;\n\t\t\t}\n\t\t\n\t<\/style>\n\n<script type=\"text\/javascript\">\n\tdocument.ontouchmove = function(e){ e.preventDefault(); }\n<\/script>\n\t<style type=\"text\/css\">\n\n\n.portrait #app {\n\tbackground-image:url('http:\/\/a.chartboost.com\/u\/4ed590e06d96198a4b000000\/2a0fec362b33681dd4ebc572f93be0c4ad2b3bfb.jpg');\n}\n<\/style>\n\n<script type=\"text\/javascript\">\n\twindow.addEventListener('load', function() {\n\t\t\t\tdocument.getElementById('app').setAttribute('href', 'chartboost:\/\/link\/market%3A%2F%2Fdetails%3Fid%3Dcom.mobage.ww.a759.Blood_Brothers_Android');\n\t\t\t}, false); \n<\/script><\/body>\t\n<\/html>","cgn":"500f10ca2284bbbb0a000000-8c2bb0de6edd228fc927c52573b5da27d8fd0fbe-508546e717ba47955a000030-mP6tQFOI0z-Prod Interstitial"}
+11-02 16:04:02.405: I/ClockWidgetTCReceiver(2200): onReceive
+11-02 16:04:02.405: D/dalvikvm(4565): GC_FOR_MALLOC freed 182K, 51% free 3675K/7431K, external 3958K/4943K, paused 31ms
+11-02 16:04:02.538: I/ClockWidgetUpdateService(2200): onStart
+11-02 16:04:02.553: I/ClockWidget(2200): updateWidget: isWidgetCreated: Value is >>>>>false
+11-02 16:04:02.553: I/ClockWidget(2200): BuildUpdate widgetId=15
+11-02 16:04:02.553: I/ClockWidget(2200): Orientation landscape=false
+11-02 16:04:02.553: I/ClockSettingsTable(2200): fetching: widget=15
+11-02 16:04:02.600: I/ActivityManager(1389): Process com.google.android.youtube (pid 3302) has died.
+11-02 16:04:02.702: D/dalvikvm(4565): GC_FOR_MALLOC freed 94K, 51% free 3767K/7623K, external 3958K/4943K, paused 51ms
+11-02 16:04:02.756: D/dalvikvm(2245): GC_EXPLICIT freed 17K, 49% free 2625K/5123K, external 3369K/3576K, paused 68ms
+11-02 16:04:02.913: I/ClockSettingsTable.Tuple(2200): type1
+11-02 16:04:02.936: I/ClockSettingsTable(2200): fetched: widget=15 returned= _id=1, widgetId=15, isAnalogStyle=false, bkClor=0
+11-02 16:04:02.967: I/ClockWidget(2200): updateWidget Created settings   _id=1, widgetId=15, isAnalogStyle=false, bkClor=0
+11-02 16:04:03.046: D/dalvikvm(4565): GC_FOR_MALLOC freed 536K, 50% free 3893K/7751K, external 3958K/4943K, paused 24ms
+11-02 16:04:03.046: I/ClockWidget(2200): clockSettings= _id=1, widgetId=15, isAnalogStyle=false, bkClor=0:4:2
+11-02 16:04:03.053: I/ClockWidget(2200): buildUpdate
+11-02 16:04:03.100: I/ClockWidget(2200): 24hrs time format AddVerticalDigitalClock in if 
+11-02 16:04:03.139: D/dalvikvm(4565): GC_FOR_MALLOC freed 302K, 48% free 4174K/7943K, external 3958K/4943K, paused 25ms
+11-02 16:04:03.171: D/dalvikvm(4565): GC_FOR_MALLOC freed 192K, 49% free 4270K/8263K, external 3958K/4943K, paused 26ms
+11-02 16:04:03.202: D/dalvikvm(4565): GC_FOR_MALLOC freed 287K, 51% free 4175K/8519K, external 3958K/4943K, paused 26ms
+11-02 16:04:03.235: E/ClockWidget(2200): Add Calender  spanX: 4 spanY: 2 isLandscape: false
+11-02 16:04:03.241: I/MonthView(2200): FULL_HDPI_FONTS_LAND_4X2
+11-02 16:04:03.241: I/MonthView(2200): Scale=1.5
+11-02 16:04:03.241: I/MonthView(2200): CreateMonthView
+11-02 16:04:03.319: I/ClockSettingsTable(2200): fetching: widget=15
+11-02 16:04:03.327: I/ClockSettingsTable.Tuple(2200): type1
+11-02 16:04:03.327: I/ClockSettingsTable(2200): fetched: widget=15 returned= _id=1, widgetId=15, isAnalogStyle=false, bkClor=0
+11-02 16:04:03.436: W/ChipWidgetProvider(2200): Widget span not found for id=70
+11-02 16:04:03.436: I/ClockWidget(2200): updateWidget: isWidgetCreated: Value is >>>>>false
+11-02 16:04:03.436: I/ClockWidget(2200): BuildUpdate widgetId=70
+11-02 16:04:03.436: I/ClockWidget(2200): Orientation landscape=false
+11-02 16:04:03.436: I/ClockSettingsTable(2200): fetching: widget=70
+11-02 16:04:03.444: I/ClockWidget(2200): updateWidget Created settings  null
+11-02 16:04:03.499: I/ClockWidget(2200): getBlurDB widgetId=70
+11-02 16:04:03.671: I/ActivityManager(1389): Process com.motorola.blur.provider.datacollector (pid 4096) has died.
+11-02 16:04:03.968: W/KeyCharacterMap(4565): Can't open keycharmap file
+11-02 16:04:03.968: W/KeyCharacterMap(4565): Error loading keycharmap file '/data/usr/keychars/qtouch-touchscreen.kcm.bin'. hw.keyboards.65537.devname='qtouch-touchscreen'
+11-02 16:04:03.975: W/KeyCharacterMap(4565): Can't open keycharmap file
+11-02 16:04:03.975: W/KeyCharacterMap(4565): Error loading keycharmap file '/system/usr/keychars/qtouch-touchscreen.kcm.bin'. hw.keyboards.65537.devname='qtouch-touchscreen'
+11-02 16:04:03.983: W/KeyCharacterMap(4565): Can't open keycharmap file
+11-02 16:04:03.983: W/KeyCharacterMap(4565): Using default keymap: /system/usr/keychars/qwerty.kcm.bin
+11-02 16:04:04.725: I/ActivityManager(1389): Process com.google.android.partnersetup (pid 3954) has died.
+11-02 16:04:05.921: I/ActivityManager(1389): Process com.motorola.blur.friendfeed (pid 3835) has died.
+11-02 16:04:08.866: I/ActivityManager(1389): Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10200000 cmp=com.gau.go.launcherex/com.jiubang.ggheart.apps.desks.diy.GoLauncher } from pid 1389
+11-02 16:04:08.905: D/PhoneWindow(4565): couldn't save which view has focus because the focused view com.adobe.air.AIRWindowSurfaceView@4050d830 has no id.
+11-02 16:04:09.116: I/ggheart(1715): onNewIntent
+11-02 16:04:09.186: I/DemoService(1715): DiyScheduer.onStart
+11-02 16:04:09.186: I/ggheart(1715): onStart
+11-02 16:04:09.264: W/ActivityManager(1389): Unable to start service Intent { act=com.gau.golauncherex.notification.start }: not found
+11-02 16:04:09.342: W/InputManagerService(1389): Starting input on non-focused client com.android.internal.view.IInputMethodClient$Stub$Proxy@40b1ee00 (uid=10128 pid=4565)
+11-02 16:04:09.631: I/ggheart(1715): onNewIntent
+11-02 16:04:09.631: I/ActivityManager(1389): Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10200000 cmp=com.gau.go.launcherex/com.jiubang.ggheart.apps.desks.diy.GoLauncher } from pid 1389
+11-02 16:04:09.694: I/ActivityManager(1389): Resumed Activity: com.gau.go.launcherex/com.jiubang.ggheart.apps.desks.diy.GoLauncher totalTime: 828 ms
+11-02 16:04:09.710: W/ActivityManager(1389): Unable to start service Intent { act=com.gau.golauncherex.notification.start }: not found
+11-02 16:04:10.092: D/dalvikvm(1715): GC_EXTERNAL_ALLOC freed 1573K, 36% free 7695K/11975K, external 10694K/11291K, paused 110ms
+11-02 16:04:11.796: I/WifiService(1389): setWifiEnabled enable=false, persist=true, pid=3335, uid=10104
+11-02 16:04:11.866: I/ActivityManager(1389): Start proc com.motorola.mediashare for broadcast com.motorola.mediashare/.HomeSyncReceiver: pid=4625 uid=10039 gids={3002, 3001}
+11-02 16:04:11.905: I/wpa_supplicant(3658): CTRL-EVENT-TERMINATING - signal 15 received
+11-02 16:04:11.921: I/wpa_supplicant(3658): CTRL-EVENT-TERMINATING - signal 0 received
+11-02 16:04:11.921: I/wpa_supplicant(3658): CTRL-EVENT-STATE-CHANGE id=0 state=0 BSSID=00:00:00:00:00:00
+11-02 16:04:12.093: V/WifiMonitor(1389): Event [CTRL-EVENT-TERMINATING - signal 15 received]
+11-02 16:04:12.694: I/HomeSyncReceiver(4625): onReceive. WifiState= 0
+11-02 16:04:12.710: I/ActivityManager(1389): Start proc com.android.settings for broadcast com.android.settings/.widget.SettingsAppWidgetProvider: pid=4632 uid=1000 gids={3002, 3001, 3003, 1015, 2001, 1007, 3005}
+11-02 16:04:12.788: W/dalvikvm(4632): Refusing to reopen boot DEX '/system/framework/com.motorola.android.frameworks.jar'
+11-02 16:04:13.077: D/WifiStateTracker(1389): Reset connections and stopping DHCP
+11-02 16:04:13.077: V/WifiStateTracker(1389): Connection to supplicant lost
+11-02 16:04:13.116: D/NetworkStateTracker(1389): setDetailed state, old =CONNECTED and new state=DISCONNECTED
+11-02 16:04:13.202: D/ConnectivityService(1389): ConnectivityChange for WIFI: DISCONNECTED/DISCONNECTED
+11-02 16:04:13.202: V/ConnectivityService(1389): Handle DISCONNECT for WIFI
+11-02 16:04:13.280: I/CachedBluetoothDeviceManager(4632): disconnectCacheDevice size = 0
+11-02 16:04:13.296: W/ConnectivityService(1389): interface tiwlan0 is useless
+11-02 16:04:13.296: D/NetworkStateTracker(1389): setTeardownRequested: false
+11-02 16:04:13.296: D/ConnectivityService(1389): updateWifiHostException: delete file :/tmp/WifiHostException
+11-02 16:04:13.296: D/ConnectivityService(1389): getMobileDataEnabled returning false
+11-02 16:04:13.296: D/ConnectivityService(1389): not failing over to mobile type 0 because Mobile Data Disabled
+11-02 16:04:13.296: D/ConnectivityService(1389): handleConnectivityChange
+11-02 16:04:13.296: D/ConnectivityService(1389): handleDnsConfig Change
+11-02 16:04:13.303: D/RadioSignalLevel(1459): Gsm Radio Signal level: 5
+11-02 16:04:13.358: D/GTalkService(1591): ##### Network broadcast (connected=false) type=WIFI, state=DISCONNECTED
+11-02 16:04:13.366: I/GTalkService(1591): [GTalkConnection.1] setInternalNetworkState: type=1, state=DISCONNECTED
+11-02 16:04:13.509: D/NetStatUtils(3701): Receive a broadcast: android.net.conn.CONNECTIVITY_CHANGE
+11-02 16:04:13.509: D/NetStatUtils(3701): NetworkInfo: type: WIFI[], state: DISCONNECTED/DISCONNECTED, reason: (unspecified), extra: (none), roaming: false, failover: false, isAvailable: false
+11-02 16:04:13.530: I/PollingManager(1481): connectivity_action: NetworkInfo: type: WIFI[], state: DISCONNECTED/DISCONNECTED, reason: (unspecified), extra: (none), roaming: false, failover: false, isAvailable: false
+11-02 16:04:13.678: I/DeviceReconnectManager(1481): Connection State Changed: NetworkInfo: type: WIFI[], state: DISCONNECTED/DISCONNECTED, reason: (unspecified), extra: (none), roaming: false, failover: false, isAvailable: false
+11-02 16:04:13.678: I/DeviceReconnectManager(1481): getBackgroundDataSetting: true 
+11-02 16:04:13.678: I/DevicePushListener(1481): Connection State Changed: NetworkInfo: type: WIFI[], state: DISCONNECTED/DISCONNECTED, reason: (unspecified), extra: (none), roaming: false, failover: false, isAvailable: false
+11-02 16:04:13.788: I/GTalkService(1591): [GTalkConnection.28] connectionClosed: connId=266941, error=NO NETWORK
+11-02 16:04:13.788: I/WSBase(1481): got connectivity action, connected: false type: -1 waiting requests: 0
+11-02 16:04:13.796: D/global frequency(1481): BcsPlatformAndroid.onReceive() com.motorola.blur.service.blur.Actions.POLLINGMGR_CONNECTIVITY
+11-02 16:04:13.796: D/cUs(1481): AndroidClientUpgradeService.handleIntent: com.motorola.blur.service.blur.Actions.POLLINGMGR_CONNECTIVITY
+11-02 16:04:13.796: D/cUs(1481): CusSM.onRadioDown
+11-02 16:04:13.796: I/DPLCfg(1481): POLLINGMGR_CONNECTIVITY return. connected: false background: true
+11-02 16:04:13.803: D/Tethering(1389): Tethering got CONNECTIVITY_ACTION
+11-02 16:04:13.803: D/Tethering(1389): mWifiTethered = falsemUsbTethered = false
+11-02 16:04:13.803: D/ConnectivityService(1389): reportNetworkCondition(1, 0)
+11-02 16:04:13.811: D/Tethering(1389): MasterInitialState.processMessage what=3
+11-02 16:04:13.913: D/global frequency(1481): BcsPlatformAndroid.onReceiveActions() com.motorola.blur.service.blur.Actions.POLLINGMGR_CONNECTIVITY
+11-02 16:04:13.932: D/ConnectivityService(1389): Inet connectivity change, net=1, condition=0,mActiveDefaultNetwork=-1
+11-02 16:04:13.932: D/ConnectivityService(1389): no active default network - aborting
+11-02 16:04:13.952: I/WifiToggle(2200): OnReceive
+11-02 16:04:13.952: I/WifiToggle(2200): getServiceState.INTERMEDIATE_STATE
+11-02 16:04:13.952: I/WifiToggle(2200): UpdateWidget - currentState=INTERMEDIATE_STATE
+11-02 16:04:13.960: I/WifiToggle(2200): updateButtons
+11-02 16:04:14.022: D/DeviceStatsSvc(1494): onStartCommand: received action android.net.wifi.supplicant.CONNECTION_CHANGE
+11-02 16:04:14.022: D/DeviceStatsSvc(1494): handleMessage: Message=3
+11-02 16:04:14.022: D/SysClassNetUtils(1494): getWifiBytesFromSys:2932720,733915
+11-02 16:04:14.030: D/SysClassNetUtils(1494): updateWifiRxTxBytes;(Before) prevRxBytes=0prevTxBytes=0cumRxBytes=1824913337cumTxBytes=165440500currRxBytes=2932720currTxBytes=733915
+11-02 16:04:14.077: D/PollingManager(1481): unregisterApp(): PushService
+11-02 16:04:14.077: I/PollingManager(1481): calculateShortestInterval(): shortest interval is 540000
+11-02 16:04:14.233: I/GTalkService(1591): [GTalkConnection.28] (WORKER THREAD) update account status
+11-02 16:04:14.241: D/Smack(1591): [XMPPConn] close connection, notifyClosed=false
+11-02 16:04:14.264: D/WifiStateTracker(1389): Disabling interface
+11-02 16:04:14.397: W/Smack/Packet(1591): notify conn break (IOEx), close connection
+11-02 16:04:14.530: E/NetlinkEvent(1216): NetlinkEvent::FindParam(): Parameter 'UDEV_LOG' not found
+11-02 16:04:14.530: E/NetlinkEvent(1216): NetlinkEvent::FindParam(): Parameter 'UDEV_LOG' not found
+11-02 16:04:14.530: E/NetlinkEvent(1216): NetlinkEvent::FindParam(): Parameter 'UDEV_LOG' not found
+11-02 16:04:14.530: E/NetlinkEvent(1216): NetlinkEvent::FindParam(): Parameter 'UDEV_LOG' not found
+11-02 16:04:14.587: E/Tethering(1389): attempting to remove unknown iface (tiwlan0), ignoring
+11-02 16:04:14.803: I/TLSStateManager(1481): org.apache.harmony.nio.internal.SocketChannelImpl@40732950: Wrote out 37 bytes of data with 0 bytes remaining.
+11-02 16:04:14.811: W/System.err(1481): java.lang.RuntimeException: manager closed detected in write
+11-02 16:04:14.811: W/System.err(1481): 	at com.motorola.blur.async.io.impl.NormalAsyncConnection$_AsyncSender$GenericSendEventHandler.handleEvent(NormalAsyncConnection.java:202)
+11-02 16:04:14.811: W/System.err(1481): 	at com.motorola.blur.async.io.ChannelProcessingTask.processSelectedKeys(ChannelProcessingTask.java:626)
+11-02 16:04:14.819: W/System.err(1481): 	at com.motorola.blur.async.io.ChannelProcessingTask.processSelectedEvents(ChannelProcessingTask.java:585)
+11-02 16:04:14.819: W/System.err(1481): 	at com.motorola.blur.async.io.ChannelProcessingTask.run(ChannelProcessingTask.java:385)
+11-02 16:04:14.827: W/System.err(1481): 	at java.lang.Thread.run(Thread.java:1019)
+11-02 16:04:14.827: I/ChannelProcessingTask(1481): Closing channel org.apache.harmony.nio.internal.SocketChannelImpl@40732950
+11-02 16:04:14.881: I/ActivityManager(1389): Start proc com.google.android.apps.uploader for broadcast com.google.android.apps.uploader/.ConnectivityBroadcastReceiver: pid=4653 uid=10073 gids={3003}
+11-02 16:04:15.077: W/TLSStateManager(1481): Failed to cleanly close down SSL: Inbound is closed before close_notify alert has been received.
+11-02 16:04:15.233: I/XMPPConnection(1481): Shutting down connection for user 4503601740517601 to host jabber-cloud225-blur.svcmot.com
+11-02 16:04:15.335: I/ActivityThread(4653): Pub com.google.android.apps.uploader: com.google.android.apps.uploader.UploadsContentProvider
+11-02 16:04:15.350: I/ActivityThread(4653): Pub com.google.photos.provider.Album: com.google.android.apps.uploader.clients.picasa.AlbumProvider
+11-02 16:04:15.358: D/MediaUploader(4653): UploaderApplication.onCreate
+

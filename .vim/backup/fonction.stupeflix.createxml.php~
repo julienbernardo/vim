@@ -1,0 +1,308 @@
+<?php
+
+function truncateDescription($description, $rowSize, $nbRowMax, $textLimit){
+	if(preg_match('/[\n]/i', $description) > 0){
+		$tmp = preg_split('/[\n]/i', $description);
+		$description = array();
+		$nbRow = 0;
+		foreach($tmp as $row){
+			if(($nbRow+ceil(strlen($row)/$rowSize)) > $nbRowMax){
+				while(($nbRow+ceil(strlen($row)/$rowSize)) > $nbRowMax){ 
+					$row = preg_replace('/([\.\?!])?[^\.\?!]*.$/i', '$1', $row);
+				}
+				$description[] = $row;
+				break;
+			}
+			$description[] = $row;
+			$nbRow += ceil(strlen($row)/$rowSize);
+		}
+		$description = implode("\n", $description);
+	}else if(strlen($description) > $textLimit){
+		$description = substr($description, 0, $textLimit);
+		if(preg_match('/([\.\?!])/i', $description) > 0){
+			$description = preg_replace('/([\.\?!])?[^\.\?!]*.$/i', '$1', $description);
+		}else{ $description .= "...";}
+	}
+	return $description;
+}
+
+function formatTypeBien($idTypeBien, $typeBien, $dico){
+	return ($typeBien != '' ? $typeBien : $dico[$idTypeBien]);
+}
+
+function loadDicoTemplate($lang, $template, $defaultLang = "EN"){
+	if($lang != "" && $template != ""){
+		$return = array();
+		$lang = strtolower($lang);
+		$type_biens =  array();
+		$template = strtolower($template);
+		$path_dico = PATH_DICO.$lang.".php";
+		if(file_exists($path_dico)){ 
+			include($path_dico);
+		}
+		foreach($dico as $k=>$v){
+			if($k != 'template' && count($v) > 0){ 
+				$return[$k] = $v;
+			}
+		}
+		if($defaultLang != "" && count($dico['template'][$template]) == 0){
+			$path_dico = PATH_DICO.strtolower($defaultLang).".php";
+			if(file_exists($path_dico)){ 
+				include($path_dico);
+			}
+			foreach($dico as $k=>$v){ 
+				if(count($return[$k]) == 0 && $k != 'template' && count($v) > 0 ){
+					$return[$k] = $v;
+				}
+			}
+		}
+		if(is_array($dico['template'][$template])){
+			$return = array_merge( $return, $dico['template'][$template]);
+		}
+		return $return;
+	}
+	return "";
+}
+
+function loadTemplateFunctions($template, $videos_options){
+	$main_template = "";
+	if(is_array($videos_options['TYPE'][$template]) && $videos_options['TYPE'][$template]['MAIN_TEMPLATE'] != ""){
+		$main_template = $videos_options['TYPE'][$template]['MAIN_TEMPLATE'];
+	}else if(file_exists(PATH_TEMPLATE.strtolower($template).".php")){
+		$main_template = $template;
+	}else if(preg_match('/^([A-Z]{2})_CUSTOM(_.+)?/i', $template) > 0){
+		$main_template = "CUSTOM";
+	}else if(preg_match('/^(.+)_[^_]+$/i', $template, $result) > 0){
+		$main_template = $result[1];
+	}else if(preg_match( '/^(FR|US|AGENCEPLUS)$/i', $template) > 0){
+		$main_template = "DEFAULT";
+	}
+	echo $main_template;
+	if($main_template != "" && file_exists(PATH_TEMPLATE.strtolower($main_template).".php")){
+		require_once(PATH_TEMPLATE.strtolower($main_template).".php");
+		return true;
+	}
+	return false;
+}
+
+function create_stupeflix_xml($options){
+	global $videos_options;
+	global $tts_language;
+	$type = $options['TYPE'];
+	$url_infos_tour = str_replace('#TOUR#', $options['ID_VISITE'], URL_GET_TOUR_INFOS);
+	$response = @file_get_contents($url_infos_tour);
+	$options['INFOS'] = json_decode($response, true);
+	$options['REF_VIDEO'] = convertTourToShortCode($options['ID_VIDEO']);
+	$profil_mobile = "mobile";	
+	$result = array('error_code'=> 0, 'ref_video'=> $options['REF_VIDEO']);
+	if(is_guid($options['INFOS']['TOUR']['ID_VISITE'])){
+		if($options['INFOS']['TOUR']['ID_STATUT_VISITE'] > 0){
+			if(count($options['INFOS']['IMAGES']) > 0){
+				//images
+				$only_still = ($videos_options['TYPE'][$options['TYPE']]['ONLY_STILL_IMAGE'] === true);
+				$options['IMAGES'] = array();
+				foreach($options['INFOS']['IMAGES'] as $img){
+					$url_image = str_replace('#ID#', $img['ID_IMAGE'], ($img['ID_TYPE_IMAGE'] == 1 || $only_still ? URL_IMG_VIDEO_FIXE : URL_IMG_VIDEO));
+					$options['IMAGES'][] = array('URL_IMAGE' => $url_image, 'TITLE'=> $img['NOM_IMAGE'], 'TYPE' => $img['ID_TYPE_VUE']);
+				}
+				//TTS
+				$lock_tts = ($options['INFOS']['USER']['BLOCKTTSAUTO'] == "1");
+				if(is_array($options['INFOS']['TOUR']['COMPLEMENTS']) && $options['INFOS']['TOUR']['COMPLEMENTS']['BLOCKTTSAUTO'] == "1" ){
+					$lock_tts = true;
+				}
+				if($videos_options['TYPE'][$options['TYPE']]['NO_TTS'] !== true){
+					if($options['INFOS']['TOUR']['TYPE_SON'] == "TTS" && get_tts_statut($options['INFOS']['TOUR']['ID_VISITE']) == "1"){
+						$options['TTS'] = str_replace('#ID#', $options['INFOS']['TOUR']['ID_VISITE'], URL_TTS)."?r=".rand();
+					}else if(in_array($options['INFOS']['TOUR']['ID_LANGUE'], $tts_language) && $options['WAIT_TTS'] && $options['INFOS']['TOUR']['DESCRIPTION'] != "" && $options['INFOS']['TOUR']['REF_VOICE'] != "" && !$lock_tts){
+						$result['error_code'] = 5;
+						$result['type'] = $type;
+						$result['tour']	= $options['INFOS']['TOUR'];
+						$result['user']	= $options['INFOS']['USER'];
+						return $result;
+					}
+				}
+				//music
+				if(getSoundState($options['INFOS']['TOUR']['ID_MUSIQUE_VIDEO'])){ $options['MUSIC'] = $options['INFOS']['TOUR']['ID_MUSIQUE_VIDEO'];}
+				$profil = $videos_options['DEFAULT']['PROFIL'];
+				if($videos_options['TYPE'][$options['TYPE']]['PROFIL'] != ""){	$profil = $videos_options['TYPE'][$options['TYPE']]['PROFIL'];}
+				if($options['IS_DEBUG']){ 
+					$profil = $options['PROFIL'];
+					$options['INFOS']['USER']['VIDEO_MOBILE_USER'] = 0;
+					$options['INFOS']['USER']['VIDEO_MOBILE_DISTRIB'] = 0;
+				}
+				if(preg_match('/mobile/i', $profil) > 0){
+					$options['INFOS']['USER']['VIDEO_MOBILE_USER'] = 1;
+					if(preg_match('/mobile-small/i', $profil) > 0){ $profil_mobile = "mobile-small";}
+					$profil = preg_replace('/mobile(-small)?/i', '', $profil);
+				}
+				$list_profiles = explode(';', $profil);
+				$options['MAP_ACTIVE'] = ($options['INFOS']['TOUR']['CACHER_LOCALISATION'] != '1');
+				$options['COUNTRY'] = $options['INFOS']['TOUR']['ID_LANGUE'];
+					
+				$xml_header = write_stupeflix_xml_head();
+				$xml_footer = write_stupeflix_xml_foot();
+
+	//			if(preg_match(''"FR_DOOR"){ $type = "DOOR";}
+	//			else if($type == "FR_TV"){ $type = "TV";}
+				$type = preg_replace('/^[^_].+_((DOOR|TV)_?)/i', '$1', $type);
+				$type_function = preg_replace('/_CORP$/i','', $type);
+				if(loadTemplateFunctions($type_function, $videos_options)){	
+					$profiles = array();
+					if(count($list_profiles) > 0){
+						foreach($list_profiles as $current_profil){
+							if($current_profil == "") continue;
+							//create xml			
+							$options['PROFIL'] = $current_profil;
+							$options['PROFIL_SIZE'] = getProfilSize($options['PROFIL']);
+							$profil_extentions = getProfilExts();
+							$options['IS_YOUTUBE'] = ($profil_extentions[$options['PROFIL']] == 'mp4');
+
+							if(function_exists(FUNCTION_CREATEXML."_".$type_function)){ $function_createxml = FUNCTION_CREATEXML."_".$type_function;}
+							else{ $function_createxml = FUNCTION_CREATEXML."_DEFAULT";}
+								$xml = $function_createxml($options);
+							if(is_array($xml) && $xml['error_code'] != 0){
+								return $xml;
+							}else if($xml != ""){
+								$profiles[] = array('profile' => $options['PROFIL'], 'xml' => $xml_header.$xml.$xml_footer);
+							}
+						}
+					}			
+					if($options['INFOS']['USER']['VIDEO_MOBILE_USER'] == 1 || $options['INFOS']['USER']['VIDEO_MOBILE_DISTRIB'] == 1){
+						$bgimg = str_replace('#ID#', $options['INFOS']['IMAGES'][0]['ID_IMAGE'], str_replace('#PATH#', 'thumb', URL_IMG_BG));
+						$type_mobile = ($type == "ADELE" ? "ADELE" : "DEFAULT"); 
+						$function_createxml = FUNCTION_CREATEXML."_".$type_mobile;
+						if($type_mobile != $type_function && !function_exists($function_createxml)){
+							loadTemplateFunctions($type_mobile, $videos_options);
+						}
+						if(function_exists($function_createxml)){
+							$options['PROFIL'] = $profil_mobile;
+							$options['PROFIL_SIZE'] = getProfilSize($options['PROFIL']);
+							$options['IS_YOUTUBE'] = false;
+							$xml = $function_createxml($options);
+							if($xml != ""){
+								$profiles[] = array('profile' => $options['PROFIL'], 'xml' => $xml_header.$xml.$xml_footer);
+							}
+						}else $result['error_code'] = 8;
+					}
+
+					if(count($profiles) > 0 && $result['error_code'] == 0){
+						$result['ref_video']	= $options['REF_VIDEO'];
+						$result['id_video'] 	= $options['ID_VIDEO'];
+						$result['tour'] 		= $options['INFOS']['TOUR'];
+						$result['user'] 		= $options['INFOS']['USER'];
+						$result['nb_image'] 	= count($options['INFOS']['IMAGES']);
+						$result['type'] 		= $type;
+						$result['bgimg']		= $bgimg;
+						$result['profiles']		= $profiles;
+						$result['error_code'] 	= 0;
+					}else{ $result['error_code'] = 8;}
+				}else{ $result['error_code'] = 11;}
+			}else{ $result['error_code'] = 3;}
+		}else{ $result['error_code'] = -1;}
+	}else{	$result['error_code'] = 2;}
+	return $result;
+}
+
+function create_stupeflix_xml_TEMPLATE(&$options){
+	global $config_video;
+	$xml = "";
+	$old_country = "";
+	$options_default_values = array(
+		'FONT' => URL_VIDEO_YOUTUBE_FONT,
+		'FONT_BOLD' => URL_VIDEO_YOUTUBE_FONT_BOLD,
+		'FONT_COLOR' => URL_VIDEO_YOUTUBE_FONT_COLOR,
+		'TITLE_FONT_COLOR' => URL_VIDEO_YOUTUBE_TITLE_FONT_COLOR,
+		'MAP_ACTIVE' => true, 
+		'NOBANNER_DESCRIPTION' => false,
+		'MORE_INFORMATIONS_BACKGROUND' => true,
+		'SHOW_ALL_PLANS' => false,
+		'ONLY_STILL' => false,
+	);
+	$options = array_merge($options_default_values, $options);
+
+	$tab_tour = $options['INFOS']['TOUR'];
+	if($options['MAIN_TEMPLATE'] != ""){
+		$country = $options['INFOS']['TOUR']['ID_LANGUE'];
+		$main_template = $options['MAIN_TEMPLATE'];
+		$template = $options['TEMPLATE'];
+	}else{
+		$infos_conversions = explode("_", preg_replace('/_CORP$/i', '', $options['TYPE']));
+		if($infos_conversions[0] == "CUSTOM"){
+			$main_template = $infos_conversions[0];
+			$template = strtolower($infos_conversions[1]);
+		}else if(count($infos_conversions) > 1){
+			$country = $infos_conversions[0];
+			$main_template = $infos_conversions[1];
+			$template = strtolower($infos_conversions[2]);	
+		}else{
+			$main_template = preg_replace('/_CORP$/i', '', $options['TYPE']);	
+			$template = $options['TYPE'];
+		}
+		if($options['INFOS']['TOUR']['ID_LANGUE'] != $country){ 
+			$old_country = $country;
+			$country = $options['INFOS']['TOUR']['ID_LANGUE'];
+		}
+	}
+	
+	$url_plan = array();
+	if(count($tab_tour['PLANS']) > 0){
+		foreach($tab_tour['PLANS'] as $plan){
+			if(is_guid($plan['ID_PLAN'])){ 
+				$replace = array(
+					'search' => array('#ID#', '#EXT#'),
+					'replace' => array($plan['ID_PLAN'], $plan['EXTENSION_FICHIER'])
+				);
+				$url_plan[] = str_replace($replace['search'], $replace['replace'], URL_IMG_PLAN);
+				if(!$options['SHOW_ALL_PLANS']){ break;}
+			}
+		}
+	}
+
+	$url_logo = "";
+	if($template != ""){
+		$exts = array('jpg', 'png');
+		foreach($exts as $ext){
+			$replace = array(
+				'search' => array('#TEMPLATE#', '#EXT#'),
+				'replace' => array( $template, $ext)
+			);
+
+			if(file_exists(str_replace(URL_HOST, PATH_SITE, str_replace($replace['search'], $replace['replace'], URL_VIDEO_YOUTUBE_LOGO)))){
+				$url_logo = str_replace($replace['search'], $replace['replace'], URL_VIDEO_YOUTUBE_LOGO);
+				break;
+			}
+		}
+	}
+				
+	if($url_logo == "" && is_guid($options['INFOS']['USER']['ID_LOGO_VIDEO'])){
+		$url_logo = clean_url(str_replace( array('#ID#','#EXT#'), array($options['INFOS']['USER']['ID_LOGO_VIDEO'], $options['INFOS']['USER']['ID_LOGO_VIDEO_EXT']), URL_IMG_VIDEO_LOGO));
+	}
+	
+	if($url_logo == "" && is_guid($options['INFOS']['USER']['ID_LOGO_SOCIETE'])){
+		$url_logo = clean_url(str_replace(array('#ID#','#EXT#'), array($options['INFOS']['USER']['ID_LOGO_SOCIETE'], $options['INFOS']['USER']['ID_LOGO_SOCIETE_EXT']), URL_IMG_AGENCY));
+	}
+	
+	if($url_logo == "" && is_guid($options['INFOS']['USER']['ID_LOGO_USER'])) {
+		$url_logo = clean_url(str_replace(array('#ID#','#EXT#'), array($options['INFOS']['USER']['ID_LOGO_USER'],$options['INFOS']['USER']['ID_LOGO_USER_EXT']), URL_IMG_USER));
+	}
+
+	if(($url_logo == "" || $options['IS_CORPORTATE']) && $options['INFOS']['USER']['ID_LOGO_DISTRIB'] != ""){
+		$url_logo = str_replace('#LOGO#', $options['INFOS']['USER']['ID_LOGO_DISTRIB'], URL_DIFFUSION_LOGOAGENT);
+	
+	}
+	if($options['INFOS']['USER']['URL_LOGO_SOCIETE'] != ""){ $url_logo = $options['INFOS']['USER']['URL_LOGO_SOCIETE'];}
+	$function = "create_stupeflix_xml_TEMPLATE_".$main_template;
+
+	if(function_exists($function)){
+		$options['TEMPLATE'] = $template;
+		$options['MAIN_TEMPLATE'] = $main_template;
+ 		$options['COUNTRY'] = $country;
+		$options['URL_LOGO'] = $url_logo;
+		$options['URL_PLAN'] = $url_plan;
+		$xml = $function($options);
+		if($old_country != ""){ $options['COUNTRY'] = $old_country;}
+	}	
+	return $xml;
+}
+
+?>

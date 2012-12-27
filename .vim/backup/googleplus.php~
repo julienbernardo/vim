@@ -1,0 +1,80 @@
+<?php
+
+function googleplus($scriptName, $workPath, $config, $debug = false){
+	$return= array('DONE' => 0, 'FAILED' => 0, 'TOTAL' => 0, 'WAITING' => 0, 'DELETED_DONE' => 0, 'DELETED' => 0);
+	global $_REQUEST;
+	$isTest = ($_REQUEST['test'] != "" || $_REQUEST['debug']!= "");
+	$logs_error = array('PUBLISH' => array(), 'DELETE' => array());
+	$export = new PrevisiteExport($config['DNS']);
+	$tours = $export->getPartnerTours($config['PARTNERS'], $config['OPT_DETAILS']);	
+	$nb_tours_found = count($tours);
+	if($nb_tours_found > 0){
+		for($i=0, $last_checkpoint = 0; $i < $nb_tours_found; $i++){
+			googleplus_checkPercent( $i, $nb_tours_found, $last_checkpoint, $scriptName);
+			if($tours[$i]['ID_STATUT_DIFFUSION'] >= 0) {
+				$action = "publish";
+				$replace = array(
+					'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#REF#', '#TITLE#', '#NEW#', '#NO_TTS#', '#REDIFFUSE#', '#MODE#'),
+					'replace' => array($tours[$i]['ID_PORTAIL'], $tours[$i]['ID_VISITE'], $tours[$i]['ID_UTILISATEUR'], $tours[$i]['DIFFUSIONS'][$tours[$i]['ID_PORTAIL']]['REF_PORTAIL'], '', '', '', '', 'export')
+				);
+
+				$url_base = str_replace( $replace['search'], array_map('urlencode', $replace['replace']), URL_PUBLISH);
+			}else{
+				$action = "unpublish";
+				$replace = array(
+					'search' => array('#TOUR#', '#USER#', '#PARTNER#', '#MODE#'),
+					'replace' => array($tours[$i]['ID_VISITE'], $tours[$i]['ID_UTILISATEUR'], $tours[$i]['ID_PORTAIL'], 'export'),
+				);
+				$url_base = str_replace($replace['search'], array_map('urlencode', $replace['replace']), URL_UNPUBLISH);				
+			}
+			//$url_base = str_replace('api.', 'dev.api.', $url_base);
+			if($isTest){
+				echo ucfirst($action)." : ".$url_base." <br />";
+				$json = array('status' => 'success');
+			}else{
+				$response = file_get_contents($url_base);
+				if($action == 'publish') $json = json_decode( $response, true);
+			}
+
+			if(($response == 'true' && $action=="unpublish") || (is_array($json) && $json['status'] == "success")){ 
+				$return[($action != "publish" ? "DELETED_" : "").'DONE']++;
+			}else{ 
+				import_log('['.strtoupper($action).'][FAILED] '.$tours[$i]['ID_VISITE'].' ('.$url_base.':'.$response.')', $scriptName);
+				if($action == "publish") $return['FAILED']++;
+				$logs_error[strtoupper($action)][$json['error']]++;
+			}
+			$return[($action != "publish" ? "DELETED" : "TOTAL")]++;
+			if($isTest) break;
+		}
+	}
+
+	if(count($logs_error) > 0){
+		$first = false;
+		foreach ($logs_error as $action => $errors) {
+			if(count($errors) > 0){
+				if(!$first){
+					import_log('---------------------------------', $scriptName);
+					import_log('----------[RECAP ERROR]----------', $scriptName);
+					$first = true;
+				}
+				import_log('-------['.$action.']-------', $scriptName);
+				foreach( $errors as $k => $v){
+					import_log($v.' errors like: "'.$k.'"', $scriptName);
+				}
+				import_log('---------------------------', $scriptName);
+			}
+		}
+		if($first)	import_log('---------------------------------', $scriptName);
+	}
+
+	return $return;
+}
+
+function googleplus_checkPercent( $pos, $total, &$last_checkpoint, $scriptName){
+	if($last_checkpoint+($total/5) < $pos){
+		import_log(round($pos/$total*100).'% done', $scriptName);
+		$last_checkpoint = $pos;
+	}
+}
+
+?>

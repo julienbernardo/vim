@@ -1,0 +1,182 @@
+<?php
+
+/* code includes */
+require_once('./include/fonctions.php');
+require_once('./include/fonction.db.php');
+require_once('./include/global.php');
+require_once('./include/fonction.stupeflix.php');
+require_once('DB.php');
+require_once('previsite/GetDsn.php');
+require_once('HTTP/Request.php');
+echo "oki";
+//http://dev.video.previsite.net/publication.php?id=261ACDF7-64AC-5450-A4D6-57F064F076C9&site=YOUTUBE&login=adresseachier&password=youtube-ass&type=FR&notification=http%3A%2F%2Fdev.api.previsite.com%2Fpublication%2Fnotification.php&distrib=F622B422-83BB-47DF-EF79-2359A7FD0F9A&mode=auto
+
+$id 			= $_REQUEST['id'];
+$list_site 		= explode(';',strtoupper($_REQUEST['site'])); 
+$login			= $_REQUEST['login'];
+$pwd			= $_REQUEST['password'];
+$type			= strtoupper($_REQUEST['type']);
+$type_reference = preg_replace('/_CORP$/i','',$type);
+$notification 	= $_REQUEST['notification'];
+$ref 			= $_REQUEST['ref'];
+$date			= $_REQUEST['date'];
+$title			= $_REQUEST['title'];
+$finish			= ($_REQUEST['todo'] == "finish");
+$types 			= array_keys($videos_options['TYPE']);
+$distrib		= $_REQUEST['distrib'];
+$mode			= $_REQUEST['mode'];
+$only_video		= (strtolower($_REQUEST['site']) == 'only_video');
+$new   			= ($_REQUEST['new'] == 'true');
+$wait_for_tts 	= !($_REQUEST['no_tts'] == 'true');
+$rediffuse 		= ($_REQUEST['rediffuse'] == 'true');
+$is_corp 		= ($type != $type_reference);
+
+$site_available = true;
+foreach($list_site as $v){
+	if(!in_array($v,$videos_options['DIFFUSION'])){ $site_available = false;}
+}
+
+$default_log = ($login == "");
+write_stupeflix_log("[PUBLICATION][".$id."/".$distrib."]: ".$type."(".$login."/".$pwd." mode:".$mode." / title:".$title."): ".$date."(".$notification.($only_video ? "ONLY_VIDEO" : "")." / ".($new ? "regenerate:true" : "")." / ".(!$wait_for_tts ? "no_tts:true" : "")." / ".($rediffuse ? "rediffuse:true" : "").") ".$_REQUEST['site']);
+
+$getDsn = new GetDsn();
+if(is_guid($id)){ $tourDsn = $getDsn->byTourID($id);}
+if(is_guid($distrib) && $tourDsn == ""){$tourDsn = $getDsn->byDistrib($distrib);}
+$db_data['pool'][$db_data['name']]['DSN'] = $tourDsn;
+
+$out = "false";
+
+if( $tourDsn != "" && is_guid($id) && in_array(strtoupper($type_reference),$types) && ($site_available || $only_video) && !($default_log && $mode=="auto" && !$only_video)){
+	$sql = "SELECT ID_VIDEO, ID_VISITE, ID_STATUT_VIDEO, TYPE_VIDEO, DATE_MODIFICATION_VIDEO, PROFIL_AVAILABLE, ID_DISTRIBUTEUR, ID_CRON, WAIT_TTS FROM VIDEO WHERE ID_VISITE='".$id."' AND TYPE_VIDEO='".$type."'";
+	$result = db_query($sql);
+	$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+	$generation = ($new || !is_guid($row['ID_VIDEO']) || $rediffuse );
+	if(is_guid($row['ID_VIDEO']) && $row['ID_STATUT_VIDEO'] != "1"){ 
+		$generation = true;
+		if($row['ID_STATUT_VIDEO'] == "2"){
+			$url = get_storage_path('del',$row['ID_VIDEO'], getProfilExt("youtube"));
+			$result = file_get_contents($url);
+			if($result != "true"){
+				write_stupeflix_log("[PUBLICATION][REPROCESS][".$id."/".$distrib."]: delete videos failed...(".$url.":".$result.")");
+			}
+			$tmp = explode(",", $row['PROFIL_AVAILABLE']);
+			$new_list = array();
+			foreach($tmp as $tmp_r){ 
+				if($tmp_r != "youtube"){ $new_list[] = $tmp_r;}
+			}
+			$row['PROFIL_AVAILABLE'] = implode(',',$new_list);
+			$sql = "UPDATE VIDEO SET PROFIL_AVAILABLE='".$row['PROFIL_AVAILABLE']."' WHERE ID_VIDEO='".$row['ID_VIDEO']."'";
+			db_query($sql);
+		}
+	}
+	if(strtoupper($row['TYPE_VIDEO']) != strtoupper($type)){ $generation = true;}
+	if($row['TYPE_VIDEO'] != "VIDEOTOUR" && $mode != "auto" && !$only_video){
+		if($date == ""){ $generation = true;}
+		if($date > $row['DATE_MODIFICATION_VIDEO'] && $row['ID_STATUT_VIDEO'] > 0){ $generation = true;}
+	}
+	if(preg_match('/(480p)/i',$row['PROFIL_AVAILABLE']) == 0) $generation = true;
+	if($generation){
+		if($row['ID_STATUT_VIDEO'] != "0" || strtoupper($row['TYPE_VIDEO']) != strtoupper($type) || $rediffuse){
+			write_stupeflix_log("[PUBLICATION][".$id."/".$distrib."]: NEED GENERATION");
+			if($mode == "auto"){
+				if(!is_guid($row['ID_VIDEO'])){ $row['ID_VIDEO'] = generate_guid();}
+				insert_video_infos_cron( $row['ID_VIDEO'], $ref, $type, $distrib, $id, $wait_for_tts);
+				$out = "true";
+			}else{
+				if(is_guid($row['ID_VIDEO']) && $row['ID_CRON'] > 0){
+					write_stupeflix_log("[PUBLICATION][OLD_CRON][".$id."/".$distrib."]");
+					$sql = "UPDATE VIDEO SET ID_CRON=0, WAIT_TTS=0, DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$row['ID_VIDEO']."'";
+					db_query($sql);
+				}
+				$replace = array(
+					'search' => array('#ID#', '#TYPE#', '#REF#', '#DISTRIB#', '#MODE#'),
+					'replace'=> array($id, $type, $ref, $distrib, urlencode($mode))
+				);
+				$url = str_replace($replace['search'], $replace['replace'], URL_GENERATION_VIDEO);
+				write_stupeflix_log("[PUBLICATION][URL:GENERATION] ".$url);
+				$out = file_get_contents($url);
+			}
+		}else{ 
+			insert_video_infos_cron( $row['ID_VIDEO'], $ref, $type, $distrib, $id, $wait_for_tts, true);
+			$out = "true";
+		}
+		
+		if(!$only_video){
+			if(!is_guid($row['ID_VIDEO'])){
+				$sql = "SELECT ID_VIDEO, ID_STATUT_VIDEO, TYPE_VIDEO, DATE_MODIFICATION_VIDEO, PROFIL_AVAILABLE, ID_DISTRIBUTEUR, ID_CRON, WAIT_TTS FROM VIDEO WHERE ID_VISITE='".$id."' AND TYPE_VIDEO='".$type."'";
+				$result = db_query($sql);
+				$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+			}
+			
+			foreach($list_site as $site){
+				write_stupeflix_log("[PUBLICATION][".$id."/".$distrib."]: DIFFUSION:".$site);
+				if($default_log){
+					$login 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['LOGIN'];
+					$pwd 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['PASSWORD'];								
+				}
+				$diffusion_exists = false;
+				$sql = "SELECT ID_VIDEO, ID_STATUT_DIFFUSION FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$row['ID_VIDEO']."' AND SITE_DIFFUSION='".fix_text($site)."' AND LOGIN_DIFFUSION='".fix_text($login)."'";
+//				$diffusion_exists = is_guid(db_getOne($sql));
+				$result = db_query($sql);
+				if($infos = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+					$diffusion_exists = is_guid($infos['ID_VIDEO']);
+					//$rediffuse = ($infos['ID_STATUT_DIFFUSION'] > 0);
+				}
+				$sql = "";
+				if($diffusion_exists){
+					$sql = "UPDATE VIDEO_DIFFUSION SET DATE_MODIFICATION_DIFFUSION=GETDATE(), ID_STATUT_DIFFUSION='".($rediffuse ? "3" : "0")."', URL_NOTIFICATION_DIFFUSION='".fix_text($notification)."', TITLE_DIFFUSION=N'".fix_text($title)."', auto='".($mode == "auto" ? "1" : "0")."' WHERE ID_VIDEO='".$row['ID_VIDEO']."' AND SITE_DIFFUSION='".fix_text($site)."' AND LOGIN_DIFFUSION='".fix_text($login)."' ";
+					write_stupeflix_log("[PUBLICATION][".$id."/".$distrib."]: DIFFUSION UPDATE (".$sql.")");
+				}else{
+					$sql = "INSERT INTO VIDEO_DIFFUSION(Id_video, Site_diffusion, Login_diffusion, Password_diffusion, Url_video_diffusion, Date_creation_diffusion, Date_modification_diffusion, result_code_diffusion, result_text_diffusion, result_description_diffusion, Id_statut_diffusion, url_notification_diffusion,  title_diffusion, auto) VALUES('".$row['ID_VIDEO']."', '".fix_text($site)."', '".fix_text($login)."', '".fix_text($pwd)."', '', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '0', '', '', '0', '".fix_text($notification)."', N'".fix_text($title)."', '".($mode == "auto" ? "1" : "0")."')";
+					write_stupeflix_log("[PUBLICATION][".$id."/".$distrib."]: DIFFUSION INSERT (".$sql.")");
+				}
+				db_query($sql);
+			}
+		}else{ write_stupeflix_log("[PUBLICATION][".$id."/".$distrib."]: ONLY VIDEO");}
+	}else{
+
+		write_stupeflix_log("[PUBLICATION][".$id."/".$distrib."]: GENERATION ALREADY DONE)");
+		foreach($list_site as $site){
+			if($default_log){
+				$login 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['LOGIN'];
+				$pwd 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['PASSWORD'];
+			}
+			
+//			$sql = "SELECT ID_STATUT_DIFFUSION_VIDEO FROM DIFFUSION_VIDEO WHERE ID_VIDEO='".$id."' AND SITE='".fix_text($site)."' AND LOGIN='".fix_text($login)."'";
+//			if(db_getOne($sql) != "1"){
+				$replace = array(
+					'search' => array('#ID#', '#TOUR#', '#TYPE#', '#SITE#', '#NOTIFICATION#', '#TITLE#', '#LOGIN#', '#PASSWORD#', '#MODE#','#DISTRIB#'),
+					'replace'=> array( urlencode($row['ID_VIDEO']), urlencode($id), urlencode($type), urlencode($site), urlencode($notification), urlencode($title), urlencode($login), urlencode($pwd), urlencode($mode), $row['ID_DISTRIBUTEUR'])
+				);
+				
+				$url = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_VIDEO);
+				
+//				die(htmlspecialchars($url));
+
+				write_stupeflix_log("[PUBLICATION][DEBUG] diffusion: ".$url);		
+				$out = file_get_contents($url);
+//			}else{
+//				$out = "true";
+//			}
+		}
+	}
+}else if($finish){
+	$sql = "SELECT VIDEO_DIFFUSION.ID_VIDEO, SITE_DIFFUSION, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, TITLE_DIFFUSION, TYPE_VIDEO, ID_DISTRIBUTEUR FROM VIDEO_DIFFUSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO WHERE ID_STATUT_DIFFUSION='0' ".(is_guid($id) ? "AND VIDEO_DIFFUSION.ID_VIDEO='".$id."'" : "");
+	$result = db_query($sql,"video");
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+		$replace = array(
+			'search' => array('#ID#', '#TOUR#', '#SITE#', '#TYPE#', '#REF#', '#NOTIFICATION#', '#LOGIN#', '#PASSWORD#', '#TITLE#', '#MODE#', '#DISTRIB#'),
+			'replace'=> array(urlencode($row['ID_VIDEO']), urlencode($id), urlencode($row['SITE']), urlencode($row['TYPE_VIDEO']), '', '', urlencode($row['LOGIN']), urlencode($row['PASSWORD']), urlencode($row['TITLE_DIFFUSION']), urlencode($mode), $row['ID_DISTRIBUTEUR'])
+		);
+		$url = str_replace( $replace['search'], $replace['replace'], URL_DIFFUSION_VIDEO);
+		
+		write_stupeflix_log("[FINISH PUBLICATION][".$row['ID_VIDEO']."]: diffusion: ".$url);
+		$cmd = str_replace('#URL#',$url, CMD_LAUNCH_URL);
+		exec($cmd);
+	}
+	$out = "true";
+}
+
+echo $out;
+exit
+?>

@@ -1,0 +1,8 @@
+<?php
+function video_us($scriptName, $workPath, $config, $debug = false){
+	if(!function_exists('video')){
+		require_once(PATH_EXPORT.'video.php');
+	}
+	video($scriptName, $workPath, $config, $debug);
+}
+?>

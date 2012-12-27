@@ -1,0 +1,362 @@
+<?php
+
+require_once 'previsite/Pinterest.php';
+
+function pinterest($scriptName, $workPath, $config, $debug = false){
+	$return= array('DONE' => 0, 'FAILED' => 0, 'TOTAL' => 0, 'WAITING' => 0, 'WAITING_DONE' => 0, 'DELETED' => 0, 'DELETED_DONE' => 0);
+	global $_REQUEST;
+	$logs_error = array();
+	//permet de debugguer le script
+	//++ de message d'erreur
+	//et s'arrête à la première erreur de diffusion sur pinterest rencontré. En affichant la dernière requête html
+	$mode_debug = ($_REQUEST['test'] != "");
+	$action = $_REQUEST['action'];
+	$debug_id = $_REQUEST['id'];
+	$debug_id_type = ($_REQUEST['id_type'] == "user" ? "user" : "tour");
+	$debug_pinterest = $debug || $mode_debug;
+	//permet de mettre à jour les diffusions prudential déjà diffusées (url, text, lien)
+	//ATTENTION ne sera actif que si il est à 'true' et step_publish à false
+	$step_edit = false || ($mode_debug && $action == "edit");
+	//différente étapes du script
+	$step_publish = (!$mode_debug || ($mode_debug && $action == "publish")) && true;
+	$step_unpublish = (!$mode_debug || ($mode_debug && $action == "unpublish")) && true;
+	$step_publish_on_youtube = (!$mode_debug || ($mode_debug && $action == "publish_youtube")) && true;
+	//options d'aide au debugage START
+	//	$debug_pinterest = true;
+	if($mode_debug && $debug_id != 'no_id'){
+		$config['OPT_DETAILS']['ID_'.($debug_id_type == 'user' ? 'UTILISATEURS' : 'VISITES')] = array(is_guid($debug_id) ? $debug_id : '261ACDF7-64AC-5450-A4D6-57F064F076C9');
+	}
+	
+	//options d'aide au debugage END
+	// les différentes liaisons entre partenaires.
+	$partners_link = array(
+		'Pinterest' => array( 'partner' => ID_PINTEREST, 'need' => ID_YOUTUBE, 'cover' => false),
+		'Pinterest Corporate' => array( 'partner' =>	ID_PINTEREST_CORP, 'need' => ID_YOUTUBECORP, 'cover' => false),
+		'Pinterest Image' => array( 'partner' =>	ID_PINTEREST_IMAGE, 'need'=> '', 'cover' => true)
+	);	
+	foreach($partners_link as $partner_name => $partner_link){
+		$partner = $partner_link['partner'];
+		$need_diffusion = $partner_link['need'];
+		$need_cover = $partner_link['cover'];
+		import_log('----- [START] '.($partner_name), $scriptName);
+		$tours_done = array();
+		if($step_publish || $step_edit){
+			$export = new PrevisiteExport($config['DNS']);
+			if(is_guid($need_diffusion)){
+				$config['OPT_DETAILS']['NEED_DIFFUSION'] = $need_diffusion;
+			}else{
+				unset($config['OPT_DETAILS']['NEED_DIFFUSION']);
+			}
+			$config['OPT_DETAILS']['PARTNER_PLAYLIST'] = 1;
+			$config['OPT_DETAILS']['STATUT_DIFFUSION'] = ($step_publish ? array(0,2) : array(1));
+
+			$tours = $export->getPartnerTours(array($partner), $config['OPT_DETAILS']);	
+			$tours = pinterest_sortByLogin($tours);
+			$last_access = array('login' => '', 'password' => '');
+			$blocked_account = array();
+			$nb_tours_found = count($tours);
+			if($nb_tours_found > 0){
+				import_log('--[STEP] '.($step_publish? 'Publish' : 'Edit').' START--', $scriptName);
+				import_log($nb_tours_found.' tours found', $scriptName);
+				for($i=0, $last_checkpoint = 0; $i < $nb_tours_found; $i++){
+					pinterest_checkPercent( $i, $nb_tours_found, $last_checkpoint, $scriptName);
+					$msg_error = "script not finish";
+					$pinId = $tours[$i]['DIFFUSIONS'][$partner]['REF_PORTAIL'];
+					$didIt = false;
+					if($tours[$i]['REF_DIFFUSION_STATUT'] == 1 || (!is_guid($need_diffusion) && $need_cover)){
+						$tours_done[] = $tours[$i]['ID_VISITE'];
+						$prefixe_portail = $tours[$i]['DIFFUSIONS'][$partner]['PREFIXE_PORTAIL'];
+						$password_portail = $tours[$i]['DIFFUSIONS'][$partner]['PASSWORD_PORTAIL'];
+						$infos = "";
+						if($prefixe_portail == "" || $password_portail == ""){
+							$infos = "Missing login or password";
+						}else{
+							$tours[$i]['URL_EXPORT_LISTING'] = $export->buildCustomURL($tours[$i], $partner);
+							$infos = pinterest_getDiffusionInfos($tours[$i], $partner, $need_cover);
+						}
+
+						if(is_array($infos)){
+							if(in_array( $prefixe_portail, $blocked_account)){
+								$return['WAITING']++;
+								$return['WAITING_DONE']++;
+								continue;
+							}else if($last_access['login'] == "" || ($last_access['login'] != $prefixe_portail && $last_access['password'] != $password_portail)){
+								$pinterest = new Pinterest( $prefixe_portail, $password_portail, $debug_pinterest);
+								$last_access = array('login' => $prefixe_portail, 'password' => $password_portail);
+							}
+							if($step_publish){
+								$result = $pinterest->pinIt($infos['url'], $infos['description'], $infos['boards'], $infos['cover'], $infos['price']);
+							}else{
+								if($pinId != "" && !is_guid($pinId)){
+									$result = $pinterest->pinEdit($pinId, $infos['url'], $infos['description'], $infos['boards'], $infos['price']);	
+								}else{ 
+									import_log('[EDIT][FAILED] '.$tours[$i]['ID_VISITE'].' pinId not found: ', $scriptName);
+									$return['FAILED']++;
+									$return['TOTAL']++;
+									continue;
+								}
+							}
+							if($result){
+								$pinId = $pinterest->getId();
+								$didIt = true;
+							}else{ 
+								$msg_error = $pinterest->getError();
+								$logs_error[$msg_error]++;
+							}
+						}else{ 
+							$msg_error = $infos;
+							if($msg_error == "Url Video in error" && $tours[$i]['REF_DIFFUSION_STATUT'] > 0){
+								pinterest_update_diff($tours[$i]['ID_VISITE'], $tours[$i]['ID_SHORT_DIFFUSION'], $tours[$i]['REF_DIFFUSION'], '2', 'Pinterest:'.$msg_error, $debug_pinterest);
+							}
+							$logs_error[$msg_error]++;
+						}
+						if($need_cover && $infos['cover'] != ""){
+							$url_cover_delete = str_replace('get', 'del', $infos['cover']);
+							$result = file_get_contents( $url_cover_delete);
+							if($result != "true"){
+								import_log('[INFOS] '.$tours[$i]['ID_VISITE'].': DELETE COVER FAILED ('.$url_cover_delete.':'.$result.')', $scriptName);
+							}
+						}
+						if($didIt){
+							$msg_error = "OK";
+							$return['DONE']++;
+							$status = 1;
+							if($debug_pinterest){
+								import_log('['.($step_publish ? 'PUBLISH' : 'EDIT').'][DONE] '.$tours[$i]['ID_VISITE'], $scriptName);
+							}
+						}else{
+							$status = 2;
+							echo $msg_error;
+							print_r($tours[$i]);
+							$return['FAILED']++;
+							import_log('['.($step_publish ? 'PUBLISH' : 'EDIT').'][FAILED] '.$tours[$i]['ID_VISITE'].': '.$msg_error, $scriptName);
+							if($msg_error == "Login failed - Wrong login/password"){
+								$blocked_account[] = $last_access['login'];
+								import_log('['.($step_publish ? 'PUBLISH' : 'EDIT').'][FAILED] Blocked account: '.$last_access['login'].'/'.$last_access['password'].': '.$msg_error, $scriptName);
+							}
+						}
+						$return['TOTAL']++;
+						pinterest_update_diff($tours[$i]['ID_VISITE'], $tours[$i]['ID_SHORT'], $pinId, ($step_publish ? $status : $tours[$i]['ID_STATUT_DIFFUSION']), $msg_error, $debug_pinterest);
+					}else{
+						import_log('['.($step_publish ? 'PUBLISH' : 'EDIT').'][FAILED] '.$tours[$i]['ID_VISITE'].' Missing youtube video', $scriptName);
+					}
+				}
+				import_log($return['DONE'].'/'.$return['TOTAL'].' '.($step_publish ? 'Publish' : 'Edit').' done on '.$partner_name, $scriptName);
+				import_log('--[STEP] '.($step_publish? 'Publish' : 'Edit').' END--', $scriptName);
+			}
+		}
+
+		///////////////////////////////////////
+		//	Tour not diffuse missing video	 //
+		///////////////////////////////////////
+		if($step_publish_on_youtube && is_guid($need_diffusion)){
+			$to_unset = array('NEED_DIFFUSION', 'PARTNER_PLAYLIST');
+			foreach($to_unset as $unset){
+				unset($config['OPT_DETAILS'][$unset]);
+			}
+			$config['OPT_DETAILS']['STATUT_DIFFUSION'] = array(0,2);
+			$export = new PrevisiteExport($config['DNS']);
+			$tours = $export->getPartnerTours(array($partner), $config['OPT_DETAILS']);
+			$blocked_account = array();
+			$nb_tours_found = count($tours);
+			if($nb_tours_found > 0){
+				import_log('--[STEP] Publish on youtube '.($need_diffusion == ID_YOUTUBECORP ? 'Corporate' : '').' START--', $scriptName);
+				import_log($nb_tours_found.' tours found', $scriptName);
+				for($i=0, $last_checkpoint = 0; $i < $nb_tours_found; $i++){
+					pinterest_checkPercent( $i, $nb_tours_found, $last_checkpoint, $scriptName);
+					if( !in_array($tours[$i]['ID_VISITE'], $tours_done)){
+						$replace = array(
+							'search' => array( '#TOUR#', '#USER#', '#REF#', '#TITLE#', '#PARTNER#', '#MODE#', '#NEW#', '#NO_TTS#', '#REDIFFUSE#'),
+							'replace' => array( $tours[$i]['ID_VISITE'], $tours[$i]['ID_UTILISATEUR'], $tours[$i]['ID_VISITE'], '', $need_diffusion, 'auto', '', '', ''),
+						);
+						$url_diffusion = str_replace($replace['search'], $replace['replace'], URL_PUBLISH)."&liaison=".urlencode($tours[$i]['ID_DIFFUSION_PORTAIL']);
+						$data = @file_get_contents($url_diffusion);
+						if($debug_pinterest){ import_log('[DEBUG] '.$tours[$i]['ID_VISITE'].': ('.$url_diffusion.':'.$data.')', $scriptName);}
+						if($data == "true"){
+							$return['WAITING_DONE']++;
+							pinterest_update_diff( $tours[$i]['ID_VISITE'], $tours[$i]['ID_SHORT'], $tours[$i]['ID_VISITE'], 2, '', $debug_pinterest);
+						}
+						$return['WAITING']++;
+					}
+				}
+				import_log($return['WAITING_DONE'].'/'.$return['WAITING'].' diffusions done on YOUTUBE'.(ID_YOUTUBECORP == $need_diffusion ? ' Corporate' : ''), $scriptName);
+				import_log('--[STEP] Publish on youtube '.($need_diffusion == ID_YOUTUBECORP ? 'Corporate' : '').' END--', $scriptName);
+			}
+		}
+		////////////////////////////
+		//	Tour ready to delete //
+		///////////////////////////
+		if($step_unpublish){
+			$to_unset = array('NEED_DIFFUSION', 'PARTNER_PLAYLIST');
+			foreach($to_unset as $unset){
+				unset($config['OPT_DETAILS'][$unset]);
+			}
+			$config['OPT_DETAILS']['STATUT_DIFFUSION'] = array(-2, -3);
+			if($mode_debug) $config['OPT_DETAILS']['STATUT_DIFFUSION'][] = 1;
+			$last_access = array('login' => '', 'password' => '');
+			$blocked_account = array();
+			$export = new PrevisiteExport($config['DNS']);
+			$tours = $export->getPartnerTours(array($partner), $config['OPT_DETAILS']);	
+			$tours = pinterest_sortByLogin($tours);
+			$nb_tours_found = count($tours);
+			if($nb_tours_found > 0){
+				import_log('--[STEP] Unpublish START--', $scriptName);
+				import_log($nb_tours_found.' tours found', $scriptName);
+				for($i=0, $last_checkpoint = 0; $i < $nb_tours_found; $i++){
+					pinterest_checkPercent( $i, $nb_tours_found, $last_checkpoint, $scriptName);
+					$msg_error = "script not finish";
+					$didIt = false;
+					if(!is_guid($tours[$i]['REF_PORTAIL'])){
+						if(in_array( $tours[$i]['PREFIXE_PORTAIL'], $blocked_account)){
+							$return['DELETED']++;
+							continue;
+						}else if($last_access['login'] != $tours[$i]['PREFIXE_PORTAIL'] && $last_access['password'] != $tours[$i]['PASSWORD_PORTAIL']){
+							$pinterest = new Pinterest( $tours[$i]['PREFIXE_PORTAIL'], $tours[$i]['PASSWORD_PORTAIL'], $debug_pinterest);
+							$last_access = array('login' => $tours[$i]['PREFIXE_PORTAIL'], 'password' => $tours[$i]['PASSWORD_PORTAIL']);
+						}
+						$didIt = ($pinterest->delete($tours[$i]['REF_PORTAIL']));
+						$msg_error = $pinterest->getError();
+					}else{
+						$didIt = true;
+					}
+					if($didIt){
+						$status = -1;
+						$return['DELETED_DONE']++;
+					}else{
+						$status = -3;
+						import_log('[DELETE][FAILED] '.$tours[$i]['ID_VISITE'].': '.$msg_error, $scriptName);
+						if($msg_error == "Login failed - Wrong login/password"){
+							$blocked_account[] = $last_access['login'];
+							import_log('[DELETE][FAILED] Blocked account: '.$last_access['login'].'/'.$last_access['password'].': '.$msg_error, $scriptName);
+						}
+					}
+					$return['DELETED']++;
+					pinterest_update_diff($tours[$i]['ID_VISITE'], $tours[$i]['ID_SHORT'], $tours[$i]['REF_PORTAIL'], $status, $msg_error, $debug_pinterest);
+				}
+				import_log($return['DELETED_DONE'].'/'.$return['DELETED'].' diffusions deleted on pinterest and pinterest', $scriptName);
+				import_log('--[STEP] Unpublish END--', $scriptName);
+			}
+		}
+		import_log('----- [END] '.($partner_name), $scriptName);
+	}
+	if(count($logs_error) > 0){
+		import_log('---------------------------------', $scriptName);
+		import_log('----------[RECAP ERROR]----------', $scriptName);
+		foreach ($logs_error as $k => $v) {
+			import_log($v.' errors like: "'.$k.'"', $scriptName);
+		}
+		import_log('---------------------------------', $scriptName);
+	}
+	//if(count($return) > 0){
+		//import_log('--------------------------------', $scriptName);
+		//import_log('------------RESUME--------------', $scriptName);
+		//foreach ($return as $k => $v) {
+			//import_log($k.': '.$v, $scriptName);
+		//}
+		//import_log('--------------------------------', $scriptName);
+	//}
+	return $return;
+}
+
+function pinterest_checkPercent( $pos, $total, &$last_checkpoint, $scriptName){
+	if($last_checkpoint+($total/5) < $pos){
+		import_log(round($pos/$total*100).'% done', $scriptName);
+		$last_checkpoint = $pos;
+	}
+}
+
+function pinterest_sortByLogin($tours){
+	$sort = array();
+	for($i =0; $i < count($tours); $i++){
+		$sort[] = $tours[$i]['PREFIXE_PORTAIL'].'/'.$tours[$i]['PASSWORD_PORTAIL'];
+	}
+	array_multisort($sort, SORT_ASC, $tours);
+	return $tours;
+}
+
+function pinterest_getDiffusionInfos($tour, $partner, $need_cover = false){
+	//description
+	$description .= $tour['TEXTES'][$tour['ID_LANGUE']]['DESCRIPTION'];
+	if($description == ""){ 
+		$description = $tour['TEXTES'][$tour['ID_LANGUE']]['NOM_VISITE'];
+	}
+	//url
+	if($tour['REF_DIFFUSION']!= "" && !is_guid($tour['REF_DIFFUSION'])){
+		$url = "http://www.youtube.com/watch?v=".$tour['REF_DIFFUSION'];
+	}
+	//boards
+	$boards = array();
+	if(count($tour['DIFFUSIONS'][$partner]['PLAYLIST']) > 0){
+		foreach($tour['DIFFUSIONS'][$partner]['PLAYLIST'] as $playlist){
+			$filtre = json_decode($playlist['FILTRE_PLAYLIST'], true);
+			$in_playlist = true;
+			if(is_array($filtre) && count($filtre) > 0){
+				foreach($filtre as $field=>$value){
+					if(is_array($value)){
+						if(!in_array( $tour[$field], $value)){
+							$in_playlist = false;
+							break;
+						}
+					}else if(preg_match('/^([^#]+)#(MIN|MAX)$/i', $field, $operator) > 0){
+						if($operator[2] == "MAX" && $tour[$operator[1]] > $value){
+							$in_playlist = false;
+							break;
+						}else if($operator[2] == "MIN" && $tour[$operator[1]] < $value){
+							$in_playlist = false;
+							break;
+						}
+					}else if($tour[$field] != $value){ 
+						$in_playlist = false; 
+						break;
+					}
+				}
+			}
+			if($in_playlist){ 
+				$boards[] = $playlist['NOM_PLAYLIST'];
+			}
+		}
+	}
+	//print_r($boards);
+	if($need_cover){
+		$url_cover = str_replace(array('#TODO#', '#TOUR#'),  array('get', $tour['ID_VISITE']), URL_PINTEREST_COVER);
+		$url_cover_create = str_replace('get', 'create', $url_cover);
+		$result = file_get_contents( $url_cover_create);
+		if($result != "true"){
+			return "Cover creation failed (".$url_cover_create.":".$result.")"; 
+		}
+		$url = $tour['URL_ANNONCE'];
+		if($url == ""){
+			$url = str_replace('#TOUR#', $tour['ID_VISITE'], URL_TOUR);
+		}
+	}
+
+	if(count($tour['DIFFUSIONS'][$partner]['OPTIONS_DIFFUSION']) > 0 && $tour['DIFFUSIONS'][$partner]['OPTIONS_DIFFUSION']['PRICE_USD'] != ""){
+		$price = "$".$tour['DIFFUSIONS'][$partner]['OPTIONS_DIFFUSION']['PRICE_USD'];
+	}
+
+	if($description == ""){
+		return "Missing description";
+	}
+
+	if($url != ""){	
+		$headers = get_headers($url);
+		if(preg_match('/404/i', $headers[0]) > 0){ 
+			return "Url Video in error";
+		}
+	}else{
+		return "Missing Url Video";
+	}
+	return array('url' => $url, 'description' => $description, 'boards' => $boards, 'cover' => $url_cover, 'price' => $price);
+}
+
+function pinterest_update_diff($tourId, $diffId, $pinId, $status, $msg_error, $debug){
+	$replace = array(
+		'search' => array('#ID#', '#REF#', '#STATUS#', '#MSG#', '#URL#', '#EXPIRATION#'),
+		'replace' => array(urlencode($diffId), urlencode($pinId), urlencode($status), urlencode($msg_error), '', '')
+	);
+	$url_update_diffusion = str_replace($replace['search'], $replace['replace'], WS_URL_UPDATE_DIFFUSION);
+	$response = file_get_contents($url_update_diffusion);
+	if($debug){ import_log('[DEBUG] '.$tourId.': ('.$url_update_diffusion.':'.$response.')', $scriptName);}
+}
+
+?>

@@ -1,0 +1,302 @@
+<?php
+//function gateway_debug2($script_name, $users, $workPath, $archive_path, $archive_file, $prefixe_archive, $partial_import){
+function gateway_debug2($script_name, $users, $workPath, $archive_path, $archive_file, $prefixe_archive, $date_last_exec){
+	//log lancement gateway ici: /mnt/ftp/_log/gateway_gateway_debug.log
+	global $db_data;
+	global $import;
+	print_r($import['USERS']);exit;
+	//echo "oki";
+	//die("test");	
+//	return array();
+//	global $import;print_r($import);exit;
+//	print_r($users);exit;
+	$user_data = array(
+		array(
+			'USERCODE' => "user007",
+			'NOM_UTILISATEUR' => "toon toon",
+			'PRENOM_UTILISATEUR' => "vartoon",
+			'NOM_SCRIPT_COMPLEMENT' => "user007",
+			'TELEPHONE_UTILISATEUR' => "téléphone utilisateur",
+			'BIO_UTILISATEUR' => "bio utilisateur",
+			'QUALITE_UTILISATEUR' => "qualite utilisateur",
+			'NUMERO_LISCENCE' => "numero license",
+			'MOBILE_UTILISATEUR' => "0698754123",
+			'EMAIL_UTILISATEUR' => "julien1@mail.com",
+			'NOM_SOCIETE' => "Previsite",
+			'SITEWEB_SOCIETE' => "www.previsite.fr",
+			'ADRESSE' => "12 rue henri",
+			'VILLE' => "suresne",
+			'CODE_POSTAL' => "92150",
+			'ETAT' => "",
+			'ID_PAYS' => "US",
+			'FAX' => "0123456789",
+			'TELEPHONE' => "0123456798",
+			'LOGIN' => "jbernardo_gateway_debug",
+			'PASSWORD' => "julien",
+			'EMAIL_SOCIETE' => "mail@mail.com",
+	//		'URL_LOGO' => array('REQUIRE' => 'MD5_LOGO'),
+	//		'MD5_LOGO' => false,
+	//		'URL_LOGO_USER' => array('REQUIRE' => 'MD5_LOGO_USER'),
+	//		'MD5_LOGO_USER' => false,
+			'URL_LOGO_VIDEO' => 'http://images3.wikia.nocookie.net/__cb20071014153440/desencyclopedie/images/thumb/c/cd/Jollyfishth.jpg/180px-Jollyfishth.jpg',
+			'MD5_LOGO_VIDEO' => md5('http://images3.wikia.nocookie.net/__cb20071014153440/desencyclopedie/images/thumb/c/cd/Jollyfishth.jpg/180px-Jollyfishth.jpg'),
+			'PROFIL_VIDEO' => "FR_CUSTOM",
+			'DIFFUSIONS' => array( '59C4948B-DB6D-FDAF-E15D-CD67B8347126' => array('LOGIN'=>'adressachier', 'PASSWORD'=>'gmail-ass', 'DSN_IMAP'=> 'imap://email:password@domain.com', 'REDIFFUSE'=>true, 'LIMITE' => "essai")),
+//			'OPTIONS' => array('DISABLED'=> false),
+	//		'COMPLEMENTS' => array('FIELD'=>true, 'VALUE'=>false),
+		),
+		array(
+			'USERCODE' => "bibi1",
+			'NOM_UTILISATEUR' => "nom utilisateur",
+			'PRENOM_UTILISATEUR' => "prénom utilisateur",
+			'NOM_SCRIPT_COMPLEMENT' => "bibi1",
+			'TELEPHONE_UTILISATEUR' => "téléphone utilisateur",
+			'BIO_UTILISATEUR' => "bio utilisateur",
+			'QUALITE_UTILISATEUR' => "qualite utilisateur",
+			'NUMERO_LISCENCE' => "numero license",
+			'MOBILE_UTILISATEUR' => "0698754123",
+			'EMAIL_UTILISATEUR' => "julien1@mail.com",
+			'NOM_SOCIETE' => "Previsite",
+			'SITEWEB_SOCIETE' => "www.previsite.fr",
+			'ADRESSE' => "12 rue henri",
+			'VILLE' => "suresne",
+			'CODE_POSTAL' => "92150",
+			'ETAT' => "",
+			'ID_PAYS' => "US",
+			'FAX' => "0123456789",
+			'TELEPHONE' => "0123456798",
+			'LOGIN' => "jbernardo_gateway_debug",
+			'PASSWORD' => "julien",
+			'EMAIL_SOCIETE' => "jmail@mail.com",
+	//		'URL_LOGO' => array('REQUIRE' => 'MD5_LOGO'),
+	//		'MD5_LOGO' => false,
+	//		'URL_LOGO_USER' => array('REQUIRE' => 'MD5_LOGO_USER'),
+	//		'MD5_LOGO_USER' => false,
+			'URL_LOGO_VIDEO' => 'http://images3.wikia.nocookie.net/__cb20071014153440/desencyclopedie/images/thumb/c/cd/Jollyfishth.jpg/180px-Jollyfishth.jpg',
+			'MD5_LOGO_VIDEO' => md5('http://images3.wikia.nocookie.net/__cb20071014153440/desencyclopedie/images/thumb/c/cd/Jollyfishth.jpg/180px-Jollyfishth.jpg'),
+			'PROFIL_VIDEO' => "FR_CUSTOM",
+			'DIFFUSIONS' => array( '59C4948B-DB6D-FDAF-E15D-CD67B8347126' => array('LOGIN'=>'adressachier', 'PASSWORD_PORTAIL'=>'gmail-ass', 'DSN_IMAP'=> 'imap://email:password@domain.com', 'REDIFFUSE'=>true, 'LIMITE' => "essai")),
+//			'OPTIONS' => array('DISABLED'=> false),
+	//		'COMPLEMENTS' => array('FIELD'=>true, 'VALUE'=>false),
+		),		
+		array(
+			'USERCODE' => "bibi",
+			'NOM_UTILISATEUR' => "nom utilisateur",
+			'PRENOM_UTILISATEUR' => "prenom utilisateur",
+			'NOM_SCRIPT_COMPLEMENT' => "bibi",
+			'TELEPHONE_UTILISATEUR' => "0123456789",
+			'BIO_UTILISATEUR' => "bio utilisateur",
+			'QUALITE_UTILISATEUR' => "qualite utilisateur",
+			'NUMERO_LISCENCE' => "numero license",
+			'MOBILE_UTILISATEUR' => "0698754123",
+			'EMAIL_UTILISATEUR' => "julien@mail.com",
+			'NOM_SOCIETE' => "Previsite",
+			'SITEWEB_SOCIETE' => "www.previsite.fr",
+			'ADRESSE' => "12 rue henri",
+			'VILLE' => "suresne",
+			'CODE_POSTAL' => "92150",
+			'ETAT' => "",
+			'ID_PAYS' => "FR",
+			'ID_LANGUE' => "FR",
+			'FAX' => "0123456789",
+			'TELEPHONE' => "0123456798",
+			'LOGIN' => "jbernardofr",
+			'PASSWORD' => "julien",
+			'EMAIL_SOCIETE' => "frmail@mail.com",
+	//		'URL_LOGO' => array('REQUIRE' => 'MD5_LOGO'),
+	//		'MD5_LOGO' => false,
+	//		'URL_LOGO_USER' => array('REQUIRE' => 'MD5_LOGO_USER'),
+	//		'MD5_LOGO_USER' => false,
+			'PROFIL_VIDEO' => "FR_CUSTOM",
+			'DIFFUSIONS' => array( '59C4948B-DB6D-FDAF-E15D-CD67B8347126' => array('LOGIN'=>'adressachier', 'PASSWORD'=>'gmail-ass', 'REDIFFUSE'=>false/*, 'DSN_IMAP' => 'imap://email:password@domain.com'*/)),
+	//		'OPTIONS' => array('DISABLED'=> false),
+	//		'COMPLEMENTS' => array('FIELD'=>true, 'VALUE'=>false),
+		)
+	);
+	
+	$tours =array(
+		array('USERCODE' => "bibi", 'DESCRIPTION' => 'ma desc1 encore 22modifiee', 'DESCRIPTION_VIDEO' => 'ma desc1 encore 22modifiee', 'REF_PORTAIL' => "bibi1.35", 'ID_PAYS' => "FR", 'ID_TYPE_BIEN' => "1", 'ID_TYPE_TRANSACTION' => "1", 'ID_LANGUE' => "EN", 'NOM_VISITE' => 'דירות למכירה בחדרה',
+			"DIFFUSIONS" => array(ID_YOUTUBE => array('TITLE' => 'דירות למכירה בחדרה') ),
+		),
+		array('USERCODE' => "bib32171", 'DESCRIPTION' => 'ma desc2', 'REF_PORTAIL' => "bibi1.45", 'ID_PAYS' => "FR", 'ID_TYPE_BIEN' => "1", 'ID_TYPE_TRANSACTION' => "1", 'ID_LANGUE' => "FR", 'ID_EXCLUSIVITE' => 1, 'REF_DEVISE' => 'THB',
+			'DIFFUSIONS'=> array( ID_FACEBOOK =>array('ONLINE' => true)),
+			'COMPLEMENTS' => array(array('FIELD'=>'tour_logo', 'VALUE'=>'test.jpg')),
+		),
+		array('USERCODE' => "bibi1", 'DESCRIPTION' => 'ma desc3', 'REF_PORTAIL' => "bibi1.452", 'ID_PAYS' => "FR", 'ID_TYPE_BIEN' => "1", 'ID_TYPE_TRANSACTION' => "1", 'ID_LANGUE' => "FR", 'ID_EXCLUSIVITE' => 1, 'REF_DEVISE' => 'THB',
+			'DIFFUSIONS'=> array( ID_FACEBOOK=> array('ONLINE' => false))
+		)
+//		array('USERCODE' => "bibi", 'REF_PORTAIL' => "bibi.2", 'ID_PAYS' => "FR", 'ID_TYPE_BIEN' => "1", 'ID_TYPE_TRANSACTION' => "1", 'ID_LANGUE' => "FR"),
+/*		array(
+			'USERCODE' => "bibi1",
+			'REF_PORTAIL' => "bibi31",
+			'ID_PAYS' => "FR",
+			'ID_TYPE_BIEN' => "1",
+			'ID_TYPE_TRANSACTION' => "1",
+			'ID_LANGUE' => "FR",
+			'NOM_VISITE' => "ceci est un test d'essai",//fixe_nom_visite("vente", 'Maison', "paris", "75001", "10", "3"),
+			'DESCRIPTION' => fixe_nom_visite("vente", 'Maison', "paris", "75001", "10", "3"),
+	//		'ADRESSE' => false,
+	//		'ANNEE_CONSTRUCTION' => false,
+	//		'CHARGES' => false,
+	//		'CODE_POSTAL' => false,
+	//		'DATE_DISPONIBILITE' => false,
+	//		'DESCRIPTION' => false,
+	//		'EQUIPEMENTS' => false,
+	//		'FRAIS_AGENCE' => false,
+	//		'ID_AMENAGEMENT_HANDICAP' => false,
+	//		'ID_ASCENSEUR' => false,
+	//		'ID_BIEN_AMENAGE' => false,
+	//		'ID_CAVE' => false,
+	//		'ID_CLIMATISATION' => false,
+	//		'ID_DIGICODE' => false,
+	//		'ID_EXCLUSIVITE' => false,
+	//		'ID_GARDIEN' => false,
+	//		'ID_IMMEUBLE_RECENT' => false,
+	//		'ID_NEUF' => false,
+	//		'ID_INTERNET_HAUT_DEBIT' => false,
+	//		'ID_INTERPHONE' => false,
+	//		'ID_PERIODICITE_LOYER' => false,
+	//		'ID_PISCINE' => false,
+	//		'ID_REFAIT_NEUF' => false,
+	//		'ID_STATUT_LISTING' => false,
+	//		'ID_TRAVAUX' => false,
+	//		'ID_TYPE_CHAUFFAGE' => false,
+	//		'ID_TYPE_CUISINE' => false,
+	//		'ID_UNITE_SURFACE_HABITABLE' => false,
+	//		'ID_UNITE_SURFACE_TERRAIN' => false,
+	//		'LATITUDE' => false,
+	//		'LONGITUDE' => false,
+	//		'MONTANT_TRAVAUX' => false,
+	//		'NOM_VISITE' => false,
+	//		'NOMBRE_PIECE' => false,
+	//		'NOMBRE_CHAMBRE' => false,
+	//		'NOMBRE_TERRASSE' => false,
+	//		'NOMBRE_SALLE_BAIN' => false,
+	//		'NOMBRE_DEMI_SALLE_BAIN' => false,
+	//		'NOMBRE_GARAGE' => false,
+	//		'NOMBRE_ETAGES' => false,
+	//		'NOMBRE_SALLE_EAU' => false,
+	//		'NUMERO_ETAGE' => false,
+	//		'NUMERO_MLS' => false,
+	//		'ORIENTATION' => false,
+	//		'PERIODICITE_LOCATION' => false,
+	//		'PRIX_BIEN' => false,
+	//		'REF_DEVISE' => false,
+	//		'REF_ETAT' => false,
+	//		'REF_VISITE' => false,
+	//		'SURFACE_HABITABLE' => false,
+	//		'SURFACE_SEJOUR' => false,
+	//		'SURFACE_TERRAIN' => false,
+	//		'TAXES' => false,
+	//		'URL_ANNONCE' => false,
+	//		'VILLE' => false,
+	//		'VOISINNAGE' => false,
+	//		'ID_ADRESSE_CACHEE' => false,
+	//		'CLASSE_BATIMENT' => false,
+	//		'DATE_DERNIERE_VERIFICATION' => false,
+	//		'DUREE_BAIL_MIN' => false,
+	//		'DUREE_BAIL_MAX' => false,
+	//		'ID_RAIL' => false,
+	//		'ID_SOUS_LOCATION' => false,
+	//		'ID_UNITE_PRIX_SURFACE' => false,
+	//		'ID_PRIX_NEGOCIABLE' => false,
+	//		'PRIX_MIN' => false,
+	//		'PRIX_MAX' => false,
+	//		'REF_PORTAIL_MASTER' => false,
+	//		'SURFACE_DISPONIBLE' => false,
+	//		'SURFACE_TOTALE_BATIMENT' => false,
+	//		'ID_PRESTIGE' => false,
+	//		'TAXE_FONCIERE' => false,
+	//		'TAXE_HABITATION' => false,
+	//		'ID_MUSIQUE_VIDEO' => false,
+	//		'REF_VOICE' => false,
+	//		'DPE_LETTRE' => false,
+	//		'DPE_VALEUR' => false,
+	//		'GES_LETTRE' => false,
+	//		'GES_VALEUR' => false,
+	//		'CACHER_LOCALISATION' => false,
+	//		'COMPLEMENTS' => array('FIELD'=>true, 'VALUE'=>false),
+	//		'OPTIONS' => array('NO_TTS'=> false, 'NO_VIDEO' => false),
+	//		'DIFFUSIONS' => array( 'LOGIN'=>false, 'PASSWORD'=>false, 'TITLE'=>false),
+	//		//field not in db
+	//		'ID_ANIMAUX' => false,
+	//		'CAUTION' => false,
+	//		'DESCRIPTION_VIDEO' => false,
+			'DIFFUSIONS' => array(
+				'YOUTUBEFR' => array('TITLE' => "ceci est un test d'essai"),
+			),
+			'OPTIONS' => array(
+				'NO_TTS' => true,
+			),
+		)
+*/	);
+
+	
+	$images = array(
+		array(
+			'REF_PORTAIL' => "bibi1.35",
+			'POIDS' => "1", 
+			'URL_IMAGE' => "http://www.keenersells.com/img/real-estate-1.jpg", 
+		),
+		array('REF_PORTAIL' => "bibi1.45", 'POIDS' => "1",'URL_IMAGE' => "http://www.keenersells.com/img/real-estate-2.jpg", ),
+//		array('REF_PORTAIL' => "bibi.2", 'POIDS' => "1", 'URL_IMAGE' => "http://photo1.pericles.fr/photo_get.php?S1=8627&S2=03&I0=6242857&lettre=d&format=1",),
+/*		array(
+			'REF_PORTAIL' => "bibi31", 
+			'POIDS' => "2", 
+			'URL_IMAGE' => "http://photo1.pericles.fr/photo_get.php?S1=8627&S2=03&I0=6242857&lettre=c&format=1", 
+//			'FILE_IMAGE' => false, 
+//			'TITRE_IMAGE' => false, 
+//			'TYPE' => false, 
+//			'KEEP_IMAGE' => false, 
+//			'APPEND_IMAGES' => false
+		),
+ */	);
+	$transactions = array(
+		array('USERCODE' => 'bibi1', 'REF_PORTAIL' => 'bibi1.45', 'ID_PAYS' => 'FR', 'ID_TYPE_BIEN' => '2', 'ID_TYPE_TRANSACTION' => '1', 'ADRESSE' => 'rue général de gaulle', 'CODE_POSTAL' => '78780', 'VILLE' => 'MAURECOURT',),
+		array('USERCODE' => 'bibi1', 'REF_PORTAIL' => 'bibi1.35', 'ID_PAYS' => 'FR', 'ID_TYPE_BIEN' => '2', 'ID_TYPE_TRANSACTION' => '1', 'ADRESSE' => 'rue général de gaulle', 'CODE_POSTAL' => '78780', 'VILLE' => 'MAURECOURT',),
+	);
+	//	$user_data[2] = $user_data[0];
+	//	$user_data[2]['USERCODE'] = 'bibi2';
+
+	$key = ($partial_import === true ? 0 : 1);
+	$user_data = array($user_data[$key]);
+	$tours = array($tours[$key]);
+	$images = array($images[$key]);
+	//$user_data = array($user_data[2]);
+	//$tours = array($tours[0]);
+	foreach($user_data as $k=>$user){ $user_data[$k]['MD5_USER'] = md5(implode(',',$user));}//.rand());}
+	foreach($tours as $k=>$tour){ $tours[$k]['MD5_TOUR'] = md5(implode(',',$tour).rand());}
+	foreach($images as $k=>$image){ $images[$k]['MD5_IMAGE'] = md5(implode(',',$image).rand());}
+	foreach($transactions as $k=>$transaction){ $transactions[$k]['MD5_TRANSACTION'] = md5(implode(',',$transaction).rand());}
+
+	$users = array($users[0]);
+	$tours = array($tours[0]);
+	$images = array($images[0]);
+	$plans = array($plans[0]);
+	$transactions = array($transactions[0]);
+	
+	$data = array('USERS'=>$user_data, 'TOURS'=>$tours, 'IMAGES'=> $images, 'PLANS' => $images, 'TRANSACTIONS' => $transactions);
+	$data = array('USERS'=>$user_data);
+/*	$data['DEFAULT_USER'] = array(
+		'NOM_UTILISATEUR' => "compte de demo",
+		'NOM_SOCIETE' => "compte de demo2",
+		'MD5_USER' => "default user2",
+	);
+	$data['DEFAULT_USER'] = $user;
+	$data['USERS_DEL'] = array( array('USERCODE'=> 'bibi2'),);
+	
+	$data['TOURS_DEL'] = array( array('USERCODE'=> 'bibi1', 'REF_PORTAIL' => 'bibi1.45'));
+*/
+	
+	//$data['NEXT_PART'] = array('CONTINUE' => ($partial_import === true), 'CURRENT_STEP' => ($partial_import ? 1 : 2));
+	//if($partial_import !== true){
+		//$data['USERS'] = array();
+		//$data['TOURS'] = array();
+		//$data['TRANSACTIONS'] = array();
+		//$data['IMAGES'] = array();
+		//$data['PLANS'] = array();
+	//}
+	return $data;
+}
+
+?>

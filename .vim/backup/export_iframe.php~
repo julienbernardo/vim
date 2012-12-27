@@ -1,0 +1,550 @@
+<?php
+
+function export_iframe($scriptName, $workPath, $config, $debug = false) {
+	$export = new PrevisiteExport($config['DNS']);
+/*
+	$city = 'lyon-proximite-gerland';
+	echo nl2br($city.' -> '.export_iframe_clean_city('FR', $city, '')."\n");
+
+	$city = 'lyon prox. gerland';
+	echo nl2br($city.' -> '.export_iframe_clean_city('FR', $city, '')."\n");
+
+	$city = 'lyon prox gerland';
+	echo nl2br($city.' -> '.export_iframe_clean_city('FR', $city, '')."\n");
+
+	$city = 'lyon proximité gerland';
+	echo nl2br($city.' -> '.export_iframe_clean_city('FR', $city, '')."\n");
+
+	$city = 'proximite lyon gerland';
+	echo nl2br($city.' -> '.export_iframe_clean_city('FR', $city, '')."\n");
+
+	$city = 'proche lyon gerland';
+	echo nl2br($city.' -> '.export_iframe_clean_city('FR', $city, '')."\n");
+
+	die;
+*/
+
+
+	$final_result = array('FAILED' => 0, 'DONE'=> 0, 'TOTAL'=> 0, 'WAITING' => 0);
+	$testmode = isset($_GET['test']);
+
+	$purge_listings = !$testmode;
+
+	$path_file_tmp = $workPath.'export.json';
+
+	if(is_file($path_file_tmp)) {
+		unlink($path_file_tmp);
+	}
+
+	$tab_all_errors = array();
+
+	$step = 0;
+
+	$tab_db_processing = array();
+
+	do {
+		$tours = $export->getPartnerTours($config['PARTNERS'], $config['OPT_DETAILS']);
+
+		if(!in_array($tours[0]['DB'], $tab_db_processing)) {
+			$tab_db_processing[] = $tours[0]['DB'];
+			import_log('Start processing '.$tours[0]['DB'], $scriptName);
+		}
+
+		$contents = '';
+
+		for($i=0; isset($tours[$i]); $i++) {
+			$row = array(
+				'id' => $tours[$i]['ID_VISITE'],
+				'company' => $tours[$i]['NOM_SOCIETE'], 
+				'company_id' => $tours[$i]['ID_SOCIETE'], 
+				'type_p' => $tours[$i]['ID_TYPE_BIEN'],
+				'type_t' => $tours[$i]['ID_TYPE_TRANSACTION'],
+				'rooms' => $tours[$i]['NOMBRE_PIECE'],
+				'beds' => $tours[$i]['NOMBRE_CHAMBRE'],
+				'baths' => $tours[$i]['NOMBRE_SALLE_BAIN'],
+				'price' => $tours[$i]['PRIX_BIEN'],
+				'curr' => $tours[$i]['REF_DEVISE'],
+				'lang' => $tours[$i]['ID_LANGUE'],
+				'country' => $tours[$i]['ID_PAYS'],
+				'city' => replace_accents($tours[$i]['VILLE']),
+				'zip' => $tours[$i]['CODE_POSTAL'],
+				'nb_img' => $tours[$i]['NB_ACTIVE_IMAGE'],
+				'img' => $tours[$i]['ID_PREMIERE_IMAGE'],
+				'status' => $tours[$i]['ID_STATUT_VISITE'],
+				'area' => convert_area($tours[$i]['SURFACE_HABITABLE'], $tours[$i]['SURFACE_HABITABLE_UNITE'], 1),
+				'ref_dm' => ''
+				'diff' => array(),
+				'txt' => array()
+			);
+
+			$row['city'] = export_iframe_clean_city($row['country'], $row['city'], $row['zip']);
+
+
+			foreach($tours[$i]['DIFFUSIONS'] as $partner => $tab_diff) {
+				if($tab_diff['ID_STATUT_DIFFUSION']>=0) {
+					$row['diff'][] = $partner;
+					
+					// Ajout de la ref dailymotion
+					if(ID_DAILYMOTION==$partner && !is_guid($tab_diff['REF_PORTAIL'])) {
+						$row['ref_dm'] = $tab_diff['REF_PORTAIL'];
+					}
+				}
+			}
+			if(!empty($tours[$i]['TEXTES'])) {
+				foreach($tours[$i]['TEXTES'] as $lang => $tab_txt) {
+					$row['txt'][$lang] = array(
+						'title' => $tab_txt['NOM_VISITE'],
+						'desc' => mb_strcut($tab_txt['DESCRIPTION'], 0, 500, 'UTF-8')
+					);
+				}
+			}
+			$contents .= json_encode($row)."\n";
+			$final_result['TOTAL']++;
+		}
+
+		if(!empty($contents)) {
+			$handle = fopen($path_file_tmp, 'a+');
+			if(false!==$handle) {
+				fwrite($handle, $contents);
+				fclose($handle);
+			}
+		}
+		
+		if(++$step%100==0) {
+			import_log('Processed '.$step.' steps', $scriptName);
+		}
+		
+	} while($export->next_step === true);
+	// Fin Export
+
+
+
+
+
+
+
+
+	// Debut import dans MYSQL
+	import_log('Start import to mysql', $scriptName);
+
+	try {
+		if($testmode && $purge_listings) {
+			throw new Exception('No mysql import in test mode');
+		}
+		
+		$handle = @fopen($path_file_tmp, 'r');
+		if(false===$handle) {
+			throw new Exception('Unable to open the file');
+		}
+		
+		$pdo_dsn = array(
+			'dbname' => 'worldposting',
+			'host' => '10.0.4.61',
+			'log' => 'root',
+			'pwd' => 'prev180sql'
+		);
+
+		$pdo_opt = array(
+			PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+			PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+			PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'UTF8'",
+			PDO::ATTR_TIMEOUT => 60
+		);
+		
+		$pdo = new PDO('mysql:dbname='.$pdo_dsn['dbname'].';host='.$pdo_dsn['host'], $pdo_dsn['log'], $pdo_dsn['pwd'], $pdo_opt);
+		
+		$sql = 'SELECT NOW() AS date_import';
+		$res = $pdo->query($sql);
+		$raw = $res->fetch();
+
+		$date_import = isset($raw['date_import']) ? $raw['date_import'] : date('Y-m-d H:i:s');
+
+		// Correspondance nom_ville -> id_ville
+		$tab_cities = array();
+		
+		
+		// Correspondance id_portail base MSSQL (guid) -> MYSQL (int)
+		$tab_converted_partners = array();
+		$sql = 'SELECT id_portail, id_prev FROM portails';
+		$res = $pdo->query($sql);
+		$raw = $res->fetchAll();
+		for($i=0; isset($raw[$i]); $i++) {
+			$tab_converted_partners[ $raw[$i]['id_prev'] ] = $raw[$i]['id_portail'];
+		}
+
+		$st_fetch_annonce = $pdo->prepare('SELECT id_annonce FROM annonce_id WHERE id_visite = :tour');
+		$st_get_md5 = $pdo->prepare(<<<SQL
+SELECT
+	md5_data
+FROM
+	annonce
+	INNER JOIN annonce_md5 ON annonce.id_annonce=annonce_md5.id_annonce
+WHERE
+	annonce.id_annonce = :annonce AND annonce.id_statut_annonce=1
+SQL
+
+);
+		$st_insert_tour = $pdo->prepare('INSERT INTO annonce_id (id_visite) VALUES (:tour)');
+		$st_upd_data = $pdo->prepare(<<<SQL
+UPDATE
+	annonce
+SET
+	id_societe=:id_societe,
+	id_type_transaction=:id_type_transaction,
+	id_type_bien=:id_type_bien,
+	nombre_piece=:nombre_piece,
+	nombre_chambre=:nombre_chambre,
+	nombre_salle_bain=:nombre_salle_bain,
+	surface_m2=:area,
+	prix_bien=:prix_bien,
+	ref_devise=:ref_devise,
+	id_pays=:id_pays,
+	id_langue=:id_langue,
+	id_ville=:id_ville,
+	code_postal=:code_postal,
+	nombre_image=:nombre_image,
+	id_statut_annonce=1,
+	date_maj_annonce=NOW()
+WHERE
+	id_annonce=:id_annonce
+SQL
+);
+
+		$st_ins_data = $pdo->prepare(<<<SQL
+INSERT INTO annonce
+	(id_annonce, id_societe, surface_m2, id_type_transaction, id_type_bien, nombre_piece, nombre_chambre, nombre_salle_bain, prix_bien, ref_devise, id_pays, id_langue, id_ville, code_postal, nombre_image, id_statut_annonce)
+VALUES
+	(:id_annonce, :id_societe, :area, :id_type_transaction, :id_type_bien, :nombre_piece, :nombre_chambre, :nombre_salle_bain, :prix_bien, :ref_devise, :id_pays, :id_langue, :id_ville, :code_postal, :nombre_image, 1)
+SQL
+);
+		$st_upd_md5 = $pdo->prepare('INSERT INTO annonce_md5 (id_annonce, md5_data, date_last_import) VALUES (:id_annonce, :md5_data, :date_last_import) ON DUPLICATE KEY UPDATE md5_data=:md5_data, date_last_import=:date_last_import');
+		$st_upd_text = $pdo->prepare('INSERT INTO annonce_textes (id_annonce, id_langue, nom_visite, description) VALUES (:id_annonce, :id_langue, :nom_visite, :description) ON DUPLICATE KEY UPDATE nom_visite=:nom_visite, description=:description');
+		$st_upd_img = $pdo->prepare('INSERT INTO annonce_image(id_annonce, id_image) VALUES (:id_annonce, :id_image) ON DUPLICATE KEY UPDATE id_image=:id_image');
+		$st_add_partner = $pdo->prepare('INSERT INTO portails (id_prev) VALUES (:id_prev)');
+		$st_upd_diff = $pdo->prepare('INSERT IGNORE INTO annonce_diffusion (id_annonce, id_portail) VALUES (:id_annonce, :id_portail)');
+
+		$st_get_city = $pdo->prepare('SELECT id_ville FROM villes WHERE nom_ville=:nom_ville');
+		$st_upd_city = $pdo->prepare('INSERT IGNORE INTO villes (nom_ville) VALUES (:nom_ville)');
+
+		$st_get_company = $pdo->prepare('SELECT id_societe FROM societes WHERE id_prev=:id_prev');
+		$st_upd_company = $pdo->prepare('INSERT INTO societes (id_prev, nom_societe) VALUES (:id_prev, :nom_societe)');
+		
+		$st_upd_data_daily = $pdo->prepare('INSERT INTO annonce_dailymotion (id_annonce, ref) VALUES (:id_annonce, :ref) ON DUPLICATE KEY UPDATE ref=:ref');
+
+		$step_bench = rand(9000, 10000);
+		$tab_bench = array(
+			'get_tour_id' => array(),
+			'get_md5' => array(),
+			'upd_data' => array(),
+			'upd_text' => array(),
+			'upd_diff' => array(),
+			'upd_md5' => array()
+		);
+
+		$tab_deleted = array();
+
+		while(!feof($handle)) {
+			try {
+				$pdo->beginTransaction();
+
+				$row = fgets($handle);
+				$tab = json_decode($row, true);
+				if(false===$tab) {
+					throw new Exception('Bad JSON format');
+				}
+				if(empty($tab['company_id'])) {
+					throw new Exception('Bad Company');
+				}
+
+				if($tab['price']<5000 && 1==$tab['type_t']) {
+					throw new Exception('Invalid price for sale');
+				}
+
+				$tour = strtoupper($tab['id']);
+
+				$fields_dm = array(
+					'ref' => !empty($tab['ref_dm']) ? $tab['ref_dm'] : null
+				);
+				$fields_update = array(
+					'id_type_transaction' => $tab['type_t'],
+					'id_type_bien' => $tab['type_p'],
+					'nombre_piece' => $tab['rooms'],
+					'nombre_chambre' => $tab['beds'],
+					'nombre_salle_bain' => $tab['baths'],
+					'prix_bien' => (int)$tab['price'],
+					'ref_devise' => $tab['curr'],
+					'id_pays' => $tab['country'],
+					'id_langue' => $tab['lang'],
+					'code_postal' => $tab['zip'],
+					'nombre_image' => $tab['nb_img'],
+					'area' => $tab['area'],
+					'id_societe' => null
+				);
+
+				$fields_update_txt = array();
+				if(!empty($tab['txt'])) {
+					foreach($tab['txt'] as $lang => $txt) {
+						$fields_update_txt[$lang] = array(
+							'nom_visite' => $txt['title'],
+							'description' => $txt['desc']
+						);
+					}
+				}
+
+				// Conversion id_visite (guid) -> id_annonce (int)
+				$annonce = null;
+				$time = microtime(true);
+				$st_fetch_annonce->execute(array('tour' => $tour));
+				$row = $st_fetch_annonce->fetch();
+
+				if(!isset($row['id_annonce'])) {
+					// insertion si n'existe pas puis recup de l'id généré
+					$st_insert_tour->execute(array('tour' => $tour));
+					$annonce = (int)$pdo->lastInsertId();
+				} else {
+					$annonce = (int)$row['id_annonce'];
+				}
+
+				$fields_update['id_ville'] = null;
+
+				// Convertir nom_ville -> id_ville
+				if(!empty($tab['city'])) {
+					$st_get_city->execute(array(
+						'nom_ville' => $tab['city']
+					));
+					$row = $st_get_city->fetch();
+					// inserer
+					if(!isset($row['id_ville'])) {
+						$st_upd_city->execute(array(
+							'nom_ville' => $tab['city']
+						));
+						$fields_update['id_ville'] = (int)$pdo->lastInsertId();
+					} else {
+						$fields_update['id_ville'] = (int)$row['id_ville'];
+					}
+				}
+
+				// Convertir id_societe_prev -> id_societe
+				$st_get_company->execute(array(
+					'id_prev' => $tab['company_id']
+				));
+				$tmp = $st_get_company->fetch();
+
+				if(!empty($tmp['id_societe'])) {
+					$fields_update['id_societe'] = (int)$tmp['id_societe'];
+				} else {
+					$st_upd_company->execute(array(
+						'id_prev' => $tab['company_id'],
+						'nom_societe' => $tab['company']
+					));
+					$fields_update['id_societe'] = (int)$pdo->lastInsertId();
+
+				}
+				if(0==$fields_update['id_societe']) {
+					throw new Exception('no company found for: '.$tab['company_id']);
+				}
+
+
+				// Comparaison des md5
+				$md5_data = substr(md5(serialize($fields_update).serialize($fields_update_txt).serialize($fields_dm)), 0, 8);
+
+
+				$st_get_md5->execute(array('annonce' => $annonce));
+				$row = $st_get_md5->fetch();
+
+				$need_update_data = !isset($row['md5_data']) || $row['md5_data'] !== $md5_data;
+
+				if($need_update_data) {
+					$fields_update['id_annonce'] = $annonce;
+					$st_upd_data->execute($fields_update);
+					if(0==$st_upd_data->rowCount()) {
+						$st_ins_data->execute($fields_update);
+					}
+					$st_upd_img->execute(array(
+						'id_annonce' => $annonce,
+						'id_image' => $tab['img']
+					));
+					foreach($fields_update_txt as $lang => $txt) {
+						$st_upd_text->execute(array(
+							'id_annonce' => $annonce,
+							'id_langue' => $lang,
+							'nom_visite' => $txt['nom_visite'],
+							'description' => $txt['description']
+						));
+					}
+
+					$annonce_portail = array();
+					for($i=0; isset($tab['diff'][$i]); $i++) {
+						if(is_guid($tab['diff'][$i])) {
+							// inserer si portail n'existe pas dans base mysql
+							if(!isset($tab_converted_partners[ $tab['diff'][$i] ])) {
+								$st_add_partner->execute(array(
+									'id_prev' => $tab['diff'][$i]
+								));
+								$tab_converted_partners[ $tab['diff'][$i] ] = (int)$pdo->lastInsertId();
+							}
+						}
+						$partner = (int)$tab_converted_partners[ $tab['diff'][$i] ];
+
+						$st_upd_diff->execute(array(
+							'id_annonce' => $annonce,
+							'id_portail' => $partner
+						));
+						$annonce_portail[] = $partner;
+					}
+				
+					if(empty($annonce_portail)) {
+						$st_purge = $pdo->prepare('DELETE FROM annonce_diffusion WHERE id_annonce=:id_annonce');
+					} else {
+						$st_purge = $pdo->prepare('DELETE FROM annonce_diffusion WHERE id_annonce=:id_annonce AND id_portail NOT IN('.implode(',', $annonce_portail).')');
+					}
+					$st_purge->execute(array(
+						'id_annonce' => $annonce
+					));
+					
+					$fields_dm['id_annonce'] = $annonce;
+					$st_upd_data_daily->execute($fields_dm);
+				}
+
+
+				// Maj du md5
+				$st_upd_md5->execute(array(
+					'id_annonce' => $annonce,
+					'md5_data' => $md5_data,
+					'date_last_import' => $date_import
+				));
+				$tab_bench[] = ceil(1000*(microtime(true) - $time));
+
+				if(isset($tab_bench[$step_bench-1])) {
+					import_log('[BENCH] Average time to update '.$step_bench.' listings: '.(array_sum($tab_bench)/count($tab_bench)).'ms', $scriptName);
+					$tab_bench = array();
+				}
+
+				$pdo->commit();
+			} catch(Exception $e) {
+				$pdo->rollback();
+				$final_result['WAITING']++;
+				$tab_all_errors[ $e->getMessage().' at line '.$e->getLine() ]++;
+			}
+		}
+		
+		if(!empty($tab_bench)) {
+			import_log('[BENCH] Average time to update '.$step_bench.' listings: '.(array_sum($tab_bench)/count($tab_bench)).'ms', $scriptName);
+			$tab_bench = array();
+		}
+
+
+		if(!$purge_listings || $final_result['TOTAL']<150000) {
+			throw new Exception('Skip purge, not enough results');
+		}
+		
+
+
+		$tab_deleted = array();
+
+		$sql = 'SELECT id_annonce FROM annonce_md5 WHERE date_last_import < ?';
+		$st = $pdo->prepare($sql);
+		$st->execute(array($date_import));
+		$rows = $st->fetchAll();
+
+		for($i=0; isset($rows[$i]); $i++) {
+			$tab_deleted[] = (int)$rows[$i]['id_annonce'];
+		}
+		$tab_deleted = array_chunk($tab_deleted, 250);
+
+		for($i=0; isset($tab_deleted[$i][0]); $i++) {
+			try {
+				$pdo->beginTransaction();
+				$annonces = implode(',', $tab_deleted[$i]);
+				$sql = 'UPDATE annonce SET date_maj_annonce=NOW(), id_statut_annonce=-1 WHERE id_annonce IN ('.$annonces.') AND id_statut_annonce=1';
+				$deleted = $pdo->exec($sql);
+
+				$sql = 'UPDATE annonce_md5 SET md5_data=null WHERE id_annonce IN ('.$annonces.')';
+				$pdo->exec($sql);
+
+				$sql = 'DELETE FROM annonce_diffusion WHERE id_annonce IN ('.$annonces.')';
+				$pdo->exec($sql);
+
+				if($testmode) {
+					throw new Exception('Cancel delete: '.$deleted);
+				}
+				$pdo->commit();
+
+			} catch(Exception $e) {
+				$pdo->rollback();
+				$tab_all_errors[ $e->getMessage().' at line '.$e->getLine() ]++;
+			}
+		}
+
+
+	} catch(PDOException $e) {
+		import_log('[SQL_ERROR] '.$e->getCode().' '.$e->getMessage(), $scriptName);
+	} catch(Exception $e) {
+		import_log('[ERROR] '.$e->getMessage(), $scriptName);
+	}
+
+
+
+	if($testmode) {
+		print_p($final_result);
+		print_p($tab_all_errors);
+	} else if(!empty($tab_all_errors)) {
+		foreach($tab_all_errors as $error => $nb) {
+			import_log('[ERROR] '.$error. '('.$nb.')', $scriptName);
+		}
+	}
+
+	return $final_result;
+}
+
+function export_iframe_clean_city($country, $city, $zip) {
+	$city = preg_replace('/\([^\)]+\)/', '', $city); // Enlever les (...)
+	$city = str_replace('-', ' ', $city);
+
+	$city = preg_replace('/^proche /i', '', $city); // Enlever prox lorsque en debut. Ex : prox Lyon -> Lyon
+	$city = preg_replace('/^prox\.?(imit.{1,2})?/i', '', $city); // Enlever prox lorsque en debut. Ex : prox Lyon -> Lyon
+	$city = preg_replace('/^(.*\s)prox\.?(imit.{1,2})?(\s.*?)$/i', '$1', $city); // Enlever prox + suite lorsque en fin. Ex : Lyon promimite gerland -> Lyon
+	$city = preg_replace('/\s\s+/', ' ', $city); // multispace
+
+
+
+	if('FR'==$country) {
+		$new_city = '';
+		// arrondissements paris
+		for($i=20; empty($new_city) && $i>=1; $i--) {
+			$dep = str_pad($i, 2, '0', STR_PAD_LEFT);
+			if('750'.$dep==$zip || preg_match('/^Paris.*'.$dep.'/i', $city.$zip)) {
+				$new_city = 'Paris (750'.$dep.')';
+			}
+		}
+
+		// arrondissements marseille
+		for($i=16; empty($new_city) && $i>=1; $i--) {
+			$dep = str_pad($i, 2, '0', STR_PAD_LEFT);
+			if('130'.$dep==$zip || preg_match('/^Marseille.*'.$dep.'/i', $city.$zip)) {
+				$new_city = 'Marseille (130'.$dep.')';
+			}
+		}
+
+		// arrondissements Lyon
+		for($i=9; empty($new_city) && $i>=1; $i--) {
+			$dep = str_pad($i, 2, '0', STR_PAD_LEFT);
+			if('690'.$dep==$zip || preg_match('/^Lyon.*'.$dep.'/i', $city.$zip)) {
+				$new_city = 'Lyon (690'.$dep.')';
+			}
+		}
+
+		if(!empty($new_city)) {
+			$city = $new_city;
+		} else if(preg_match('/^Paris /i', $city.$zip)) {
+			$city = 'Paris';
+		} else if(preg_match('/^Marseille /i', $city.$zip)) {
+			$city = 'Marseille';
+		}
+	}
+
+	return trim($city);
+}
+
+
+

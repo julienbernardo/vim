@@ -1,0 +1,648 @@
+<?php   
+
+function getImagesURL($images, $template, $sub_template){
+	if($images != ""){
+		if($sub_template != "" &&  file_exists(str_replace( '#TEMPLATE#', $template.'/'.$sub_template , PATH_VIDEO_TEMPLATE).$images)){
+			$images = str_replace( '#TEMPLATE#', $template.'/'.$sub_template , URL_VIDEO_TEMPLATE).$images;
+		}else if(file_exists(str_replace( '#TEMPLATE#', $template , PATH_VIDEO_TEMPLATE).$images)){
+			$images = str_replace( '#TEMPLATE#', $template , URL_VIDEO_TEMPLATE).$images;
+		}else{	$images = "";}
+	}
+	return $images;
+}
+
+function chooseEffets(&$effectsMade, $start, $end, $tab = ""){
+	$return = array();
+	$effects = array(
+		//zoomAdapter in
+		array('<key scale="1,1,1" time="#START#"/>', '<key scale="1.1,1.1,1.1" time="#END#"/>'),
+		//zoomAdapter out
+		array('<key scale="1.1,1.1,1.1" time="#START#"/>', '<key scale="1,1,1" time="#END#"/>'),
+		//kenburn left
+		array('<key scale="1.3,1.3,1.3" pos="-0.3,0,0" time="#START#"/>','<key scale="1.3,1.3,1.3" pos="0.3,0,0" time="#END#"/>'),
+		//kenburns right
+		array('<key scale="1.3,1.3,1.3" pos="0.3,0,0" time="#START#"/>', '<key scale="1.3,1.3,1.3" pos="-0.3,0,0" time="#END#"/>'),
+		//kenburn left
+		array('<key scale="1.3,1.3,1.3" pos="-0.3,0,0" time="#START#"/>','<key scale="1.3,1.3,1.3" pos="0.3,0,0" time="#END#"/>'),
+		//kenburns right
+		array('<key scale="1.3,1.3,1.3" pos="0.3,0,0" time="#START#"/>', '<key scale="1.3,1.3,1.3" pos="-0.3,0,0" time="#END#"/>')
+	);
+	if(count($effectsMade) == count($effects)){ $effectsMade = array();}
+	do{
+		$key = rand( 0, count($effects)-1);
+	}while(array_key_exists( $key, $effectsMade));	
+	$effectsMade[$key] = true;
+	
+	foreach($effects[$key] as $effect){
+		$return[] = $tab.str_replace(array('#START#', '#END#'), array($start, $end), $effect);
+	}
+	return implode("\n", $return);
+}
+
+function getLangSpec($lang =""){
+	$lang = strtoupper($lang);
+	$return = array('orientation'=>'left', 'has_special_char' => false);
+	switch($lang){
+		case "HE":
+			$return['orientation'] = 'right';
+			$return['has_special_char'] = true;
+			break;
+		case "PL":
+			$return['has_special_char'] = true;
+			break;
+	}
+	return $return;
+}
+
+function getPois($latitude, $longitude, $types){
+	if(count($types) > 0){
+		$replace = array(
+			'search' => array('#LATITUDE#', '#LONGITUDE#'),
+			'replace' => array( $latitude, $longitude)
+		);
+		
+		//echo $latitude." / ".$longitude."\n";
+		
+		$map_x_min = 0.0264;
+		$map_x_max = 0.5765;
+		$map_y_min = 0.226;
+		$map_y_max = 0.786;
+	
+		$scale = (99*($map_x_max-$map_x_min)/IMAGE_YOUTUBE_WIDTH)/500;
+	
+		$url_get_proximity = str_replace($replace['search'], $replace['replace'], URL_GET_PROXIMITY);
+		$pois = array();
+		foreach($types as $type=>$name){
+			$content = file_get_contents(str_replace('#TYPE#', $type, $url_get_proximity));
+			if($content != ""){
+				$xml = simplexml_load_string($content);
+				if(count($xml) > 0 && count($xml->item) > 0){
+					foreach($xml->item as $k=>$item){
+						$att = $item->attributes();
+						$lat = $att['lat']."";
+						$lng = $att['lng']."";
+						//pos x
+						$distance = get_distance_m( $latitude, $longitude, $latitude, $lng);					
+						$pos_x = ($distance*$scale);
+						if($longitude > $lng){ $pos_x = (($map_x_max-$map_x_min)/2)-$pos_x;}
+						else{ $pos_x= (($map_x_max-$map_x_min)/2)+$pos_x;}
+						$pos_x += $map_x_min;
+						//pos y
+						$distance = get_distance_m( $latitude, $longitude, $lat, $longitude);					
+						$pos_y = ($distance*$scale);
+						if($latitude < $lat){ $pos_y = (($map_y_max-$map_y_min)/2)-$pos_y;}
+						else{ $pos_y= (($map_y_max-$map_y_min)/2)+$pos_y;}
+						$pos_y += $map_y_min;
+						
+						if($pos_x > $map_x_min && $pos_x < $map_x_max && $pos_y > $map_y_min && $pos_y < $map_y_max){
+							if(!is_array($pois[$type])){ $pois[$type] = array();}
+							$pois[$type][] = array(
+								'left'=>$pos_x, 'top'=>$pos_y, 
+								'lat'=>$lat, 'lng'=>$lng,
+								'title'=>$att['label'].'',
+								'distance' => get_distance_m( $latitude, $longitude, $lat, $lng)
+							);
+						}
+					}
+				}
+			}
+		}
+		$tmp = array();
+		foreach($pois as $type=>$poi){
+			$tmp[$type] = array('pois'=>$poi, 'icon'=>str_replace('#TYPE#', $type, URL_VIDEO_YOUTUBE_POI),'name'=>$types[$type][(count($poi) > 1 ? 'more' : 'one')]);
+		}
+		$pois = $tmp;
+		return $pois;
+	}
+	return null;
+}
+
+function getAdvancedTextFontSize($field_size, $text, $limit = false, $needReference = false, $limit_min = 10, $font = ""){
+	if(strlen($text) > 0){
+		$font_size = ceil($field_size/strlen($text))+1;
+		if($limit !== false && $font_size > $limit){ $font_size = $limit;}
+		$reference = "";
+		if($font_size < $limit_min){
+			$font_size = $limit_min;
+			//$needReference = true;
+		}
+		if($needReference){
+			$text_len = ceil($field_size/$font_size);
+			$reference = ' reference="';
+			if($font == "arial"){ $text_len += 1;}
+			for($i=0; $i < $text_len; $i++){ $reference .= "A";}
+			$reference .= '" ';
+		}
+
+	}else{ $font_size = 10;}
+	return ' fontsize="'.$font_size.'" '.$reference;
+}
+
+
+function ChooseTransition( &$transitionsMade=array(), $limits = ""){
+	$transitions = array(	"type=\"circle\"",
+		  									"type=\"crossfade\"",
+		  									"type=\"radial\"",
+		  									"type=\"scans\"",
+		  									"type=\"strip\"",
+		  									"type=\"swirl\"",
+		  									"type=\"waterdrop\"",
+		  									//array('type' => "type=\"cube\"", 'direction' => array( "direction=\"left\"","direction=\"down\"","direction=\"right\"","direction=\"up\"")),
+		  									"type=\"cube\" direction=\"left\"",
+		  									"type=\"cube\" direction=\"down\"",
+		  									"type=\"cube\" direction=\"right\"",
+		  									"type=\"cube\" direction=\"up\"",
+												array('type' => "type=\"move\"", 'direction' => array( "direction=\"left\"","direction=\"down\"","direction=\"right\"","direction=\"up\"")),
+		  									array('type' => "type=\"over\"", 'direction' => array( "direction=\"left\"","direction=\"down\"","direction=\"right\"","direction=\"up\"")),
+		  									array('type' => "type=\"scan\"", 'direction' => array( "direction=\"left\"","direction=\"down\"","direction=\"right\"","direction=\"up\"")),
+												array('type' => "type=\"under\"", 'direction' => array( "direction=\"left\"","direction=\"down\"","direction=\"right\"","direction=\"up\"")),
+												//array('type' => "type=\"spiral\" angle=\"60\"", 
+												//			'direction' => array( "direction=\"left\"","direction=\"down\"","direction=\"right\"","direction=\"up\""),
+												//			'rotCenter' => array( "rotCenter=\"left\"", "rotCenter=\"middle\"", "rotCenter=\"right\"", "rotCenter=\"top\"", "rotCenter=\"bottom\"",)
+												//			),
+												"type=\"spiral\" angle=\"60\" direction=\"down\" rotCenter=\"right\"",
+												"type=\"spiral\" angle=\"60\" direction=\"down\" rotCenter=\"left\"",
+												"type=\"spiral\" angle=\"60\" direction=\"up\" rotCenter=\"right\"",
+												"type=\"spiral\" angle=\"60\" direction=\"up\" rotCenter=\"left\""
+											);
+	if($limits != ""){
+		$tmp = array();
+		foreach($transitions as $v){
+			if(preg_match('/'.$limits.'/i', (is_array($v) ? $v['type'] : $v)) == 0){ $tmp[] = $v;}
+		}
+		$transitions = $tmp;
+	}
+	if(count($transitionsMade) == count($transitions)){ $transitionsMade = array();}
+	do{
+		$key = rand(0,count($transitions)-1);
+	}while(array_key_exists($key,$transitionsMade));
+	$transitionsMade[$key] = true;
+	if(is_array($transitions[$key])){
+		$str = $transitions[$key]['type']." ".$transitions[$key]['direction'][rand(0,3)];
+		if(is_array($transitions[$key]['rotCenter'])){
+			$str .= " ".$transitions[$key]['rotCenter'][rand(0,4)];
+		}
+	}else{
+		$str = $transitions[$key];
+	}
+	
+	return $str;
+}
+
+function ChooseEffects(&$listEffectsImg_made){
+	$listEffectsImg = array(
+						//array('type' => 'type="diving"'	,	'nb_child_max'=>	4),
+						//array('type' => 'type="rotator"', 'nb_child_max'=>	4),
+						//array('type' => 'type="sliding"', 'nb_child_max'=>	4),
+						//array('type' => 'type="square"'	, 'nb_child_max'=>	4),
+						//array('type' => 'type="rectangles" filterType="grow"', 'nb_child_max'=>	1),
+						//array('type' => 'type="explode"'	, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						//array('type' => 'type="flower"'		, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						//array('type' => 'type="panel"'		, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						//array('type' => 'type="slice"'		, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						//'type="kenburns" adapter="panoramicAdapter" direction="positive"',
+						//'type="kenburns" adapter="panoramicAdapter" direction="negative"',
+						//'type="kenburns" adapter="fixedAdapter" direction="positive"',
+						//'type="kenburns" adapter="fixedAdapter" direction="negative"',
+						'type="kenburns" adapter="zoomAdapter" direction="positive"',
+						'type="kenburns" adapter="zoomAdapter" direction="negative"',
+						'type="kenburns" adapter="kenburnsAdapter" direction="positive"', 
+						'type="kenburns" adapter="kenburnsAdapter" direction="negative"',
+						'type="kenburns" adapter="kenburnsAdapter" direction="positive"', 
+						'type="kenburns" adapter="kenburnsAdapter" direction="negative"'
+						//array('type' => 'type="kenburns"'	, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"'),'direction' => array('direction="negative"')),
+						//array('type' => 'type="kenburns"'	, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"'),'direction' => array('direction="positive"'))
+					);
+	
+	if( !is_array($listEffectsImg_made) || count($listEffectsImg_made) == count($listEffectsImg)){ $listEffectsImg_made = array();}
+	
+	do{
+		$key = rand(0,count($listEffectsImg)-1);
+	}while(array_key_exists($key,$listEffectsImg_made));				
+	
+	$listEffectsImg_made[$key] = true;
+	if(is_array($listEffectsImg[$key])){
+		$effect = $listEffectsImg[$key]['type'];
+		if(is_array($listEffectsImg[$key]['adapter'])){ $effect .= " ".$listEffectsImg[$key]['adapter'][rand(0,count($listEffectsImg[$key]['adapter'])-1)];}
+		if(is_array($listEffectsImg[$key]['direction'])){ $effect .= " ".$listEffectsImg[$key]['direction'][rand(0,count($listEffectsImg[$key]['direction'])-1)];}
+	}else{
+		$effect = $listEffectsImg[$key];
+	}
+	
+	return $effect;
+}
+
+
+function ChooseSound(){
+/*	$sounds = array('11111111-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111112-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111113-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111114-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111115-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111116-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111117-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111118-8f9d-4405-9ffb-fcf00658e9f7',
+					'11111119-8f9d-4405-9ffb-fcf00658e9f7',
+					'1111111A-8f9d-4405-9ffb-fcf00658e9f7');*/
+	$sounds = getSounds();
+	if($id == ""){ $id = $sounds[rand(0,count($sounds)-1)];}
+	return $id;
+	//return ($getId ? $id : str_replace('#ID#',$id, URL_SOUND));
+//	return get_storage_path("get",$sounds[rand(0,count($sounds)-1)],"mp3");
+}
+
+function ChooseSoundDuration($duration, $volume, $sound, $fadein = "2.0"){
+	$result = "";
+//	if(!is_guid($sound)){ $sound = ChooseSound();}
+	if(is_guid($sound)){
+//		$sounds = array("11111111-8F9D-4405-9FFB-FCF00658E9F7" => "77", "11111112-8F9D-4405-9FFB-FCF00658E9F7" => "98", "11111113-8F9D-4405-9FFB-FCF00658E9F7" => "88", "11111114-8F9D-4405-9FFB-FCF00658E9F7" => "87", "11111115-8F9D-4405-9FFB-FCF00658E9F7" => "63", "11111116-8F9D-4405-9FFB-FCF00658E9F7" => "65", "11111117-8F9D-4405-9FFB-FCF00658E9F7" => "83", "11111118-8F9D-4405-9FFB-FCF00658E9F7" => "67", "11111119-8F9D-4405-9FFB-FCF00658E9F7" => "63", "1111111A-8F9D-4405-9FFB-FCF00658E9F7" => "61", "1111111B-8F9D-4405-9FFB-FCF00658E9F7" => "47", "1111111C-8F9D-4405-9FFB-FCF00658E9F7" => "53", "1111111D-8F9D-4405-9FFB-FCF00658E9F7" => "57", "1111111E-8F9D-4405-9FFB-FCF00658E9F7" => "55", "1111111F-8F9D-4405-9FFB-FCF00658E9F7" => "60", "11111121-8F9D-4405-9FFB-FCF00658E9F7" => "58", "11111122-8F9D-4405-9FFB-FCF00658E9F7" => "58", "11111123-8F9D-4405-9FFB-FCF00658E9F7" => "52", "11111124-8F9D-4405-9FFB-FCF00658E9F7" => "61", "11111125-8F9D-4405-9FFB-FCF00658E9F7" => "60", "11111126-8F9D-4405-9FFB-FCF00658E9F7" => "61", "11111127-8F9D-4405-9FFB-FCF00658E9F7" => "60", "11111128-8F9D-4405-9FFB-FCF00658E9F7" => "56");
+//		$sound_duration = $sounds[$sound];
+		$url_sound = fix_xml(str_replace('#ID#',$sound, URL_SOUND));
+		$sound_duration = getDurationMusic($sound);
+		if($sound_duration !== false && $sound_duration != "" && ceil($duration/$sound_duration) > 1){
+			$result .= "			<audio filename=\"".$url_sound."\" duration=\"".$sound_duration."\" fadein=\"".$fadein."\" fadeout=\"4.0\" volume=\"".$volume."\"/>\n";
+			for($i=1;$i<ceil($duration/$sound_duration)-1 && ($sound_duration*$i)+$i<$duration;$i++){
+				$result .= "			<audio filename=\"".$url_sound."\" duration=\"".$sound_duration."\" margin-start=\"".($sound_duration*$i)."\" fadein=\"2.0\" fadeout=\"2.0\" volume=\"".$volume."\"/>\n";
+			}
+			$result .= "			<audio filename=\"".$url_sound."\" duration=\"".($duration-($sound_duration*$i))."\" margin-start=\"".($sound_duration*$i)."\" fadein=\"".$fadein."\" fadeout=\"4.0\" volume=\"".$volume."\"/>\n";
+		}else{
+			$result .= "			<audio filename=\"".$url_sound."\" duration=\"".$duration."\" fadein=\"".$fadein."\" fadeout=\"4.0\" volume=\"".$volume."\"/>\n";
+		}
+	}
+	return $result;
+}
+
+function write_stupeflix_xml_head(){
+	$content = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n";
+	$content .= "<movie service=\"craftsman-1.0\">\n";
+	$content .= "	<body>\n";
+	return $content;
+}
+
+function write_stupeflix_xml_foot() {
+	$content = "	</body>\n";
+	$content .= "</movie>";
+	return $content;
+}
+
+
+function post_file_stupeflix($tour, $id_video, $profiles = stupeflixProfiles, $url_notification = URL_VIDEO_NOTIFICATION,$url_post = ""){
+	global $bench;
+	try{
+		$conversion = generate_guid();
+		$retour = array();
+		// Create the helper class		
+		$stupeflix = new Stupeflix(stupeflixAccessKey, stupeflixSecretKey,stupeflixHost);
+		foreach($profiles as $profile){
+			$resource = generate_guid();
+			if($url_post != ""){
+				$upload = new StupeflixHttpPOSTUpload($url_post);
+				$retour[] = array('id' => $conversion, 'resource' => $resource, 'ref' => $profile['profile'], 'xml'=> $profile['xml'], 'url_post'=> $url_post,'url_notification'=> $url_notification);
+			}else{ 
+				$upload = new StupeflixHttpPOSTUpload(get_storage_path( "post", $id_video, getProfilExt($profile['profile']))."&force=true");	
+				$retour[] = array('id' => $conversion, 'resource' => $resource, 'ref' => $profile['profile'], 'xml'=> $profile['xml'], 'url_post'=> get_storage_path("post",$id_video,getProfilExt($profile))."&force=true",'url_notification'=> $url_notification);
+			}
+			$prof = array(new StupeflixProfile($profile['profile'], array($upload), null));
+			$notify = new StupeflixNotify($url_notification);
+			$prof = new StupeflixProfileSet($prof, null, $notify);
+			$resource = str_replace('-','',$resource.$tour);
+			$path_file = PATH_TEMP.$conversion.".xml";
+			file_put_contents($path_file,$profile['xml']);
+			$stupeflix->sendDefinition( stupeflixUser, $resource, $path_file);
+			$stupeflix->createProfiles(	stupeflixUser, $resource, $prof);
+			@unlink($path_file);
+		}
+	 	return $retour;
+	}catch (Exception $e) {
+		return $e->getMessage();
+	}
+}
+
+function check_file_stupeflix($resource, $profil){
+	$stupeflix = new Stupeflix(stupeflixAccessKey, stupeflixSecretKey, stupeflixHost);
+	$infoArray = $stupeflix->getProfileStatus( stupeflixUser, $resource, $profil);
+
+	$return = -1;
+	if(count($infoArray[0]) > 0){
+		$info = $infoArray[0]->status;
+		switch($info->status){
+			case 'available':
+				$return = 1;
+				break;
+			case 'queued':
+			case 'generating':
+				$return = 0;
+				break;
+			case 'error':
+				$return = -1;
+				break;
+		}
+	}
+	return array('state' => $return, 'infos' => $info);
+}
+
+function download_stupeflix($id_video, $profile = stupeflixDefaultProfiles, $upload = true, $diffusion = false,$log=true){
+	$ext = getProfilExt($profile);
+	if($log) write_stupeflix_log("[CONVERSION][".$id_video."] GET PROFILE");
+	$stupeflix = new Stupeflix(stupeflixAccessKey, stupeflixSecretKey, stupeflixHost);
+	if($log) write_stupeflix_log("[CONVERSION][".$id_video."] GET TMP VIDEO: ".PATH_TEMP.$id_video.".".$ext);
+	$stupeflix->getProfile(stupeflixUser, preg_replace('/\-/','',$id_video), $profile, PATH_TEMP.$id_video.".".$ext);   
+	if($upload){
+		if($log) write_stupeflix_log("[CONVERSION][".$id_video."] Envoie vidéo: ".get_storage_path("post",$id_video,$ext)."&force=true");
+		$client = &new HTTP_Request(get_storage_path("post",$id_video,$ext)."&force=true");
+		$client->setMethod(HTTP_REQUEST_METHOD_POST);
+		$client->addFile("fichier",PATH_TEMP.$id_video.".".$ext);
+		$client->sendRequest();
+	 	if($log) write_stupeflix_log("[CONVERSION][".$id_video."] Upload OK");
+	}
+	
+ 	if(file_exists("./logo/".$id_video.".png")){ @unlink("./logo/".$id_video.".png");}
+ 	if($diffusion){ return PATH_TEMP.$id_video.".".$ext;}
+ 	@unlink(PATH_TEMP.$id_video.".".$ext);
+ 	return "";
+}
+
+function write_stupeflix_log($msg){
+	if($msg != ""){
+		if(!file_exists(CONVERT_LOG_FILE)){ touch(CONVERT_LOG_FILE);}
+		file_put_contents(CONVERT_LOG_FILE,date('Y-m-d H:i:s - ').$msg."\n".substr(file_get_contents(CONVERT_LOG_FILE),0,50000));
+	}
+}
+
+
+/**
+* Diffusion
+**/
+function diffuse_video($file= "", $lang="US", $description = "", $address = "", $price = "", $beds = "", $bath = "", $ref = "",$delete_file = true){
+	//file
+	if(is_guid($file)){ 
+		write_stupeflix_log("[DIFFUSION_VIDEO] Id_video:".$file);
+		if(file_get_contents(get_storage_path("exist",$file,DIFFUSION_EXT)) === 'true'){
+			write_stupeflix_log("[DIFFUSION_VIDEO] download video:".$file);
+			file_put_contents( PATH_TEMP.$file.".".DIFFUSION_EXT, get_storage_path("get",$file,DIFFUSION_EXT));
+			$file = PATH_TEMP.$file.".".DIFFUSION_EXT;
+		}else{	
+			$file = "";
+		}
+	}
+	if(!file_exists($file)){ 
+		write_stupeflix_log("[DIFFUSION_VIDEO] File not found:".$file);
+		return false;
+	}
+	
+	//description
+	if($description == "") { $description = YOUTUBE_DESCRIPTION;} 
+	//titre
+	if($address != ""){
+		$title = $address;
+		if($price!= "") $title .= " - ".$price;
+		if($beds > 0 && $bath > 0) $title .= " - ".$beds."/".$bath;
+	}else{
+		$title = $ref;
+	}
+	write_stupeflix_log("[DIFFUSION_VIDEO] titre:".$title." | description:".$description);
+	$tube = new PHPTube (YOUTUBE_LOGIN, YOUTUBE_PASS, false);
+	$id = $tube->upload ($file,DIFFUSION_TITLE.$title,YOUTUBE_TAGS, $description, YOUTUBE_CATEGORIE, $lang);
+	if($delete_file){ @unlink($file);}
+	write_stupeflix_log("[DIFFUSION_VIDEO] youtube Id: ".$id);
+	return $id;
+}
+
+function diffuse_video_dailymotion($file= "", $lang="US", $description = "", $address = "", $price = "", $beds = "", $bath = "", $ref = "",$delete_file = true){
+	//file
+	if(is_guid($file)){ 
+		write_stupeflix_log("[DIFFUSION_VIDEO] Id_video:".$file);
+		if(file_get_contents(get_storage_path("exist",$file,DIFFUSION_EXT)) === 'true'){
+			write_stupeflix_log("[DIFFUSION_VIDEO] download video:".$file);
+			file_put_contents( PATH_TEMP.$file.".".DIFFUSION_EXT, get_storage_path("get",$file,DIFFUSION_EXT));
+			$file = PATH_TEMP.$file.".".DIFFUSION_EXT;
+		}else{	
+			$file = "";
+		}
+	}
+	if(!file_exists($file)){ 
+		write_stupeflix_log("[DIFFUSION_VIDEO] File not found:".$file);
+		return false;
+	}
+	
+//	//description
+//	if($description == "") { $description = YOUTUBE_DESCRIPTION;} 
+//	//titre
+//	if($address != ""){
+//		$title = $address;
+//		if($price!= "") $title .= " - ".$price;
+//		if($beds > 0 && $bath > 0) $title .= " - ".$beds."/".$bath;
+//	}else{
+//		$title = $ref;
+//	}
+	
+	$client = &new HTTP_Request("http://2.upload.dailymotion.com/widget/upload/?web=1&amp;webcam=1&amp;skin=default&amp;cacherand=38&upload_id=8468754aac5432996a7f8e5cfb387ff0&sid=128563b79fb72a18b00417bf71397841&urlbase=http://www.dailymotion.com");
+	$client->setMethod(HTTP_REQUEST_METHOD_POST);
+	$client->addFile("video",$file);
+	$client->sendRequest();
+ 	if($log) write_stupeflix_log("[CONVERSION][".$id_video."] Upload OK");
+	
+	return $id;
+}
+
+
+
+/**
+ * Parses JSON (JavaScript value expression) into PHP variable
+ * (array or object).
+ *
+ * @compat
+ *    behaves similiar to PECL version
+ *    but is less quiet on errors
+ *    might ignore some misformed representations
+ * @bugs
+ *    doesn't decode unicode \uXXXX string escapes
+ *
+ */
+if (!function_exists("json_decode")) {
+   function json_decode($json, $assoc=FALSE, /*emu_args*/$n=0,$state=0,$waitfor=0) {
+
+      // result var
+      $val = NULL;
+      static $lang_eq = array("true" => TRUE, "false" => FALSE, "null" => NULL);
+      static $str_eq = array("n"=>"\012", "r"=>"\015", "\\"=>"\\", '"'=>'"', "f"=>"\f", "b"=>"\b", "t"=>"\t", "/"=>"/");
+
+      // flat char-wise parsing
+      for (/*n*/; $n<strlen($json); /*n*/) {
+         $c = $json[$n];
+
+         //= in-string
+         if ($state==='"') {
+            if ($c == '\\') {
+               $c = $json[++$n];
+               if (isset($str_eq[$c])) {
+                  $val .= $str_eq[$c];
+               }
+               elseif ($c == "u") {
+                  $val .= "\\u";
+               }
+               else {
+                  $val .= "\\" . $c;
+               }
+            }
+            elseif ($c == '"') {
+               $state = 0;
+            }
+            else {
+               $val .= $c;
+            }
+         }
+
+         //> end of sub-call (array/object)
+         elseif ($waitfor && (strpos($waitfor, $c) !== false)) {
+            return array($val, $n);  // return current value and state
+         }
+
+         //= in-array
+         elseif ($state===']') {
+            list($v, $n) = json_decode($json, 0, $n, 0, ",]");
+            $val[] = $v;
+            if ($json[$n] == "]") { return array($val, $n); }
+         }
+
+         //= in-object
+         elseif ($state==='}') {
+            list($i, $n) = json_decode($json, 0, $n, 0, ":");   // this allowed non-string indicies
+            list($v, $n) = json_decode($json, 0, $n+1, 0, ",}");
+            $val[$i] = $v;
+            if ($json[$n] == "}") { return array($val, $n); }
+         }
+
+         // looking for next item (0)
+         else {
+
+            //> whitesapce
+            if (preg_match("/\s/", $c)) {
+               // skip
+            }
+
+            //> string begin
+            elseif ($c == '"') {
+               $state = '"';
+            }
+
+            //> object
+            elseif ($c == "{") {
+               list($val, $n) = json_decode($json, $assoc, $n+1, '}', "}");
+               if ($val && $n && !$assoc) {
+                  $obj = new stdClass();
+                  foreach ($val as $i=>$v) {
+                     $obj->{$i} = $v;
+                  }
+                  $val = $obj;
+                  unset($obj);
+               }
+            }
+            //> array
+            elseif ($c == "[") {
+               list($val, $n) = json_decode($json, $assoc, $n+1, ']', "]");
+            }
+
+            //> comment
+            elseif (($c == "/") && ($json[$n+1]=="*")) {
+               // just find end, skip over
+               ($n = strpos($json, "*/", $n+1)) or ($n = strlen($json));
+            }
+
+            //> numbers
+            elseif (preg_match("#^(-?\d+(?:\.\d+)?)(?:[eE](-?\d+))?#", substr($json, $n), $uu)) {
+               $val = $uu[1];
+               $n += strlen($uu[0]) - 1;
+               $val = strpos($val, ".") ? (float)$val : (int)$val;
+               if (isset($uu[2])) {
+                  $val *= pow(10, (int)$uu[2]);
+               }
+            }
+
+            //> boolean or null
+            elseif (preg_match("#^(true|false|null)\b#", substr($json, $n), $uu)) {
+               $val = $lang_eq[$uu[1]];
+               $n += strlen($uu[1]) - 1;
+            }
+
+            // parsing error
+            else {
+               // PHPs native json_decode() breaks here usually and QUIETLY
+              trigger_error("json_decode: error parsing '$c' at position $n", E_USER_WARNING);
+               return $waitfor ? array(NULL, 1<<30) : NULL;
+            }
+
+         }//state
+
+         // next char
+         if ($n === NULL) { return NULL; }
+         $n++;
+      }//for
+
+      // final result
+      return ($val);
+   }
+}
+
+
+/***********************************************/
+/***********************************************/
+/***************	Crypt Method *****************/
+/***********************************************/
+/***********************************************/
+
+/*
+ * Calculate HMAC-SHA1 according to RFC2104
+ * See http://www.faqs.org/rfcs/rfc2104.html
+ */ 
+function hmacsha1($key,$data) { 
+    $blocksize=64; 
+    $hashfunc='sha1'; 
+    if (strlen($key)>$blocksize) 
+        $key=pack('H*', $hashfunc($key)); 
+    $key=str_pad($key,$blocksize,chr(0x00)); 
+    $ipad=str_repeat(chr(0x36),$blocksize); 
+    $opad=str_repeat(chr(0x5c),$blocksize); 
+    $hmac = pack( 
+                'H*',$hashfunc( 
+                    ($key^$opad).pack( 
+                        'H*',$hashfunc( 
+                            ($key^$ipad).$data 
+                        ) 
+                    ) 
+                ) 
+            ); 
+    return bin2hex($hmac); 
+} 
+ 
+/*
+ * Used to encode a field for Amazon Auth
+ * (taken from the Amazon S3 PHP example library)
+ */ 
+function hex2b64($str) 
+{ 
+    $raw = ''; 
+    for ($i=0; $i < strlen($str); $i+=2) 
+    { 
+        $raw .= chr(hexdec(substr($str, $i, 2))); 
+    } 
+    return base64_encode($raw); 
+} 
+ 
+/* Create the Amazon S3 Policy that needs to be signed */ 
+$policy = '{ "expiration": "2007-12-01T12:00:00.000Z", 
+  "conditions": [ 
+    {"acl": "public-read" }, 
+    {"bucket": "johnsmith" }, 
+    ["starts-with", "$key", "user/eric/"], 
+    ["content-length-range", 2048, 20971520] 
+  ]'; 
+ 
+/*
+ * Base64 encode the Policy Document and then
+ * create HMAC SHA-1 signature of the base64 encoded policy
+ * using the secret key. Finally, encode it for Amazon Authentication.
+ */ 
+$base64_policy = base64_encode($policy); 
+$signature = hex2b64(hmacsha1($secretkey, $base64_policy)); 
+?>

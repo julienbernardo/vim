@@ -1,0 +1,144 @@
+<?php
+//  $tab_info = get_user_infos($_SESSION['ID_UTILISATEUR']);
+
+if(NEW_INTEGRATION) {
+	if($data === false){
+?>
+	<div class="notify_box messwarn" style="display: block;"><?=$dico['diffusion']['not_allowed_for_your_country'];?></div>
+<?php
+	}else{
+		if(is_guid($tab_diff['ID_DIFFUSION_PORTAIL']) && $tab_diff['ID_STATUT_DIFFUSION'] >= 0 && $tab_diff['ID_STATUT_DIFFUSION'] != 1){
+?>
+	<div class="notify_box messinfo" style="display:block;"><?=$dico['diffusion']['publication_in_progress'];?></div>
+<?php	
+		}else if($tab_diff['ID_STATUT_DIFFUSION'] == 1){
+
+		}else{	
+			if($dico['diffusion']['do_not_forget_activation'] != ""){
+?>
+<div class="notify_box messinfo" style="display:block;"><?=$dico['diffusion']['do_not_forget_activation'];?></div>
+<?php
+			}
+
+?>
+<div class="row_form">
+  <div class="float_l half "><?=$dico['edit_tour']['field_title'];?></div>
+  <div class="float_r half"><?=$dico['edit_tour']['field_price'];?></div>
+  <div class="clear_sep"></div>
+</div>
+<div class="row_form">
+  <div class="float_l half ">
+    <input type="text" class="input_block input_w_1_2" name="ref_partner" id="ref_partner" maxlength="64" value="<?=substr(htmlspecialchars($tab_tour['NOM_VISITE'], ENT_QUOTES),0,64)?>" />
+  </div>
+  <div class="float_r half">
+    <input type="text" class="input_block input_w_1_4 td_r" name="tour_price" id="tour_price" value="<?=htmlspecialchars($tab_tour['PRIX_BIEN'], ENT_QUOTES)?>" />
+  </div>
+  <div class="clear_sep"></div>
+</div>
+
+<?php
+			if($data['states'] != ""){
+?>
+<div class="row_form"><?=$dico['edit_tour']['field_state'];?></div>
+<div class="row_form">
+  <select class="input_block float_l diff_block_w_3_4 form_align_left" name="form_etat" id="form_etat" onchange="updateKijijiForm(true);">
+          <?=$data['states'];?>
+  </select>
+  <div style="display: none;" id="wait_state" class="wait_icon float_l">
+    <img src="images/ajax_wait_blue.gif">
+
+  </div>
+</div>
+<div id="zone">
+  <div id="div_ville">
+    <div class="row_form"><?=$dico['edit_tour']['field_city'];?></div>
+    <div class="row_form">
+      <select class="input_block float_l diff_block_w_3_4 form_align_left" name="form_ville" id="form_ville" onchange="updateKijijiForm(false);" >
+        <?=$data['towns'][$data['state']];?>
+      </select>
+      <div style="display: none;" id="wait_ville" class="wait_icon float_l">
+        <img src="images/ajax_wait_blue.gif">
+      </div>
+    </div>
+  </div>
+<input name="form_quartier" id="form_quartier" value="" type="hidden">
+</div>
+<?php
+  				foreach($data['towns'] as $k=>$towns){
+?>
+      <select style="display:none;"name="form_ville" id="form_ville_<?=$k;?>">
+      	  <?=$towns;?>
+      </select>
+<?
+	  			}
+			}
+?>
+<div class="clear_sep"></div>
+<div class="row_form"><?=$dico['edit_tour']['field_description'];?></div>
+<div>
+  <textarea class="input_block input_w_1_1" name="tour_description" id="tour_description" rows="7"><?=htmlspecialchars($tab_tour['DESCRIPTION'], ENT_QUOTES)?></textarea>
+</div>
+<?php
+		}
+?>	
+<div id="button_zone" class="margin4T">
+  <span class="btn float_l form_align_left <?=($data['readyToPublish']  ? '' : ' btn_deactivated');?>" id="button_publish" onclick="return saveKijijiData('<?=$partner?>', '<?=$tour?>', $F('ref_partner'), ['tour_description', 'tour_price']);">
+    <span class="inner_btn"><a href="#"><?=$dico['common']['post']?></a></span>
+  </span>
+<?php
+		if($is_diff) {
+?>
+  <span class="btn float_l form_align_left" onclick="return deletePublication('<?=$partner?>', '<?=php_str_to_js($ref_proposee)?>');">
+    <span class="inner_btn"><a href="#"><?=$dico['common']['remove']?></a></span>
+  </span>
+<?php
+		}
+	}
+?>
+  <span class="btn float_l form_align_left" onclick="return closeAlertBox();">
+    <span class="inner_btn"><a href="#"><?=$dico['common']['cancel']?></a></span>
+  </span>
+  <div class="clear_sep"></div>
+</div>
+<div class="notify_box margin4T warning" id="add_publication_notification" style="display:none;">&nbsp;</div>
+<?php
+} else {
+?>
+  <div class="row_form">
+    <p class="float_l form_align_left diff_block_w_3_4"><?=$dico['edit_tour']['field_title'];?></p>
+    <p class="float_l form_align_left diff_block_w_1_4"><?=$dico['edit_tour']['field_price'];?></p>
+  </div>
+  <div class="row_form">
+    <input type="text" class="input_block diff_input_w_3_4" name="ref_partner" id="ref_partner" value="<?=htmlspecialchars($tab_tour['NOM_VISITE'], ENT_QUOTES)?>" />   
+    <input type="text" class="input_block diff_input_w_1_4 td_r" name="tour_price" id="tour_price" value="<?=htmlspecialchars($tab_tour['PRIX_BIEN'], ENT_QUOTES)?>" />
+  </div>
+  <div class="row_form">
+    <p><?=$dico['edit_tour']['field_description'];?></p>
+  </div>
+  <div class="row_form">
+    <textarea class="input_block diff_input_w_4_4 diff_textarea_h_100 diff_textarea_float_left" name="tour_description" id="tour_description"><?=$tab_tour['DESCRIPTION'];?></textarea>
+  </div>
+  <div class="clear_sep"></div>
+  
+<div id="button_zone" class="row_form">
+  <span class="btn float_l form_align_left" id="button_publish" onclick="return saveKijijiData('<?=$partner?>', '<?=$tour?>', $F('ref_partner'), ['tour_description', 'tour_price']);">
+    <span class="inner_btn"><a href="#"><?=$dico['common']['post']?></a></span>
+  </span>
+<?php
+	if($is_diff) {
+?>
+  <span class="btn float_l form_align_left" onclick="return deletePublication('<?=$partner?>', '<?=php_str_to_js($ref_proposee)?>');">
+    <span class="inner_btn"><a href="#"><?=$dico['common']['remove']?></a></span>
+  </span>
+<?php
+	}
+?>
+  <span class="btn float_l form_align_left" onclick="return closeLightBox();">
+    <span class="inner_btn"><a href="#"><?=$dico['common']['cancel']?></a></span>
+  </span>
+  <div class="clear_sep"></div>
+</div>
+<div class="notify_box" id="add_publication_notification" style="display: none;">&nbsp;</div>
+<?php
+}
+?>

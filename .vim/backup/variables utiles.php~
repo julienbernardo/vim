@@ -1,0 +1,459 @@
+﻿ma ligne directe: 0146257589
+
+[DEBUG] video error: BB77F9E2-596E-7658-87D8-827D0CD2CDC4
+video generation error: ECB9B989-6BD2-07F4-F260-5C4094CA9BD9 / Tour: 6995D88B-1B9B-2D93-E6A7-728B01F7E60F
+[COMMANDE]
+scp import.xml root@10.0.4.150:/var/www/ftp/importcompetitor/import.xml
+grep -Rin "ajax.php" ./
+ls -al | wc -l
+du -hs
+rename 's/^20100913150740-//' *.xml
+cd /var/www/video.previsite.com/tmp/temp/video/ && find *.* -mtime  +7 | xargs rm
+
+[VIM]
+Réindentation:
+Maj + v
+$ (pour trouver accolade du if)
+% (aller à l'accolade fermante)
+=
+mode column: ctrl + V
+
+    Ctrl + V to go into column mode
+    Select the columns and rows where you want to enter your text
+    Shift + i to go into insert mode in column mode
+    Type in the text you want to enter. Dont be discouraged by the fact that only the first row is changed.
+    Esc to apply your change (or alternately Ctrl+c)
+
+
+CTRL + a | x (incrémenté et décrémenté)
+
+[WINDOWS]
+taskkill /f /im AcapelaTraitement.exe 
+
+[LOGO VIDEO]
+taille optimale 300*162px
+
+[ACCES SERVEUR US]
+go to logmein.com login as gzenone@previsite.com/prev180nyc
+the office it people plugged the port for rdc
+so u have to use logmein
+the server login is administrator/prev180nyc
+logmein works very well though
+
+[gmail account]
+previsite@gmail.com  / Previsite123
+mobile@previsite.com / Prev180!Google
+
+[ID]
+mon id= 62AEE050-1DFF-5F1F-76C9-42103B8D8ACA
+id_distrib= F622B422-83BB-47DF-EF79-2359A7FD0F9A
+id societe = CB479859-DDEE-4F0B-9898-72B8E200959E
+id tour = 1B73E55A-2C88-A389-D509-A30032A411CA
+id_partner = FF397669-791E-DF22-93D1-4199F37F67F8
+skype phone = (347) 741-8363
+twilio number= (917) 338-4619
+google phone = (347) 559-4715
+demos video:392E7838-258E-0443-E793-D90ED1477175
+
+[TWILIO]
+twilio number = (917) 338-4619
+mobile.previsite.com / prev2011sms!
+
+[OVH]
+Compte OVH:
+cc78426-ovh / prev180!
+Compte OVH SMS:
+sms-cc78426-1
+Doc:
+http://guides.ovh.com/TelSmsUserSend
+https://www.ovh.com/managerv3/sms.pl?language=fr&hostname=&lastxsldoc=general%2Fproducts%2Fproducts.xsl&csid=0&position=
+Users:
+previsite / prevprev
+roomorama / prevprev
+Telephone:
+Roomorama: +18777507666
+Previsite: +33146257575
+
+[Appli android]
+adb -s emulator-5554 shell
+sqlite3 /data/data/com.previsite.android.previsite/databases/previsite.db
+get debug key:
+keytool -exportcert -alias androiddebugkey -keystore ~/.android/debug.keystore | openssl sha1 -binary | openssl base64 (password: android)
+
+[Acapela]
+répertoire d'installation des voix: C:\ProgramData\Acapela Group\Acapela Telecom TTS\Data\
+voice: EN, US, FR, BE, ES, DE, RU, IT, NL, PT
+
+[Mobile Stats]
+select id_video 'Keyword', Adresse_ip 'Adresse ip', agent_mobile 'navigateur', date_statistique_mobile 'date consultation' from statistique_mobile where partner='MAJESTIC' and date_statistique_mobile > '2010-07-23 13:00:00' order by date_statistique_mobile desc
+
+[Music / TTS]
+http://music2.previsite.net/generate.php?id=261ACDF7-64AC-5450-A4D6-57F064F076C9&text=%20ceci%20est%20un%20texte%20pour%20v%E9rifier%20que%20la%20g%E9n%E9ration%20marche%20correctement!
+http://api.previsite.com/tts/?todo=done&id=261ACDF7-64AC-5450-A4D6-57F064F076C9&voice=bruno&status=0.OK
+
+
+[Kaufman export]
+select nom_visite,'K-'+ref_portail, 'http://m.previsite.com/K/'+ref_portail, 'http://chart.apis.google.com/chart?chld=M|0&cht=qr&chs=300x300&chl=http%3A%2F%2Fm.previsite.com%2FK%2F'+ref_portail from diffusion_portail 
+inner join visite on visite.id_visite=diffusion_portail.id_visite
+where id_portail='8C4CAC8B-A520-0C4F-CC24-2FB658D82BCB' and id_statut_diffusion > 0
+
+[Appli facebook]
+http://dev.api.previsite.com/software/get_user_tours.php?p=191F4B45-53AD-2D10-DBE2-E7479443BBE7&u=allardimmo
+&rt=1 -> temps réel
+&img=1 -> qu'avec image
+
+http://dev.api.previsite.com/software/get_user_tours.php?p=191F4B45-53AD-2D10-DBE2-E7479443BBE7&d=020666EC-0D5E-546D-CFB5-875CEDF2A8CA
+
+[gateway notification emailing]
+http://dev.api.previsite.com/emailing/?src=TEST&template=TEST&partner=43E97248-A651-E44E-9BCC-57FBBD0AAE41&params=[{%22EMAIL%22:%22julien@previsite.com%22,%22PARAMS%22:{%22REF_PORTAIL%22:50364573,%22USERCODE%22:%22adresseachier%22}}]
+
+[WebService]
+http://dev.api.previsite.com/rest/p/tour/17040EHE?partnerID=93511BB8-6008-036C-F789-A5DC85CC60AD&password=xqlr796&lock=0&import_name=proprietes_privees&language=FR&country=FR&hide_address=1&user=proprietesprivees&listing_url=http%3A%2F%2Fwww.proprietes-privees.com%2Findex%2Fannonce%3Fcode%3D17040&ref_listing=17040&transaction=1&property_type=2&elevator=&digicode=&cellar=&title=Vannes+Sud+%3A+Erika+HERMANS&price=1545000&city=BERRIC&zip=56230&description=Bretagne+Sud%2C+Morbihan%2C+proche+Vannes+%2856230%29%2C+plages+%C3%A0+15+min.+Berric%3A+Magnifique+propri%C3%A9t%C3%A9+compos%C3%A9e+de+plusieurs+b%C3%A2timents+%28ancienne+ferme+et+moulin+%C3%A0+eau%29+avec+%C3%A9tang%2C+rivi%C3%A8re%2C+prairies%2C+bois%2C+verger+sur+9+hectares.+La+propri%C3%A9t%C3%A9+a+%C3%A9t%C3%A9+renov%C3%A9e+avec+beaucoup+de+go%C3%BBt+en+2000.+Chauffage+par+le+sol%2C+double+vitrage%2C+pas+de+travaux+%C3%A0+pr%C3%A9voir.+Grand+salon+avec+chemin%C3%A9e.+Possibilit%C3%A9+d%27explo%C3%AEter+4+chambres+d%27h%C3%B4tes.+Toutes+les+chambres+ont+leur+salle+d%27eau%2Ftoilettes.+La+propri%C3%A9t%C3%A9+comprend+un+espace+d%C3%A9tente+%C3%A0+l%27ext%C3%A9rieur+avec+jacuzzi+et+une+d%C3%A9pendance+pour+faire+des+r%C3%A9unions+de+famille.+Une+suite+parentale+en+duplex+de+30+m%C2%B2+a+%C3%A9t%C3%A9+construite+dans+un+nouveau+b%C3%A2timent+%28dans+le+style+d%27antan%29+en+2006.+Piscine+chauff%C3%A9e.+Visitez+le+site+internet+www.moulindubois.com++Prix%3A+1+545+000+euros++FAI.+Cette+demeure+de+caract%C3%A8re+vous+est+pr%C3%A9sent%C3%A9e+par+Erika+Hermans+06+33+39+98+19++e-mail+%3A+e.hermans%40proprietes-privees.com+-+Site+%3A+www.proprietes-privees.com.+RCS+487+624+777.+Mandat+n%C2%B0+15147.+Honoraires+r%C3%A9duits+inclus.&rooms=12&bedrooms=7&total_floor=3&num_floor=&field_area=90000&rent_charges=&orientation=s&interphone=&heating_type=&kitchen_type=&facebook_update=true&nolog=1
+&debug=true&update=true
+
+[Démo VIDEO]
+(FR/US)_CUSTOM: http://www.youtube.com/watch?v=1hcCTrxKgoY
+
+[VIDEO ERROR]
+select * from video_diffusion where id_video in (
+select distinct video.id_video from video 
+left join video_conversion on video_conversion.id_Video=video.id_video
+where id_visite in (
+	select id_visite from (
+		select id_visite,type_video,count(*) nb from video 
+		group by id_visite,type_video
+	) as tab where nb > 1
+) and id_conversion is null
+)
+--diffusion
+select * from video_diffusion where url_video_diffusion like '%sans_titre' and id_statut_diffusion > 0 
+order by date_modification_diffusion desc
+
+
+[VIDEO CRON]
+insert into video_cron(id_statut_cron,date_creation_cron,date_modification_cron,date_Dernier_cron,id_distributeur,id_video,id_visite)
+values(0,'2010-09-09 00:00:00','2010-09-09 00:00:00','2010-09-09 00:00:00','D6ABDAF9-2DDB-EA68-559A-86FA30541513','EBFF44DD-AFEC-FCE7-37E3-F576F56E4CB6', 'B4992E6E-5A52-411E-F9FB-F07A7CB57877')
+
+[DIVERS]
+viewer sur le 40:http://dev.tour.previsite.com/
+http://storage2.previsite.net/getfile.asp?id=#ID#&ext=#EXT#
+http://storage1.previsite.net/getfile.asp?id=1B73E55A-2C88-A389-D509-A30032A411CA&ext=flv
+
+[LAYAR]
+Your Developer ID: 	1513
+Your Developer KEY: 1m7zei4w
+
+[SMS]
+my tél (MO French):358795033943 (http://dev.sms.previsite.net/index.php?id=E13CB312-3C45-F6DE-C938-D84FA85C2945&type=MO&todo=detail_msg)
+tél caroline: 718-687-2072
+caroline carrier: att&t
+antoine: 917-902-3618 (9179023618)
+antoine carrier: verizon
+kristina:214-228-3062 (tmobile)
+http://dev.sms.previsite.net/mt_other.php?country=ZA&tour=48821F18-7D5C-8586-12F4-A2EA279A9A90&id=62AEE050-1DFF-5F1F-76C9-42103B8D8ACA&lang=en&numero=271111111111
+reload: http://dev.sms.previsite.net/credits.php?id=9BF0B928-44FD-164B-5E2F-EB68308ED084&todo=reload&pack=1
+
+[URL IMPORT COMPETITOR DEBUG]
+http://dev.api.previsite.com/import_competitor/?id=62AEE050-1DFF-5F1F-76C9-42103B8D8ACA&urlcomp=http://tour.previsite.com/E33AEE5D-7311-A7F5-0741-1D3E720923A3&debug=true
+
+[VIDEO]
+http://dev.video.previsite.net/new/generate.php?id=261ACDF7-64AC-5450-A4D6-57F064F076C9&type=FR&ref=&profiles=mobile;youtube&distrib=F622B422-83BB-47DF-EF79-2359A7FD0F9A
+http://dev.video.previsite.net/generate.php?id=261ACDF7-64AC-5450-A4D6-57F064F076C9&type=FR&ref=&profiles=mobile;youtube&distrib=F622B422-83BB-47DF-EF79-2359A7FD0F9A
+http://dev.video.previsite.net/get_logo.php?type=FR&pos=start&tour=436D729D-3298-2229-E92A-001C0F936C72&distrib=D38D5EBD-4FF0-FAAC-317B-62E2A0C3502A
+logo avendreàlouer: http://bigfile.previsite.com/files/logo_prev.jpg
+
+presta: 
+- BW => http://video.previsite.net/detail_video.php?id=2E5F4C5F-4935-804C-AC7C-D3119EA8EF59&type=FR
+
+[diffusion]
+Pinterest: http://dev.api.previsite.com/publication/software_publish.php?tour=261ACDF7-64AC-5450-A4D6-57F064F076C9&user=62AEE050-1DFF-5F1F-76C9-42103B8D8ACA&ref=261ACDF7-64AC-5450-A4D6-57F064F076C9&title=titles&partner=D210429F-4C95-FB13-59F1-896693018F15&mode=auto&action=do|in_progress 
+/*
+debug migration video en export:
+select * from diffusion_portail where id_visite='261ACDF7-64AC-5450-A4D6-57F064F076C9' and id_portail='59C4948B-DB6D-FDAF-E15D-CD67B8347126'
+select * from diffusion_portail_option where id_diffusion_portail in (select id_diffusion_portail from diffusion_portail where id_visite='261ACDF7-64AC-5450-A4D6-57F064F076C9' and id_portail='59C4948B-DB6D-FDAF-E15D-CD67B8347126')
+
+select * from video_diffusion where id_video='845706D4-6A04-9AA8-F7F0-AB365C9185D5' and site_diffusion ='YOUTUBE'
+
+select * from video_diffusion where id_video='845706D4-6A04-9AA8-F7F0-AB365C9185D5' and site_diffusion ='DAILYMOTION'
+
+select count(*) from diffusion_portail 
+where id_portail in ('E6030F50-7739-10C3-054C-27C3F035F3B6', '812F1D71-043D-282E-640E-2B3F66072949', 'A7D2ED18-84B5-E063-65B8-4A23DF54FC0A', '0C46A1AA-BC6C-A377-5B5D-9683B0F381A9', 'B7B5060D-ADBA-2E30-9DAD-A8730E47A9D0', '38429EA1-8BAD-1795-807E-B46BCF131567', '59C4948B-DB6D-FDAF-E15D-CD67B8347126', 'B18D4B31-EC0C-934B-953F-CFD48ADECC81', 'B1CBDD27-BF97-2449-B047-D7C9BAF3AD8F', '1876B6F8-6894-1335-44C5-D984D5C8E04E')
+and id_statut_diffusion=0
+*/
+http://dev.api.previsite.com/publication/software_publish.php?tour=261ACDF7-64AC-5450-A4D6-57F064F076C9&user=62AEE050-1DFF-5F1F-76C9-42103B8D8ACA&ref=261ACDF7-64AC-5450-A4D6-57F064F076C9&title=titles&partner=59C4948B-DB6D-FDAF-E15D-CD67B8347126&mode=auto&new=&no_tts=no_ttss&rediffuse=rediffuses&action=do 
+
+http://dev.api.previsite.com/publication/software_unpublish.php?tour=261ACDF7-64AC-5450-A4D6-57F064F076C9&user=62AEE050-1DFF-5F1F-76C9-42103B8D8ACA&partner=59C4948B-DB6D-FDAF-E15D-CD67B8347126&mode=auto
+
+http://dev.video.previsite.net/diffusion.php?id=261ACDF7-64AC-5450-A4D6-57F064F076C9&site=youtube&login=adresseachier&password=youtube-ass
+http://dev.api.previsite.com/diffusion/manage.php?todo=check&login=pistoorimmobilien&password=fisch1975&distrib=88C2ECF5-E748-9188-0849-DA1D3AF51847&site=youtube
+
+http://www.dailymotion.com/user/AgenceSaintFerdinand
+http://dev.api.previsite.com/diffusion/manage.php?todo=purge&login=AgenceSaintFerdinand&password=agencesaintferdinand2011prev!&site=DAILYMOTION&page=&limit=40
+http://dev.video.previsite.net/publication.php?id=261ACDF7-64AC-5450-A4D6-57F064F076C9&site=YOUTUBE&type=FR&ref=261ACDF7-64AC-5450-A4D6-57F064F076C9&notification=http%3A%2F%2Fapi.previsite.com%2Fpublication%2Fnotification.php&login=adresseachier&password=gmail-ass&date=&title=ceci est un titre&distrib=F622B422-83BB-47DF-EF79-2359A7FD0F9A&mode=auto&rediffuse=true
+stupéflix information:
+alias rvnc="ssh -L5900:127.0.0.1:5900 -C root@195.154.160.148"
+x11vnc  -display :0 -auth  /var/run/xauth/A\:0-4aMJcP -passwd MOTDEPASSEROOT
+
+[YOUTUBE]
+clientID: ytapi-adresseachier-Virtualtourpost-uh3arr83-0
+developer key: AI39si5Ga3SshNoiJF8579mPT2IYNOESYmkzchcru-QoEsiHL4OEbJ5q4Hw8adxlrdReENXqT9dO3oKzvEkPAxdTlYfFBb5jPA
+product name:Virtual tour post
+[FACEBOOK]
+http://www.facebook.com/sharer.php?u=http%3A//www.youtube.com/watch%3Fv%3DqmoJptvXn18&t=Test%20Pour%20voir
+
+
+[ACCES YOUTUBE/DAILYMOTION]
+- VIDEOTOUR:
+	- YOUTUBE: videotour.channel@gmail.com/gmail007
+	- DAILYMOTION: videotourchannel/dailymotion007!
+- FR:
+	- YOUTUBE: VisiteVirtuelleImmo/youtube007!
+	- DAILYMOTION: VisiteVirtuelleImmo/dailymotion007!
+- US:
+	- YOUTUBE: PrevisiteChannel/youtube007!
+	- DAILYMOTION: PrevisiteChannel/dailymotion007!
+- DEBUG:
+	- YOUTUBE: adresseachier/youtube-ass
+	- DAILYMOTION: adresseachier/dailymotion-ass
+
+[Profile Video]
+"dvd-mpeg1" :{ 'framerate': 25, 'width':720, 'height':576, 'vcodec' :'mpeg1video', 'acodec':'mp2', 'video_br':'1024k', 'audio_br':'64k'},
+"dvd-mpeg1-small" :{ 'framerate': 25, 'width':360, 'height':288, 'vcodec' :'mpeg1video', 'acodec':'mp2', 'video_br':'256k', 'audio_br':'64k'},
+"flash"  :{'width':640, 'height':480, 'vcodec' :'flv', 'acodec':'mp3', 'video_br':'512k', 'audio_br':'64k'},
+"flash-med-16-9"  :{ 'framerate': 25, 'width':432, 'height':240, 'vcodec' :'flv', 'acodec':'mp3', 'video_br':'192k', 'audio_br':'32k', 'samplerate':'22050', 'ext':'flv'},
+"flash-small"  :{'width':320, 'height':240, 'vcodec' :'flv', 'acodec':'mp3', 'video_br':'192k', 'audio_br':'32k'},
+"mobile" :{'width':320, 'height':240, 'vcodec' :'mpeg4', 'acodec':'aac', 'video_br':'256k', 'audio_br':'16k', FAST_START:True},
+"mobile-small" :{'width':160, 'height':120, 'vcodec' :'mpeg4', 'acodec':'aac', 'video_br':'92k', 'audio_br':'16k', FAST_START:True},
+"flash-hq"  :{ 'framerate': 25, 'width':640, 'height':480, 'vcodec' :'flv', 'acodec':'mp3', 'video_br':'1024k', 'audio_br':'128k', 'samplerate':'44100', 'ext':'flv'},
+"youtube" :{ 'framerate': 25, 'width':640, 'height':360, 'vcodec' :'h264', 'acodec':'aac', 'video_br':'1024k', 'audio_br':'128k', FAST_START:True, 'ext':'mp4'},
+"480p" :{ 'width':856, 'height':480, 'ext':'mp4'},
+
+[conversion video]
+3GP standard + h263 + AMR
+MP4 + H264 + AACLC + Other Opps streamable!
+
+ffmpeg -y -i 977174b324088cc954.mpg -s qvga -vcodec libx264 test.mp4
+
+[FTP]
+FTP .150
+pure-pw useradd importcompetitor -u 33 -g 33 -m -d /var/www/ftp/importcompetitor    prev007
+
+[SMS ID VISITE]
+French WOW:1B73E55A-2C88-A389-D509-A30032A411CA
+US WOW: 598B7992-5E5D-5F2A-F5E8-51B8C1015490
+test laurent:http://tour.previsite.com/index.php?id=40045D2A-5EE1-D529-CF13-2FEBC8AF61D7
+
+[IMPORT]
+visualtour:http://visualtour.com/inventory.asp?u=168285
+
+[GPS]
+http://software.previsite.com/partners/new/ajax_google_map.php?todo=fetch_google_map_infos&address=#ADDR#&country=#COUNTRY#&zip=#ZIP#&city=#CITY#
+http://maps.google.com/staticmap?center=49.0003465,2.0551515&zoom=14&size=640x480&maptype=mobile&markers=49.0003465,2.0551515,redc&key=ABQIAAAAzr2EBOXUKnm_jVnk0OJI7xSsTL4WIgxhMZ0ZK_kHjwHeQuOD4xQJpBVbSrqNn69S6DOTv203MQ5ufA
+
+[videoYoutubeAPI]
+login/mpd: video.previsite@gmail.com
+client id:ytapi-videoprevisite-videoprevisite-s4d4lh69-0
+developer key:AI39si6jaiFElNtsEIQGnsYdY8Nv_qrvCpTpCmHDv17ce4jyC2Mapq7fcH42WilagREytvYMTWcjOpF40kOUURDacV6q26WnQA
+
+[import tourfactory]         
+http://www.tourfactory.com/
+inventaire: 
+ - http://agent-42772.pages.tourfactory.com/Default.asp?p=Tours      
+ - http://tours.tourfactory.com/results.asp?u=39870
+tour xml: http://tours.tourfactory.com/tours/tourxml.asp?t=468861
+http://tours.tourfactory.com/tours/tour.asp?t=464576
+http://tours.tourfactory.com/tours/media/scene/big2/00/05/60/39/5603980.jpg?aol
+
+[import realbiz360]
+http://is.realbiz360.com/fif=/fpx/9862/20081022131303.Staircase.jpg.ivu&obj=iip,1.0&cell=85,60&cvt=jpeg
+http://is.realbiz360.com/fif=/fpx/9862/20081022131303.Staircase.jpg.ivu&obj=iip,1.0&&wid=800&hei=60&cvt=JPEG
+http://vt.realbiz360.com/Listing-32783.html
+
+[import customvirtualtours]
+//inventory
+http://tour.customvirtualtours.ca/public/vtour/customerTours/1916/4942
+//tours
+http://tour.customvirtualtours.ca/public/vtour/display/4952?viewerType=flash2
+http://tour.customvirtualtours.ca/public/vtour/display/4942?viewerType=flash2
+
+http://tour.customvirtualtours.ca/7652
+http://tour.customvirtualtours.ca/public/vtour/display/7652
+http://tour.customvirtualtours.ca/public/vtour/tourplayer_xml/7652
+http://tour.customvirtualtours.ca/public/vtour/print/7652
+
+[conversion presta]
+id adele: 833C5A9D-E192-DBCD-BB56-2FB451D4E103
+http://195.154.238.164/viewer/ng/classic/viewer.asp?Ref=ade397
+http://195.154.238.164/viewer/ng/classic/scripts/cpad.asp?bgcolor=FFFFFF&iIndex=3485&Speed=20
+http://195.154.238.164/viewer/ng/classic/scripts/menulist.asp?iIndex=3485&List=MIN&Size=&Speed=20&Ref=ade397&Num=&Hauteur=250&Id_langue=FR
+http://195.154.238.164/viewer/ng/classic/scripts/script.asp?Id_image_dst=73743&iIndex=3485&List=MIN&FT=0&Hauteur=250&Id_langue=FR&Speed=20&Ref=ade397&Id_image_src=73744
+
+[UPLOAD DAILYMOTION]
+http://www.dailymotion.com/widget/upload/?web=1&webcam=&skin=default
+
+[Conversion AGENCE PLUS]
+id_partner:31E6BE0D-B651-4922-9AEE-27038D21C4DC
+diffusion portail toute visite active avec id_partner id_statut_diffusion > 0
+
+[jeff issue]
+http://m.previsite.com/25DA5D41 -> fine
+http://m.previsite.com/70F74846 -> fine
+http://m.previsite.com/B1AF8F05 -> error
+
+[FTP PRESTA]
+SMARTIES3  : 10.0.4.203 port 22 / login : images / pw : previmg09
+delete from visite where id_visite in ('15088','15089')
+delete from detail_visite where id_visite in ('15088','15089')
+delete from detail_langue where id_visite in ('15088','15089')
+delete from detail_format where id_visite in ('15088','15089')
+delete from reference where id_visite in ('15088','15089')
+delete from lien_image where id_visite in ('15088','15089')
+delete from image where id_visite_origine in ('15088','15089')
+delete from image_contact where nom_fichier_contact LIKE '15088%' OR nom_fichier_contact LIKE '15089%'
+delete from image detail_titre_image where nom_fichier_image LIKE '15088%' OR nom_fichier_image LIKE '15089%'
+
+[PAYPAL]
+https://developer.paypal.com/
+paypal@previsite.com/pvm180paypal
+account test: paypal_1225112906_per@previsite.com / 225112802
+
+[videotour]
+http://www.videotour.com/index3.php?id=46F599A4-51AC-0FF8-1B9A-881A7DA5E9A2#final_preview
+
+[SQL]
+CONVERT(char(255), @myid)
+CONVERT(varchar(10), [MyDateTimecolumn], 20)
+création table:
+
+USE [PREVISITE_IMPORT]
+GO
+/****** Objet :  Table [dbo].[Table_1]    Date de génération du script : 06/03/2009 10:00:21 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[Table_1](
+	[test] [nchar](10) NULL
+) ON [PRIMARY]
+
+alter:
+ALTER table <table> add|change def
+ALTER table import_tours ALTER COLUMN Url_annonce varchar(250)
+requête en cours (se connecter en admin)
+USE master;
+
+SELECT sqltext.TEXT,
+req.session_id,
+req.status,
+req.command,
+req.cpu_time,
+req.total_elapsed_time
+FROM sys.dm_exec_requests req
+CROSS APPLY sys.dm_exec_sql_text(sql_handle) AS sqltext 
+order by cpu_time desc
+
+
+[QUICKBOOKS]
+208.46.142.34
+ccarbonnier / prev2009
+Admin/<mot de passe vide>
+http://support.quickbooks.intuit.com/support/pages/knowledgebasearticle/1000706
+
+[SMS TEXT]
+This Video Format is not supported by your Mobile Phone.
+To view the complete video, connect to http://xxxxxx from a computer
+
+---
+
+Your Mobile Phone does not support video format.
+Only images can be displayed right now, to view the complete Video, ....
+
+[KIJIJI]
+http://dev.api.previsite.com/kijiji/?id=EF712E29-FD8F-1ECE-45B7-15D7C9D53C8E&city=montreal
+http://dev.api.previsite.com/kijiji/?id=EF712E29-FD8F-1ECE-45B7-15D7C9D53C8E&location=check
+http://dev.api.previsite.com/kijiji/?id=EF712E29-FD8F-1ECE-45B7-15D7C9D53C8E&action=list_town&see=true
+0ADC656C-7656-FB14-311B-45B21B6597F7
+
+[IMPORTS]
+doc flowfact:
+http://www.universal-crm.de/help_2010/module&co/internetboersen_immoxmldatenelemente.htm
+
+[REQUETE STAT SMS]
+select code_sms,date_creation_mo from previsite_sms.dbo.mo
+where code_sms LIKE '[Gg][-_]2[-_]66523'                  
+or code_sms LIKE '[Gg][-_]2[-_]63844'                     
+or code_sms LIKE '[Gg][-_]2[-_]65933'                     
+or code_sms LIKE '[Gg][-_]2[-_]53895'                     
+or code_sms LIKE '[Gg][-_]2[-_]54203'                     
+or code_sms LIKE '[Gg][-_]2[-_]65069'                     
+or code_sms LIKE '[Gg][-_]2[-_]54688'                     
+or code_sms LIKE '[Gg][-_]2[-_]61924'                     
+or code_sms LIKE '[Gg][-_]2[-_]55592'                     
+or code_sms LIKE '[Gg][-_]2[-_]65914'                     
+or code_sms LIKE '[Gg][-_]2[-_]41532'                     
+
+[STATS VIDEO]
+select '28/09/2011',site_diffusion,id_statut_diffusion,result_code_diffusion,result_text_diffusion,result_description_diffusion,count(*) from video_diffusion
+where date_modification_diffusion between '2011-09-28 00:00:00' and '2011-09-29 00:00:00'
+group by site_diffusion,id_statut_diffusion,result_code_diffusion,result_text_diffusion,result_description_diffusion
+
+
+select '28/09/2011', type_conversion, id_statut_conversion, result_text_conversion, count(*) from video_conversion
+where date_demande_conversion between '2011-09-28 00:00:00' and '2011-09-29 00:00:00'
+group by type_conversion, id_statut_conversion, result_text_conversion
+
+select nom_distributeur, substring(CONVERT(varchar(10), Date_fin_conversion, 20),0,8), count(*) from video_conversion
+inner join video on video.id_video=video_conversion.id_video
+inner join distributeur on distributeur.id_distributeur=video.id_distributeur
+where date_demande_conversion between '2011-11-01 00:00:00' and '2012-02-01 00:00:00'
+and date_fin_conversion is not null
+group by nom_distributeur,substring(CONVERT(varchar(10), Date_fin_conversion, 20),0,8)
+
+[EXPORT]
+
+insert into diffusion_portail(id_diffusion_portail,id_portail,ref_portail,id_visite,date_diffusion,id_statut_diffusion)
+select newid(),'A13B5F8E-A0B5-3CDA-4D7F-6CF5A25F02EB', id_visite, id_visite, getdate(), 0 from visite where id_utilisateur='5347D152-167A-A280-0DB9-4DA181B334D9' and id_statut_Visite > 0
+
+// Bug video logo stup 
+// 2012-07-26: 701
+select id_video
+from video_cron_suivi 
+where date_conversion between '2012-07-10 15:15:00' and '2012-07-10 19:10:00'
+and id_video not in (
+	select id_video from video_cron_suivi where date_conversion > '2012-07-10 19:10:00'
+)
+ order by date_conversion asc
+
+[MAJ PROBLEME DIFFUSION]
+Video not diffused: http://dev.video.previsite.net/detail_video.php?tour=D8656C64-27D5-DAEC-0E10-8933B88F8688
+
+	$requests = array(
+		'YOUTUBE' 			=> array('portail' => '59C4948B-DB6D-FDAF-E15D-CD67B8347126', 'site' => 'YOUTUBE', 'limit' => 'not'),
+		'YOUTUBE_CORP' 		=> array('portail' => '1876B6F8-6894-1335-44C5-D984D5C8E04E', 'site' => 'YOUTUBE', 'limit' => ''),
+		'DAILYMOTION' 		=> array('portail' => '38429EA1-8BAD-1795-807E-B46BCF131567', 'site' => 'DAILYMOTION', 'limit' => 'not'),
+		'DAILYMOTION_CORP' 	=> array('portail' => '812F1D71-043D-282E-640E-2B3F66072949', 'site' => 'DAILYMOTION', 'limit' => ''),
+	);
+	foreach($requests as $k=>$r){
+		$sql = "
+				select id_diffusion_portail from diffusion_portail 
+				where id_statut_diffusion='2' 
+					and id_portail='".$r['portail']."'
+				and not exists (
+					select id_visite 
+					from video inner join video_diffusion on video_diffusion.id_video=video.id_video 
+					where site_diffusion='".$r['site']."' and type_video ".$portail['limit']." like '%_CORP'
+				and id_visite=DIFFUSION_PORTAIL.ID_visite
+			)
+		";
+		event_log("[INFOS] ".$k.": ".db_getOne(str_replace('id_diffusion_portail', 'count(*)', $sql), $db_name)." diffusions found");
+		db_query("update diffusion_portail set id_statut_diffusion='0' where id_diffusion_portail in (".$sql.")" , $db_name);	
+		continue;
+	}
+Safti error:
+select * from (
+	select usercode, substring(CONVERT(varchar(10), Date_modification_tour, 20),0,11) date, count(*) nb from import_tours 
+	where nom_script like 'aval_19918' and id_statut_tour < 0
+	and usercode in ('10049', '10281', '10667', '10802', '11054', '111', '11166', '11269', '11388', '11413', '11510', '11543', '11607', '11783', '11899', '11987', '12114', '12115', '12440', '12675', '13225', '13353', '13633', '13670', '13802', '13962', '14051', '14069', '14167', '14187', '14359', '14415', '14462', '14490', '14540', '14544', '14661', '1483', '15466', '15574', '15631', '16752', '16947', '16977', '17229', '17292', '17456', '17767', '17922', '17923', '17924', '17925', '17937', '18126', '18174', '1876', '1909', '19429', '19563', '19716', '19780', '19783', '19848', '19868', '19885', '19918', '19919', '19999', '20000', '20001', '20013', '20015', '20073', '20109', '20110', '20113', '20136', '20156', '20160', '20165', '20166', '20169', '20170', '20173', '20174', '20175', '20185', '20189', '20190', '20229', '20240', '20241', '20242', '20243', '20333', '20356', '20379', '20381', '20597', '20598', '20608', '20617', '20630', '20687', '20688', '20689', '20690', '20691', '20695', '20726', '20754', '20770', '20779', '20824', '20832', '20865', '20866', '20904', '20939', '20973', '20975', '21073', '21096', '21270', '21271', '2306', '2829', '2852', '3011', '3910', '4336', '4623', '5618', '5687', '6328', '6735', '7043', '7661', '8605', '8679', '8859', '8986', '9545', '9879')
+	group by usercode, substring(CONVERT(varchar(10), Date_modification_tour, 20),0,11)
+) as tab order by date
+

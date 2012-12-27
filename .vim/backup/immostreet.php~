@@ -1,0 +1,426 @@
+<?php
+
+
+function immostreet($script_name, $tab_enabled, $workPath, $archive_path, $archive_file, $prefixe_archive) {
+	$data = array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array());
+
+	$file_xml = PATH_FTP.'immostreet/Immostreet.xml';
+	$testmode = isset($_GET['test']);
+
+	// Fichier splittes a traiter
+	$max_users = 0; // <=0 for all
+	$tab_users_only = array(); // Si que certains users
+	$max_rows = 0; // <=0 for all
+
+	$size_split = 75; // Nombre d'utilisateurs par xml generes
+
+	$path_files_splitted = PATH_CACHE.'immostreet/';
+	if(!is_dir($path_files_splitted)) {
+		mkdir($path_files_splitted);
+	}
+
+	$to_process = glob($path_files_splitted.$file_pattern.'*.xml');
+
+	$file_pattern = 'immostreet_split';
+	$head_xml = '<?xml version="1.0" encoding="iso-8859-1"?>';
+
+	$tab_debug = array();
+	$tab_all_val = array();
+	$user_founds = array();
+
+	// Parser le debut du fichier pour extraire le xml des agences
+	$xml_users = '';
+	if(is_file($file_xml) && ($handle=fopen($file_xml, 'r'))) {
+		$part_users = true;
+		$xml_listing = '';
+		// Parser lignes par lignes jusqu'au la fin du tag </agences>
+		while($part_users && ($row = fgets($handle))!==false) {
+			$part_users &= stripos($row, '</agences>')===false;
+			$xml_users .= $row;
+		}
+		$xml_users = immostreet_clean_str($xml_users.'</Previsite>');
+		fclose($handle);
+	} else {
+		immostreet_log('no file', $script_name, $testmode);
+	}
+
+	// Parser le XML
+	libxml_use_internal_errors(true);
+	if(!empty($xml_users) && ($xml=simplexml_load_string($xml_users))!==false) {
+		for($i=0; isset($xml->agences->agence[$i]); $i++) {
+			$usercode = (string)$xml->agences->agence[$i]->idagence;
+			$add_user = empty($max_users) || count($user_founds)<$max_users;
+			$add_user &= empty($tab_users_only) || in_array($usercode, $tab_users_only);
+
+			if($add_user) {
+				$tmp = array(
+					'USERCODE' => $usercode,
+					'NOM_SOCIETE' => (string)$xml->agences->agence[$i]->nom,
+					'ID_PAYS' => 'FR',
+					'NOM_UTILISATEUR' => ' ',
+					'ADRESSE' => (string)$xml->agences->agence[$i]->adresse,
+					'CODE_POSTAL' => (string)$xml->agences->agence[$i]->cp,
+					'VILLE' => (string)$xml->agences->agence[$i]->ville,
+					'TELEPHONE' => (string)$xml->agences->agence[$i]->telephone,
+					'EMAIL_UTILISATEUR' => (string)$xml->agences->agence[$i]->email,
+				);
+				if(!$testmode && isset($xml->agences->agence[$i]->logo)) {
+					$url_logo = (string)$xml->agences->agence[$i]->logo;
+					$headers = array();
+					if(!empty($url_logo)) {
+						$headers = get_headers($url_logo, true);
+					}
+					if(stripos($headers[0], '200 OK')) {
+						$tmp['URL_LOGO'] = $url_logo;
+						$tmp['MD5_LOGO'] = md5($headers['Content-Length'].$headers['Last-Modified']);
+					}
+				}
+
+				// Enlever zip + ville envoyes en doublon dans l'adresse....
+				$tmp['ADRESSE'] = trim(str_replace(array($tmp['CODE_POSTAL'], $tmp['VILLE']), '', $tmp['ADRESSE']));
+				$tmp['ADRESSE'] = str_replace("\n", ' ', $tmp['ADRESSE']);
+				$tmp['ADRESSE'] = preg_replace('/\s\s+/', ' ', $tmp['ADRESSE']); // remove multispace
+				$tmp['MD5_USER'] = md5(serialize($tmp['MD5_AGENT']));
+				if($tmp['USERCODE'] != '43729'){ continue;}
+				$user_founds[$tmp['USERCODE']] = $tmp;
+			}
+		}
+	} else {
+		immostreet_log('User XML not found', $script_name, $testmode);
+	}
+
+	// Decouper les usercode en sous tableaux
+	$all_users = array_chunk(array_keys($user_founds), $size_split);
+
+
+
+
+
+	// Si plus de fichiers partiels, les regenerer en splittant le gros fichier
+	if(empty($to_process)) {
+		immostreet_log('No more splitted files, generating new from raw XML', $script_name, $testmode);
+		// Pour un usercode, donner l'indice du tableau correspondant
+		$tab_users_parts = array();
+		for($i=0; isset($all_users[$i]); $i++) {
+			for($j=0; isset($all_users[$i][$j]); $j++) {
+				$tab_users_parts[ $all_users[$i][$j] ] = $i+1;
+			}
+		}
+
+		if(is_file($file_xml) && ($handle=fopen($file_xml, 'r'))) {
+			$part_users = true;
+			$xml_listing = '';
+			
+			$nb_skip = $nb_done = 0;
+			
+			$tab_xml = array();
+			$tab_content_split = array();
+			
+
+			// Parser lignes par lignes entre les tags <annonces> </annonces>
+			while(--$max_rows!==0 && ($row = fgets($handle))!==false) {
+				$part_users &= stripos($row, '</agences>')===false;
+
+				if(!$part_users) {
+					$tag_start = stripos($row, '<annonce>')!==false;
+					$tag_end = stripos($row, '</annonce>')!==false;
+
+					if($tag_start) {
+						// debut d'une annonce
+						$xml_listing = $row;
+						$usercode = '';
+					} else if(!empty($xml_listing)) {
+						// Annonce en cours
+						$xml_listing .= $row;
+
+						if(preg_match('/<idagence>([^<]+)<\/idagence>/', $row, $tmp)) {
+							$usercode = $tmp[1];
+						}
+					} 
+
+					if($tag_end && !empty($xml_listing)) {
+						// Fin de l'annonce, la concatenner au fichier correspondant à l'indice au usercode
+						try {
+							if(!isset($tab_users_parts[$usercode])) {
+								throw new Exception('unknown user: '.$usercode);
+							}
+							$indice = str_pad($tab_users_parts[$usercode], 5, '0', STR_PAD_LEFT);
+							$tab_content_split[$indice] .= $xml_listing."\n";
+
+							$indice = str_pad($tab_users_parts[$usercode], 5, '0', STR_PAD_LEFT);
+							$file = $path_files_splitted.$file_pattern.$indice.'.xml';
+							$handle2 = fopen($file, 'a+');
+							if($handle2===false || !fputs($handle2, $xml_listing)) {
+								throw new Exception('error append xml to file: '.$file);
+							}
+							fclose($handle2);
+							
+							$nb_done++;
+						} catch(Exception $e) {
+							$mess = $e->getMessage();
+							if(empty($tab_debug[$mess])) {
+								immostreet_log($mess, $script_name, $testmode);
+							}
+							$tab_debug[$mess]++;
+							$nb_skip++;
+						}
+					}
+				}
+			}
+			immostreet_log($nb_skip.' listings skipped', $script_name, $testmode);
+			fclose($handle);
+		}		
+	}
+	// Fin Split
+
+
+
+
+
+
+
+	// Parsage des fichiers partiels (quelques uns a chaque import)
+	$tab_files = glob($path_files_splitted.$file_pattern.'*.xml');
+	rsort($tab_files);
+
+	$max_files = 3;
+	while(--$max_files>0) {
+		try {
+			$all_users = array();
+			$xml_file = array_shift($tab_files);
+
+			if(!is_file($xml_file)) {
+				throw new Exception('missing file: '.$xml_file);
+			}
+
+			$content = $head_xml.'<annonces>'.trim(file_get_contents($xml_file)).'</annonces>';
+			$content = immostreet_clean_str($content);
+
+			if(($xml=simplexml_load_string($content))===false) {
+				rename($xml_file, $xml_file.'.bug');
+				throw new Exception('invalid xml: '.$xml_file);
+			}
+
+			immostreet_log('processing '.$xml_file, $script_name, $testmode);
+
+			// debut parsage annonce
+			for($i=0; isset($xml->annonce[$i]); $i++) {
+				$ref_portail = (string)$xml->annonce[$i]->idannonce;
+				$usercode = (string)$xml->annonce[$i]->idagence;
+				$country = immostreet_fix_country((string)$xml->annonce[$i]->pays);
+
+				$process  = isset($user_founds[$usercode]);
+				$process &= !empty($country);
+
+				if($process) {
+					// Rajouter le tableau utilisateur de l'annonce si pas déjà dans le retour
+					if(!isset($data['USERS'][$usercode])) {
+						$data['USERS'][$usercode] = $user_founds[$usercode];
+					}
+			
+					$transaction = (string)$xml->annonce[$i]->typetransaction;
+					$type = (string)$xml->annonce[$i]->typebien;
+
+					// Si transaction = Fonds de commerce et type = inconnu -> Type = Commerce
+					if(stripos('fonds de commerce', $transaction)!==false && stripos('inconnu', $type)) {
+						$type = 'boutique';
+					}
+
+
+					$tmp = array(
+						'USERCODE' => $usercode,
+						'REF_PORTAIL' => $ref_portail,
+						'NOM_VISITE' => (string)$xml->annonce[$i]->titre,
+						'ADRESSE' => (string)$xml->annonce[$i]->adresse,
+						'CODE_POSTAL' => (string)$xml->annonce[$i]->cp,
+						'VILLE' => (string)$xml->annonce[$i]->ville,
+						'VOISINNAGE' => (string)$xml->annonce[$i]->quartier,
+						'ID_PAYS' => $country,
+						'LATITUDE' => (float)$xml->annonce[$i]->latitude,
+						'LONGITUDE' => (float)$xml->annonce[$i]->longitude,
+						'DESCRIPTION' => (string)$xml->annonce[$i]->description,
+						'ID_LANGUE' => strtoupper((string)$xml->annonce[$i]->description->attributes()->langue),
+						'ID_TYPE_BIEN' => immostreet_fix_property_type($type),
+						'ID_TYPE_TRANSACTION' => immostreet_fix_transaction_type($transaction),
+						'ID_PRESTIGE' => stripos($transaction, 'prestige')!==false ? 1 : 0,
+						'SURFACE_HABITABLE' => (float)$xml->annonce[$i]->surface,
+						'ID_UNITE_SURFACE_HABITABLE' => 1,
+						'NOMBRE_PIECE' => (int) $xml->annonce[$i]->nb_pieces,
+						'NOMBRE_CHAMBRE' => (int) $xml->annonce[$i]->nb_chambres,
+						'PRIX_BIEN' => immostreet_fix_int32($xml->annonce[$i]->prix),
+						'REF_DEVISE' => 'EUR',
+						'DPE_VALEUR' => (string) $xml->annonce[$i]->valeur_dpe,
+						'DPE_LETTRE' => (string) $xml->annonce[$i]->etiquette_dpe,
+						'GES_VALEUR' => (string) $xml->annonce[$i]->valeur_ges,
+						'GES_LETTRE' => (string) $xml->annonce[$i]->etiquette_ges,
+						'URL_ANNONCE' => (string)$xml->annonce[$i]->url,
+					);
+
+					$contact = (string)$xml->annonce[$i]->emailcontact;
+
+					$tmp['COMPLEMENTS'] = array(
+						array('FIELD' => 'tour_agent_email', 'VALUE' => $contact)
+					);
+
+	//				$tab_all_val[ (string)$xml->annonce[$i]->emailcontact ] ++;
+
+					$tmp['MD5_TOUR'] = md5(serialize($tmp));
+					$tmp['NOM_SCRIPT_COMPLEMENT'] = $usercode;
+					
+					if($tmp['USERCODE'] != '43729'){ continue;}
+						
+					$data['TOURS'][] = $tmp;
+
+					// Partie images
+					$node = $xml->annonce[$i]->images;
+					for($j=0; $j<1 && isset($node->image[$j]); $j++) {
+						$tmp = array(
+							'REF_PORTAIL' => $ref_portail,
+							'URL_IMAGE' => (string)$node->image[$j],
+							'POIDS' => $j+1,
+							'MD5_IMAGE' => md5($tmp['URL_IMAGE'])
+						);
+						$data['IMAGES'][] = $tmp;
+					}
+				} else {
+					$tab_all_val[$country]++;
+				}
+			
+			}
+			if(!$testmode && is_file($xml_file)) {
+				unlink($xml_file);
+			}
+		} catch(Exception $e) {
+			immostreet_log($e->getMessage(), $script_name, $testmode);
+			$tab_debug[$e->getMessage()]++;
+			$nb_skip++;
+		}
+	}
+
+	$remaining = count($tab_files);
+
+	immostreet_log('still '.$remaining.' files to parse', $script_name, $testmode);
+
+	if($testmode && !empty($tab_debug)) {
+		ksort($tab_debug);
+		print_p($tab_debug);
+	}
+
+	if($testmode && !empty($tab_all_val)) {
+		ksort($tab_all_val);
+		print_p($tab_all_val);
+	}
+	
+	if(!empty($data['USERS'])) {
+		$data['USERS'] = array_values($data['USERS']);
+	}
+
+	return $data;
+}
+
+
+
+
+
+function immostreet_fix_int32($str) {
+	$val = (int)$str;
+	$limit = -1+pow(2, 31);
+	if($val>=$limit) {
+		return $limit;
+	} else {
+		return $val;
+	}
+}
+
+
+function immostreet_clean_str($str) {
+	$pattern = array(chr(26));
+	$replace = array('');
+	return str_replace($pattern, $replace, $str);
+}
+
+
+function immostreet_fix_country($val) {
+	$val = strtolower($val);
+	
+	$tab_countries = array(
+		'france' => 'FR'
+	);
+
+	return isset($tab_countries[$val]) ? $tab_countries[$val] : null;
+}
+
+function immostreet_fix_transaction_type($val) {
+	if(stripos($val, 'viager')!==false) {
+		return 3;
+	} else if(stripos($val, 'location')!==false) {
+		return 2;
+	} else {
+		return 1;
+	}
+/*
+Array
+(
+    [viager] => 49
+    [location] => 122
+    [cession de bail] => 47
+    [produit d'investissement] => 129
+    [vente] => 130
+    [vente de prestige] => 113
+    [vente fonds de commerce] => 27
+)
+*/
+}
+
+function immostreet_fix_property_type($val) {
+/*
+    [appartement] => 50
+    [boutique] => 60
+    [bureaux] => 52
+    [immeuble] => 52
+    [maison/villa] => 50
+    [terrain] => 47
+    [parking/box] => 34
+    [bâtiment] => 43
+    [château] => 36
+    [hôtel particulier] => 40
+	  [local] => 65
+    [inconnu] => 47
+    [loft/atelier/surface] => 41
+)
+*/
+	if(stripos($val, 'appartement')!==false) {
+		return 1;
+	} else if(stripos($val, 'boutique')!==false) {
+		return 9;
+	} else if(stripos($val, 'bureaux')!==false) {
+		return 4;
+	} else if(stripos($val, 'immeuble')!==false || preg_match('/b.+timent/i', $val)) {
+		return 5;
+	} else if(stripos($val, 'maison')!==false) {
+		return 2;
+	} else if(stripos($val, 'terrain')!==false) {
+		return 3;
+	} else if(stripos($val, 'parking')!==false) {
+		return 11;
+	} else if(preg_match('/ch.+teau/i', $val)) {
+		return 10;
+	} else if(preg_match('/h.+tel parti/i', $val)) {
+		return 79;
+	} else if(stripos($val, 'local')!==false) {
+		return 80;
+	} else if(stripos($val, 'atelier')!==false) {
+		return 81;
+	} else {
+		return 0;
+	}
+}
+
+function immostreet_log($log, $script_name, $testmode) {
+	if($testmode) {
+		echo nl2br($log."\n");
+	} else {
+		import_log($log, $script_name);
+	}
+}
+

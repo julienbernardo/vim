@@ -1,0 +1,1289 @@
+<?php
+
+require_once 'DB.php';
+require_once '../include/global.php';
+require_once 'previsite/GetDsn.php';
+require_once 'include/fonctions.php';
+require_once 'include/fonction.db.php';
+require_once 'include/fonction.xml.php';
+require_once 'include/fonction.json.php';
+
+define('URL_MEDIA',	 'http://media.previsite.com/%PATH%/%SIZE%/%ID%.%EXT%');
+define('URL_FETCH_GPS', 'http://api.previsite.com/software/get_gps.php?address=#ADDR#&country=#COUNTRY#&zip=#ZIP#&city=#CITY#');
+define('ID_AGENCE',	 '9539CDD1-1DAC-49CC-AECA-710E1997FD1C');
+define('ID_DISTRIB',	'38DB5411-703A-4EF3-A4FC-3399B3D54F84');
+
+/*
+
+URL de test
+
+http://dev.api.previsite.com/rest/p/tour/1234588?partnerID=D580B51E-E85D-A925-17F7-05B3BA21DD36&password=ainm435&update&user=12345&orientation_windows=ndstecw
+http://dev.api.previsite.com/rest/p/tour/1234588?partnerID=D580B51E-E85D-A925-17F7-05B3BA21DD36&password=ainm435&user=12345&orientation_windows=ndstecw
+http://dev.api.previsite.com/rest/p/listing/12345?partnerID=D580B51E-E85D-A925-17F7-05B3BA21DD36&password=ainm435
+http://dev.api.previsite.com/rest/p/user/12345?partnerID=D580B51E-E85D-A925-17F7-05B3BA21DD36&password=ainm435
+
+
+Modif multilangue
+http://dev.api.previsite.com/rest/p/tour/12345?partnerID=D580B51E-E85D-A925-17F7-05B3BA21DD36&titleEN=title+en&descriptionEN=desc+modified+english+here&price=12345&password=ainm435&update&description=my+description&description_video=my+video+description&title=my+title+%E6%97%A5%E6%9C%AC%E8%AA%9E&neighborhood=my+neighborhood&user=12345
+
+*/
+
+$tab_bench = array();
+$tab_bench = log_time($tab_bench, 'check_dsn');
+
+
+$action = strtolower($_SERVER['REQUEST_METHOD']);
+
+$tab_pattern_url_viewer = array('#ID#', '#PORTAL#', '#REF#', '#PUB#');
+$tab_pattern_url_gps = array('#ADDR#', '#COUNTRY#', '#ZIP#', '#CITY#');
+
+
+// merci suhosin....
+$param_update  = isset($_REQUEST['update']);
+$param_update |= !empty($_REQUEST['upd']);
+$param_update |= $_GET['prevtodo']=='u';
+$param_update |= 'post'===strtolower($_GET['method']);
+
+$param_delete  = isset($_GET['delete']);
+$param_delete |= !empty($_REQUEST['del']);
+$param_delete |= $_GET['prevtodo']=='d';
+$param_delete |= 'delete'===strtolower($_GET['method']);
+
+$active_user_only = !empty($_GET['active_only']);
+
+$error_mess = array();
+
+/*
+
+http://api.previsite.com/rest/p/tour/4122-5482?partnerID=E55CDAC9-5B36-BD3D-5CB9-8B858FFD010D&password=cpze803&lock=0&import_name=cushwake&country=US&property_type=48&transaction=2&language=EN&ref_listing=4122-5482&currency=USD&title=Rum+River+Crossings&address=3851+St.+Francis+Blvd.&city=Anoka&ref_state=MN&zip=55303&total_build_area=11900&contact_users=deborah.carlson%40cushwake.com%09&user=deborah.carlson%40cushwake.com&year_built=2010&sublease=1&building_type=Commercial&parking_ratio=0&tenants_area=&availability_status=&possession_date=&transaction_comment=2&lease_expiration=&frontage=Primary&frontage2=Secondary&total_gla=&nolog=1&prevtodo=u
+
+*/
+
+// param
+$partner   = $_REQUEST['partnerID'];
+$password  = $_REQUEST['password'];
+$user	  = $_REQUEST['user'];
+$ref	   = trim($_REQUEST['ref']);
+$output	= $_REQUEST['output'];
+$result	= strtolower($_REQUEST['result']);
+
+
+$output_xml = $output_json = $output_txt = $method_name = $operation_xml = $operation_json = '';
+
+$tab_opts = array(
+	'MEMCACHED' => !SERVER_DEV
+);
+
+$getdsn = new GetDsn($tab_opts);
+
+$comment_ws = '';
+
+
+switch(strtolower($_REQUEST['ressource'])) {
+	case 'listing':
+		$dsn = $getdsn->byTourRef($partner, $ref);
+		$method_name = 'GetListing';
+		break;
+
+	case 'listings':
+		
+		$method_name = 'GetUserListings';
+		break;
+
+	case 'images':
+		$dsn = $getdsn->byTourRef($partner, $ref);
+		if($action=='delete') $method_name = 'DeleteTourImage';
+		else if($action=='get' && $param_delete) $method_name = 'DeleteTourImage';
+		else $method_name = 'GetTourImages';
+		break;
+
+	case 'tours':
+		if(!empty($user)) {
+			$dsn = $getdsn->byUserCode($partner, $user);
+			$method_name = 'GetUserTours';
+		} else {
+			$dsn = $getdsn->byPartner($partner);
+			$method_name = 'GetPartnerTours';
+		}
+		break;
+
+	case 'tour':
+		$dsn = $getdsn->byTourRef($partner, $ref);
+		if($action=='post') $method_name = 'UpdateTour';
+		else if($action=='delete') $method_name = 'DeleteTour';
+		else if($action=='get' && $param_delete) $method_name = 'DeleteTour';
+		else if($action=='get' && $param_update) $method_name = 'UpdateTour';
+		else $method_name = 'GetTour';
+
+		// 2010-12-06 : Creation de vv sur vieux bundle : Prendre la dsn en fn du user (Ex Adaptimmo)
+		if($method_name=='UpdateTour') $dsn = $getdsn->byUserCode($partner, $user);
+		else $dsn = $getdsn->byTourRef($partner, $ref);
+
+		break;
+
+	case 'users':
+		$dsn = $getdsn->byPartner($partner);
+		$method_name = 'GetPartnerUsers';
+		break;
+
+	case 'user_opt':
+		$dsn = $getdsn->byUserCode($partner, $user);
+		$method_name = 'GetUserOptions';
+		break;
+
+	case 'user':
+		$dsn = $getdsn->byUserCode($partner, $user);
+		if($action=='post') $method_name = 'UpdateUser';
+		else if($action=='delete') $method_name = 'DisableUser';
+		else if($action=='get' && $param_delete) $method_name = 'DisableUser';
+		else if($action=='get' && $param_update) $method_name = 'UpdateUser';
+		else $method_name = 'GetUser';
+		
+		// 2011-04-05 : Creation utilisateur sur distributeur dans base différente du partner
+		// Ex : Agences Coldwell FR & Monaco (17) crees par Agence+ (11)
+		if(empty($dsn) && 'UpdateUser'===$method_name && !empty($_REQUEST['cny_distrib'])) {
+			$dsn = $getdsn->byDistrib($_REQUEST['cny_distrib']);
+		}
+		break;
+}
+
+if(empty($dsn)) {
+	$dsn = $getdsn->byPartner($partner);
+}
+$tab_bench = log_time($tab_bench, 'check_dsn');
+
+if(empty($dsn)) {
+	header404();
+	die('unknown partnerID');
+}
+
+
+$tab_bench = log_time($tab_bench, 'db_connect');
+$db = DB::connect($dsn);
+$tab_bench = log_time($tab_bench, 'db_connect');
+if(PEAR::isError($db)) {
+	header404();
+	die;
+}
+$tab_bench = log_time($tab_bench, 'check_ws_auth');
+$auth = check_webservice_auth($partner, $password, $method_name);
+$tab_bench = log_time($tab_bench, 'check_ws_auth');
+if(!$auth) {
+	insert_log($partner, 'AUTH-KO '.$method_name, $_SERVER['SERVER_NAME'], $_SERVER['SERVER_ADDR'], $_SERVER['REMOTE_ADDR'], '');
+	header403();
+	die('access denied');
+}       
+                   
+$tab_bench = log_time($tab_bench, 'query_total_time');
+switch($method_name) {
+	case 'GetUserOptions':
+		$comment_ws = $user;
+		$tab_options = get_user_all_options($partner, $user);
+		$output_xml = xml_get_options($tab_options);
+		$output_json = json_get_options($tab_options);
+		break;
+
+
+
+
+	case 'UpdateTour':
+		$tab_tour = array();
+		$tab_tour_eu = array();
+		$tab_tour_us = array();
+		$tab_tour_cpt = array();
+		$tab_tour_auto = array();
+		$tab_tour_contact = array();
+		$tab_tour_txt = array();
+		// VISITE
+/*
+		if(isset($_REQUEST['title'])) {
+			$tab_tour_txt['NOM_VISITE'] = fix_desc(mb_substr($_REQUEST['title'], 0, 150));
+		}
+		if(isset($_REQUEST['description'])) {
+			$tab_tour_txt['DESCRIPTION'] = fix_desc(mb_substr($_REQUEST['description'], 0, 4000));
+		}
+		if(isset($_REQUEST['description_video'])) {
+			$tab_tour_txt['DESCRIPTION_VIDEO'] = fix_desc(mb_substr($_REQUEST['description_video'], 0, 4000));
+		}
+		if(isset($_REQUEST['neighborhood'])) {
+			$tab_tour_txt['VOISINNAGE'] = fix_desc(mb_substr($_REQUEST['neighborhood'], 0, 2500));
+		}
+
+		$fields = array(
+			'title', 
+			'description', 
+			'description_video', 
+			'neighborhood'
+		);
+*/
+		// Pas de langue = langue par defaut de la vv
+		$langs = array('', 'AR', 'CN', 'CS', 'DE', 'DK', 'EN', 'ES', 'FR', 'GR', 'HE', 'IT', 'JP', 'NL', 'PL', 'PT', 'RU', 'RO', 'TR', 'NO');
+		for($i=0; isset($langs[$i]); $i++) {
+			$tab_fields = array();
+			
+			if(isset($_REQUEST['title'.$langs[$i]])) {
+				$tab_fields['NOM_VISITE'] = fix_desc(mb_substr($_REQUEST['title'.$langs[$i]], 0, 150));
+			}
+			if(isset($_REQUEST['description'.$langs[$i]])) {
+				$tab_fields['DESCRIPTION'] = fix_desc(mb_substr($_REQUEST['description'.$langs[$i]], 0, 4000));
+			}
+			if(isset($_REQUEST['description_video'.$langs[$i]])) {
+				$tab_fields['DESCRIPTION_VIDEO'] = fix_desc(mb_substr($_REQUEST['description_video'.$langs[$i]], 0, 4000));
+			}
+			if(isset($_REQUEST['neighborhood'.$langs[$i]])) {
+				$tab_fields['VOISINNAGE'] = fix_desc(mb_substr($_REQUEST['neighborhood'.$langs[$i]], 0, 2000));
+			}
+
+			if(isset($_REQUEST['features'.$langs[$i]])) {
+				$tab_fields['EQUIPEMENTS'] = fix_desc(mb_substr($_REQUEST['features'.$langs[$i]], 0, 400));
+			}
+
+			if(!empty($tab_fields)) {
+				if(!empty($langs[$i])) {
+					// Rajouter la langue pour forcer
+					$tab_fields['ID_LANGUE'] = $langs[$i];
+				}
+				$tab_tour_txt[] = $tab_fields;
+			}
+		}
+		
+	
+/*
+	$tab_tour_txt = array(
+		array('NOM_VISITE' => ''), // Si pas Id langue = langue par defaut de la vv
+		array('ID_LANGUE' => 'EN', 'NOM_VISITE' => ''), // Id_langue forcee
+	);
+		
+*/
+
+
+		if(isset($_REQUEST['voice'])) $tab_tour['REF_VOICE'] = fix_null($_REQUEST['voice'], 15, true);
+		if(isset($_REQUEST['address'])) $tab_tour['ADRESSE'] = fix_null($_REQUEST['address'], 150, true);
+		if(isset($_REQUEST['city'])) $tab_tour['VILLE'] = fix_null($_REQUEST['city'], 100, true);
+		if(isset($_REQUEST['zip'])) $tab_tour['CODE_POSTAL'] = fix_null($_REQUEST['zip'], 50, true);
+		if(isset($_REQUEST['lock'])) $tab_tour['VERROU_ANNONCE'] = fix_null( (int)$_REQUEST['lock']);
+		if(isset($_REQUEST['listing_url'])) $tab_tour['URL_ANNONCE'] = fix_null($_REQUEST['listing_url'], 200, false);
+		if(isset($_REQUEST['ref_listing'])) $tab_tour['REF_VISITE'] = fix_null($_REQUEST['ref_listing'], 50, true);
+		if(isset($_REQUEST['ref_state']))   $tab_tour['REF_ETAT'] = fix_null($_REQUEST['ref_state'], 3, false);
+		if(isset($_REQUEST['mls_id']))   $tab_tour['NUMERO_MLS'] = fix_null($_REQUEST['mls_id'], 20, false);
+		if(isset($_REQUEST['language']) && check_language($_REQUEST['language'])) $tab_tour['ID_LANGUE'] = fix_null($_REQUEST['language'], 2, false);
+		if(isset($_REQUEST['hide_geoloc'])) $tab_tour['CACHER_LOCALISATION'] = !empty($_REQUEST['hide_geoloc']) ? '1' : '0';
+		if(isset($_REQUEST['country']) && check_country($_REQUEST['country'])) {
+			$tab_tour['ID_PAYS'] = fix_null($_REQUEST['country'], 2, false );
+		}
+		if(isset($_REQUEST['music'])) $tab_tour['ID_MUSIQUE_VIDEO'] = fix_null( is_guid($_REQUEST['music']) ? $_REQUEST['music'] : '', 36, false);
+
+		if(!empty($_REQUEST['latitude']) && !empty($_REQUEST['longitude']) && is_numeric($_REQUEST['latitude']) && is_numeric($_REQUEST['longitude'])) {
+			$tab_tour['LATITUDE'] = fix_null((float)$_REQUEST['latitude']);
+			$tab_tour['LONGITUDE'] = fix_null((float)$_REQUEST['longitude']);
+		} else {
+			if(!empty($_REQUEST['city'])) {
+				$loc = $_REQUEST['city'];
+			} else {
+				$loc = $_REQUEST['ref_state'];
+			}
+			$url_gps = str_replace(
+				$tab_pattern_url_gps,
+				array(urlencode($_REQUEST['address']), urlencode($_REQUEST['country']), urlencode($_REQUEST['zip']), urlencode($loc)),
+				URL_FETCH_GPS
+			);
+			list($lat, $lon) = explode('#', @file_get_contents($url_gps));
+			if(is_numeric($lat) && is_numeric($lon)) {
+				$tab_tour['LATITUDE'] = fix_null((float)$lat);
+				$tab_tour['LONGITUDE'] = fix_null((float)$lon);
+			}
+		}
+
+		//ajout julien
+		if(isset($_REQUEST['sector'])) {
+			$tab_tour['NOM_SECTEUR'] = fix_null($_REQUEST['sector'], 200, true);
+		}
+
+		if(isset($_REQUEST['transaction'])) {
+			switch(strtolower(trim($_REQUEST['transaction']))) {
+				case '4':	 $tab_tour_eu['ID_TYPE_TRANSACTION'] = 4; $tab_tour_us['ID_TYPE_TRANSACTION'] = 4; break; // Loc saisonnière
+				case '3':	 $tab_tour_eu['ID_TYPE_TRANSACTION'] = 3; $tab_tour_us['ID_TYPE_TRANSACTION'] = 1; break; // Viager Eu only
+				case '2':	 $tab_tour_eu['ID_TYPE_TRANSACTION'] = 2; $tab_tour_us['ID_TYPE_TRANSACTION'] = 2; break;
+				case 'rent': $tab_tour_eu['ID_TYPE_TRANSACTION'] = 2; $tab_tour_us['ID_TYPE_TRANSACTION'] = 2; break;
+				default:	   $tab_tour_eu['ID_TYPE_TRANSACTION'] = 1; $tab_tour_us['ID_TYPE_TRANSACTION'] = 1; break; // default: sale
+			}
+		}
+		if(isset($_REQUEST['property_type'])) {
+			$tab_tour_eu['ID_TYPE_BIEN'] = fix_int($_REQUEST['property_type'], 1, false);
+			$tab_tour_us['ID_TYPE_BIEN'] = fix_int($_REQUEST['property_type'], 1, false);
+		}
+		if(isset($_REQUEST['price'])) $tab_tour['PRIX_BIEN'] = fix_null( (int) $_REQUEST['price']);
+		if(isset($_REQUEST['price_hidden'])) $tab_tour['ID_PRIX_CACHE'] = fix_bool($_REQUEST['price_hidden']);
+
+		if(isset($_REQUEST['currency']) && check_currency($_REQUEST['currency'])) {
+			$tab_tour['REF_DEVISE'] = fix_null($_REQUEST['currency'], 3, false );
+		}
+		// VISITE_TPL_*
+		if(isset($_REQUEST['bedrooms'])) {
+			$tab_tour_eu['NOMBRE_CHAMBRE'] = fix_int((int)$_REQUEST['bedrooms'], 1, false);
+			$tab_tour_us['NOMBRE_CHAMBRE'] = fix_int((int)$_REQUEST['bedrooms'], 1, false);
+		}
+		if(isset($_REQUEST['bathrooms'])) {
+			$tab_tour_eu['NOMBRE_SALLE_BAIN'] = fix_int((int)$_REQUEST['bathrooms'], 1, false);
+			$tab_tour_us['NOMBRE_SALLE_BAIN'] = fix_int((int)$_REQUEST['bathrooms'], 1, false);
+		}
+		if(isset($_REQUEST['half_bathrooms'])) {
+			$tab_tour_eu['NOMBRE_SALLE_EAU'] = fix_int((int)$_REQUEST['half_bathrooms'], 1, false);
+			$tab_tour_us['NOMBRE_DEMI_SALLE_BAIN'] = fix_int((int)$_REQUEST['half_bathrooms'], 1, false);
+		}
+		if(isset($_REQUEST['half_rooms'])) {
+			$tab_tour_eu['NOMBRE_DEMI_PIECE'] = fix_int((int)$_REQUEST['half_rooms'], 1, false);
+		}
+		
+		if(isset($_REQUEST['year_built']) && is_numeric($_REQUEST['year_built'])) {
+			$tab_tour_eu['ANNEE_CONSTRUCTION'] = fix_int((int)$_REQUEST['year_built'], 2, false);
+			$tab_tour_us['ANNEE_CONSTRUCTION'] = fix_int((int)$_REQUEST['year_built'], 2, false);
+		}
+		if(isset($_REQUEST['hide_address'])) {
+			$tab_tour_eu['ID_ADRESSE_CACHEE'] = fix_bool($_REQUEST['hide_address']);
+			$tab_tour_us['ID_ADRESSE_CACHEE'] = fix_bool($_REQUEST['hide_address']);
+		}
+		if(isset($_REQUEST['shielded_room'])) {
+			$tab_tour_eu['ID_CHAMBRE_BLINDEE'] = fix_bool($_REQUEST['shielded_room']);
+		}
+		if(isset($_REQUEST['live_area'])) {
+			$tab_tour_eu['SURFACE_HABITABLE'] = fix_int($_REQUEST['live_area'], 4, true);
+			$tab_tour_us['ESPACE_UTILE'] = fix_int($_REQUEST['live_area'], 4, true);
+		}
+		if(isset($_REQUEST['field_area'])) {
+			$tab_tour_eu['SURFACE_TERRAIN'] = fix_int($_REQUEST['field_area'], 4, true);
+		}
+		if(isset($_REQUEST['garages'])) {
+			$tab_tour_eu['NOMBRE_PARKING_INT'] = fix_int($_REQUEST['garages'], 2, true);
+			$tab_tour_eu['NOMBRE_GARAGE']	  = fix_int($_REQUEST['garages'], 2, true);
+			$tab_tour_us['NOMBRE_GARAGE']	  = fix_int($_REQUEST['garages'], 2, true);
+		}
+		if(isset($_REQUEST['livingroom_area'])) {
+			$tab_tour_eu['SURFACE_SEJOUR'] = fix_int($_REQUEST['livingroom_area'], 2, true);
+		}
+		if(isset($_REQUEST['running_water'])) {
+			$tab_tour_eu['ID_EAU_COURANTE'] = fix_bool($_REQUEST['running_water']);
+			$tab_tour_us['ID_EAU_COURANTE'] = fix_bool($_REQUEST['running_water']);
+		}
+		if(isset($_REQUEST['sanitation'])) {
+			$tab_tour_eu['ID_ASSAINISSEMENT'] = fix_bool($_REQUEST['sanitation']);
+			$tab_tour_us['ID_ASSAINISSEMENT'] = fix_bool($_REQUEST['sanitation']);
+		}
+		if(isset($_REQUEST['natural_gas'])) {
+			$tab_tour_eu['ID_GAZ_NATUREL'] = fix_bool($_REQUEST['natural_gas']);
+			$tab_tour_us['ID_GAZ_NATUREL'] = fix_bool($_REQUEST['natural_gas']);
+		}
+		if(isset($_REQUEST['light'])) {
+			$tab_tour_eu['ID_LUMIERE'] = fix_bool($_REQUEST['light']);
+			$tab_tour_us['ID_LUMIERE'] = fix_bool($_REQUEST['light']);
+		}
+		if(isset($_REQUEST['sidewalk'])) {
+			$tab_tour_eu['ID_TROTTOIR'] = fix_bool($_REQUEST['sidewalk']);
+			$tab_tour_us['ID_TROTTOIR'] = fix_bool($_REQUEST['sidewalk']);
+		}
+		if(isset($_REQUEST['equip_tel'])) {
+			$tab_tour_eu['ID_TELEPHONE'] = fix_bool($_REQUEST['equip_tel']);
+			$tab_tour_us['ID_TELEPHONE'] = fix_bool($_REQUEST['equip_tel']);
+		}
+		if(isset($_REQUEST['equip_cable'])) {
+			$tab_tour_eu['ID_CABLE'] = fix_bool($_REQUEST['equip_cable']);
+			$tab_tour_us['ID_CABLE'] = fix_bool($_REQUEST['equip_cable']);
+		}
+		if(isset($_REQUEST['alarm'])) {
+			$tab_tour_eu['ID_ALARME'] = fix_bool($_REQUEST['alarm']);
+			$tab_tour_us['ID_ALARME'] = fix_bool($_REQUEST['alarm']);
+		}
+		if(isset($_REQUEST['sport_ground'])) {
+			$tab_tour_eu['ID_TERRAIN_SPORT'] = fix_bool($_REQUEST['sport_ground']);
+			$tab_tour_us['ID_TERRAIN_SPORT'] = fix_bool($_REQUEST['sport_ground']);
+		}
+		if(isset($_REQUEST['gym_room'])) {
+			$tab_tour_eu['ID_SALLE_GYM'] = fix_bool($_REQUEST['gym_room']);
+			$tab_tour_us['ID_SALLE_GYM'] = fix_bool($_REQUEST['gym_room']);
+		}
+		if(isset($_REQUEST['jacuzzi'])) {
+			$tab_tour_eu['ID_JACUZZI'] = fix_bool($_REQUEST['jacuzzi']);
+			$tab_tour_us['ID_JACUZZI'] = fix_bool($_REQUEST['jacuzzi']);
+		}
+		if(isset($_REQUEST['laundry'])) {
+			$tab_tour_eu['ID_BUANDERIE'] = fix_bool($_REQUEST['laundry']);
+			$tab_tour_us['ID_BUANDERIE'] = fix_bool($_REQUEST['laundry']);
+		}
+		if(isset($_REQUEST['sauna'])) {
+			$tab_tour_eu['ID_SAUNA'] = fix_bool($_REQUEST['sauna']);
+			$tab_tour_us['ID_SAUNA'] = fix_bool($_REQUEST['sauna']);
+		}
+		if(isset($_REQUEST['solarium'])) {
+			$tab_tour_eu['ID_SOLARIUM'] = fix_bool($_REQUEST['solarium']);
+			$tab_tour_us['ID_SOLARIUM'] = fix_bool($_REQUEST['solarium']);
+		}
+		if(isset($_REQUEST['game_room'])) {
+			$tab_tour_eu['ID_SALLE_JEU'] = fix_bool($_REQUEST['game_room']);
+			$tab_tour_us['ID_SALLE_JEU'] = fix_bool($_REQUEST['game_room']);
+		}
+		if(isset($_REQUEST['guard'])) {
+			$tab_tour_eu['ID_SURVEILLANCE'] = fix_bool($_REQUEST['guard']);
+			$tab_tour_us['ID_SURVEILLANCE'] = fix_bool($_REQUEST['guard']);
+		}
+		if(isset($_REQUEST['usage_pro'])) {
+			$tab_tour_eu['ID_USAGE_PRO'] = fix_bool($_REQUEST['usage_pro']);
+			$tab_tour_us['ID_USAGE_PRO'] = fix_bool($_REQUEST['usage_pro']);
+		}
+		if(isset($_REQUEST['usage_comm'])) {
+			$tab_tour_eu['ID_USAGE_COMMERCIAL'] = fix_bool($_REQUEST['usage_comm']);
+			$tab_tour_us['ID_USAGE_COMMERCIAL'] = fix_bool($_REQUEST['usage_comm']);
+		}
+		if(isset($_REQUEST['barbecue'])) {
+			$tab_tour_eu['ID_EQUIPEMENT_BARBECUE'] = fix_bool($_REQUEST['barbecue']);
+			$tab_tour_us['ID_EQUIPEMENT_BARBECUE'] = fix_bool($_REQUEST['barbecue']);
+		}
+		if(isset($_REQUEST['grill'])) {
+			$tab_tour_eu['ID_EQUIPEMENT_GRILL'] = fix_bool($_REQUEST['grill']);
+			$tab_tour_us['ID_EQUIPEMENT_GRILL'] = fix_bool($_REQUEST['grill']);
+		}
+		if(isset($_REQUEST['heat'])) {
+			$tab_tour_eu['ID_CHAUFFAGE'] = fix_bool($_REQUEST['heat']);
+			$tab_tour_us['ID_CHAUFFAGE'] = fix_bool($_REQUEST['heat']);
+		}
+		if(isset($_REQUEST['toilets'])) {
+			$tab_tour_eu['ID_TOILETTE_SEPARE'] = fix_bool($_REQUEST['toilets']);
+			$tab_tour_us['ID_TOILETTE_SEPARE'] = fix_bool($_REQUEST['toilets']);
+		}		
+		if(isset($_REQUEST['garden'])) {
+			$tab_tour_eu['ID_JARDIN'] = fix_bool($_REQUEST['garden']);
+			$tab_tour_us['ID_JARDIN'] = fix_bool($_REQUEST['garden']);
+		}
+		if(isset($_REQUEST['hall'])) {
+			$tab_tour_eu['ID_HALL'] = fix_bool($_REQUEST['hall']);
+			$tab_tour_us['ID_HALL'] = fix_bool($_REQUEST['hall']);
+		}
+		if(isset($_REQUEST['buffet'])) {
+			$tab_tour_eu['ID_VAISSELIER'] = fix_bool($_REQUEST['buffet']);
+			$tab_tour_us['ID_VAISSELIER'] = fix_bool($_REQUEST['buffet']);
+		}
+		if(isset($_REQUEST['reception'])) {
+			$tab_tour_eu['ID_RECEPTION'] = fix_bool($_REQUEST['reception']);
+			$tab_tour_us['ID_RECEPTION'] = fix_bool($_REQUEST['reception']);
+		}
+		if(isset($_REQUEST['suite'])) {
+			$tab_tour_eu['ID_SUITE_PARENTALE'] = fix_bool($_REQUEST['suite']);
+			$tab_tour_us['ID_SUITE_PARENTALE'] = fix_bool($_REQUEST['suite']);
+		}
+		if(isset($_REQUEST['kitchen'])) {
+			$tab_tour_eu['ID_CUISINE'] = fix_bool($_REQUEST['kitchen']);
+			$tab_tour_us['ID_CUISINE'] = fix_bool($_REQUEST['kitchen']);
+		}
+		if(isset($_REQUEST['patio'])) {
+			$tab_tour_eu['ID_PATIO'] = fix_bool($_REQUEST['patio']);
+			$tab_tour_us['ID_PATIO'] = fix_bool($_REQUEST['patio']);
+		}
+		if(isset($_REQUEST['property_condition'])) {
+			$tab_tour_eu['ID_TYPE_ETAT'] = (int)$_REQUEST['property_condition'];
+			$tab_tour_us['ID_TYPE_ETAT'] = (int)$_REQUEST['property_condition'];
+		}
+		if(isset($_REQUEST['sleeps'])) {
+			$tab_tour_eu['NOMBRE_PERSONNE'] = (int)$_REQUEST['sleeps'];
+			$tab_tour_us['NOMBRE_PERSONNE'] = (int)$_REQUEST['sleeps'];
+		}
+		if(isset($_REQUEST['street_number'])) {
+			$tab_tour_eu['NUMERO_RUE'] = (int)$_REQUEST['street_number'];
+			$tab_tour_us['NUMERO_RUE'] = (int)$_REQUEST['street_number'];
+		}
+		if(isset($_REQUEST['property_number '])) {
+			$tab_tour_eu['NUMERO_PROPRIETE'] = (int)$_REQUEST['property_number'];
+			$tab_tour_us['NUMERO_PROPRIETE'] = (int)$_REQUEST['property_number'];
+		}
+		if(isset($_REQUEST['url_youtube'])) {  // URL To VIDEO MANUALLY ADDED BY THE USER ( ARGENTINS) 
+			$tab_tour_eu['URL_YOUTUBE'] = fix_text($_REQUEST['url_youtube']);
+			$tab_tour_us['URL_YOUTUBE'] = fix_text($_REQUEST['url_youtube']);
+		}
+		if(isset($_REQUEST['dinning_room'])) {  
+			$tab_tour_eu['SALLE_MANGER'] = fix_bool($_REQUEST['dinning_room']);
+			$tab_tour_us['SALLE_MANGER'] = fix_bool($_REQUEST['dinning_room']);
+		}
+		if(isset($_REQUEST['breakfast'])) { 
+			$tab_tour_eu['SALLE_MANGER_QUOTIDIENNE'] = fix_bool($_REQUEST['breakfast']);
+			$tab_tour_us['SALLE_MANGER_QUOTIDIENNE'] = fix_bool($_REQUEST['breakfast']);
+		}
+		if(isset($_REQUEST['dependence'])) {  
+			$tab_tour_eu['DEPENDENCE'] = fix_bool($_REQUEST['dependence']);
+			$tab_tour_us['DEPENDENCE'] = fix_bool($_REQUEST['dependence']);
+		}
+		if(isset($_REQUEST['living_room'])) {  
+			$tab_tour_eu['SEJOUR'] = fix_bool($_REQUEST['living_room']);
+			$tab_tour_us['SEJOUR'] = fix_bool($_REQUEST['living_room']);
+		}
+		if(isset($_REQUEST['living_dinning'])) {  
+			$tab_tour_eu['SALON_SALLE_MANGER'] = fix_bool($_REQUEST['living_dinning']);
+			$tab_tour_us['SALON_SALLE_MANGER'] = fix_bool($_REQUEST['living_dinning']);
+		}
+		if(isset($_REQUEST['personal_laundry'])) {  
+			$tab_tour_eu['BUANDERIE_PRIVEE'] = fix_bool($_REQUEST['personal_laundry']);
+			$tab_tour_us['BUANDERIE_PRIVEE'] = fix_bool($_REQUEST['personal_laundry']);
+		}
+		if(isset($_REQUEST['multipurpose_room'])) {  
+			$tab_tour_eu['SALON_MULTI_USAGE'] = fix_bool($_REQUEST['multipurpose_room']);
+			$tab_tour_us['SALON_MULTI_USAGE'] = fix_bool($_REQUEST['multipurpose_room']);
+		}
+		// Ex pour tests : 
+		// db  = 4.11
+		// vv  = D00F6A34-125D-AFFB-A007-DD1A27FF6FEE
+		// url = http://dev.api.previsite.com/rest/p/tour/12345?partnerID=D580B51E-E85D-A925-17F7-05B3BA21DD36&password=ainm435&user=12345&update=1&kitchen=1&patio=1&suite=1&reception=1&buffet=1&hall=1&garden=1&toilets=1&heat=1&grill=1&barbecue=1&property_condition=2
+
+
+		// http://dev.api.previsite.com/rest/p/tour/12345?partnerID=D580B51E-E85D-A925-17F7-05B3BA21DD36&password=ainm435&user=12345&update=1&price=12345&tour_agent_first_name=Roro&tour_agent_last_name=rORO&tour_agent_email=roro@roro.com&tour_agent_phone=0123456789
+		
+		if(isset($_REQUEST['tour_agent_first_name'])) {
+			$tab_tour_contact['PRENOM_UTILISATEUR'] = $_REQUEST['tour_agent_first_name'];
+		}
+		if(isset($_REQUEST['tour_agent_last_name'])) {
+			$tab_tour_contact['NOM_UTILISATEUR'] = $_REQUEST['tour_agent_last_name'];
+		}
+		if(isset($_REQUEST['tour_agent_email'])) {
+			$tab_tour_contact['EMAIL_UTILISATEUR'] = $_REQUEST['tour_agent_email'];
+		}
+		if(isset($_REQUEST['tour_agent_phone'])) {
+			$tab_tour_contact['TELEPHONE_UTILISATEUR'] = $_REQUEST['tour_agent_phone'];
+		}
+		if(!empty($_REQUEST['tour_logo'])) {
+			$tab_tour_contact['NOM_LOGO_SOCIETE'] = $_REQUEST['tour_logo'];
+		}
+		if(isset($_REQUEST['tour_cny_name'])) {
+			$tab_tour_contact['NOM_SOCIETE'] = $_REQUEST['tour_cny_name'];
+		}
+		if(isset($_REQUEST['tour_cny_address'])) {
+			$tab_tour_contact['ADRESSE_SOCIETE'] = $_REQUEST['tour_cny_address'];
+		}
+		if(isset($_REQUEST['tour_cny_city'])) {
+			$tab_tour_contact['VILLE_SOCIETE'] = $_REQUEST['tour_cny_city'];
+		}
+		if(isset($_REQUEST['tour_cny_zip'])) {
+			$tab_tour_contact['CODE_POSTAL_SOCIETE'] = $_REQUEST['tour_cny_zip'];
+		}
+		if(isset($_REQUEST['tour_cny_phone'])) {
+			$tab_tour_contact['TELEPHONE_SOCIETE'] = $_REQUEST['tour_cny_phone'];
+		}
+		if(isset($_REQUEST['tour_cny_website'])) {
+			$tab_tour_contact['SITEWEB_SOCIETE'] = $_REQUEST['tour_cny_website'];
+		}
+
+/*
+
+
+numero_rue					@Street_number
+numero_propriete			@Property_number
+url_youtube					@url_youtube
+salle_manger				@Dinning_room
+salle_manger_quotidienne	@breakfast
+dependence					@dependence
+sejour						@Living_room
+salon_salle_manger			@Living_dinning
+buanderie_privee			@Personal_laundry
+salon_multi_usage 			@Multipurpose_Room
+
+
+
+Id_equipement_barbecue @barbecue
+Id_equipement_grill @grill
+Id_chauffage tinyint @heat
+Id_toilette_separe @toilets
+Id_jardin tinyint @garden
+Id_hall tinyint @hall
+Id_vaisselier @buffet
+Id_reception @reception
+Id_suite_parentale @suite
+Id_cuisine @kitchen
+Id_patio tinyint @patio
+*/
+
+/*
+
+ID_BIEN_AMENAGE : @furnished
+ANNEE_CONSTRUCTION : @year_built
+NOMBRE_BALCON : @balcony
+ID_EAU_COURANTE : @running_water
+ID_ASSAINISSEMENT : @sanitation
+ID_GAZ_NATUREL : @natural_gas
+ID_LUMIERE : @light
+TROTTOIR : @sidewalk
+ID_TELEPHONE : @equip_tel
+ID_CABLE : @equip_cable
+ID_ALARME : @alarm
+ID_TERRAIN_SPORT : @sport_ground
+ID_SALLE_GYM : @gym_room
+ID_JACUZZI : @jacuzzi
+ID_BUANDERIE : @laundry
+ID_PISCINE : @pool
+ID_SALLE_JEU : @game_room
+ID_SAUNA : @sauna
+ID_SOLARIUM : @solarium
+ID_SURVEILLANCE : @guard
+ID_USAGE_PRO : @usage_pro
+ID_USAGE_COMMERCIAL : @usage_comm
+ORIENTATION : @orientation
+
+*/
+		// Template auto
+		if(isset($_REQUEST['auto_brand_id'])) $tab_tour_auto['ID_MARQUE'] = (int)$_REQUEST['auto_brand_id'];
+		if(isset($_REQUEST['auto_model_id'])) $tab_tour_auto['ID_MODELE'] = (int)$_REQUEST['auto_model_id'];
+		if(isset($_REQUEST['auto_type'])) $tab_tour_auto['ID_TYPE_VEHICULE'] = (int)$_REQUEST['auto_type'];
+		if(isset($_REQUEST['auto_energy'])) $tab_tour_auto['ID_TYPE_ENERGIE'] = (int)$_REQUEST['auto_energy'];
+		if(isset($_REQUEST['auto_doors'])) $tab_tour_auto['NOMBRE_PORTE'] = (int)$_REQUEST['auto_doors'];
+		if(isset($_REQUEST['auto_seats'])) $tab_tour_auto['NOMBRE_PLACE'] = (int)$_REQUEST['auto_seats'];
+		if(isset($_REQUEST['auto_power_fiscal'])) $tab_tour_auto['PUISSANCE_FISCALE'] = (int)$_REQUEST['auto_power_fiscal'];
+		if(isset($_REQUEST['auto_power'])) $tab_tour_auto['PUISSANCE_MOTEUR'] = (int)$_REQUEST['auto_power'];
+		if(isset($_REQUEST['auto_nb_gears'])) $tab_tour_auto['NOMBRE_VITESSE'] = (int)$_REQUEST['auto_nb_gears'];
+		if(isset($_REQUEST['auto_gearbox'])) $tab_tour_auto['ID_TYPE_BOITE'] = (int)$_REQUEST['auto_gearbox'];
+		if(isset($_REQUEST['auto_year'])) $tab_tour_auto['ANNEE_MODELE'] = (int)$_REQUEST['auto_year'];
+		if(isset($_REQUEST['auto_distance'])) $tab_tour_auto['DISTANCE_PARCOURUE'] = (int)$_REQUEST['auto_distance'];
+		if(isset($_REQUEST['auto_distance_unit'])) $tab_tour_auto['ID_UNITE_DISTANCE_PARCOURUE'] = (int)$_REQUEST['auto_distance_unit'];
+		if(isset($_REQUEST['auto_color_ext'])) $tab_tour_auto['COULEUR_EXTERIEURE'] = fix_null($_REQUEST['auto_color_ext'], 50, true);
+		if(isset($_REQUEST['auto_options'])) $tab_tour_auto['OPTIONS'] = fix_null($_REQUEST['auto_options'], 1000, true);
+		if(isset($_REQUEST['co2_emmission'])) $tab_tour_auto['EMISSIONS_CO2'] = (int)$_REQUEST['co2_emmission'];
+		if(isset($_REQUEST['discount_percent'])) $tab_tour_auto['REMISE_POURCENTAGE'] = (float)$_REQUEST['discount_percent'];
+		if(isset($_REQUEST['auto_version_id'])) $tab_tour_auto['ID_VERSION'] = (int)$_REQUEST['auto_version_id'];
+		
+		
+		if(isset($_REQUEST['auto_date_first_owner'])) {
+			$ts = @strtotime($_REQUEST['auto_date_first_owner']);
+			$tab_tour_auto['DATE_PREMIERE_IMMATRICULATION'] = fix_null(!empty($ts) ? date('Y-m-d', $ts) : null, 20);
+		}
+
+		// Only EU
+		if(isset($_REQUEST['new_built'])) {
+			$tab_tour_eu['ID_NEUF'] = fix_bool($_REQUEST['new_built']);
+			$tab_tour_us['ID_NEUF'] = fix_bool($_REQUEST['new_built']);
+			$tab_tour_auto['ID_NEUF'] = fix_bool($_REQUEST['new_built']);
+		}
+
+		if(isset($_REQUEST['recent_built'])) {
+			$tab_tour_eu['ID_IMMEUBLE_RECENT'] = fix_bool($_REQUEST['recent_built']);
+		}
+
+		if(isset($_REQUEST['elevator'])) {
+			$tab_tour_eu['ID_ASCENSEUR'] = fix_bool($_REQUEST['elevator']);
+		}
+		if(isset($_REQUEST['exclusive'])) {
+			$tab_tour_eu['ID_EXCLUSIVITE'] = fix_bool($_REQUEST['exclusive']);
+		}
+		if(isset($_REQUEST['cellar'])) {
+			$tab_tour_eu['ID_CAVE'] = fix_bool($_REQUEST['cellar']);
+		}
+		if(isset($_REQUEST['aircond'])) {
+			$tab_tour_eu['ID_CLIMATISATION'] = fix_bool($_REQUEST['aircond']);
+			$tab_tour_us['ID_CLIMATISATION'] = fix_bool($_REQUEST['aircond']);
+		}
+		if(isset($_REQUEST['digicode'])) {
+			$tab_tour_eu['ID_DIGICODE'] = fix_bool($_REQUEST['digicode']);
+		}
+		if(isset($_REQUEST['interphone'])) {
+			$tab_tour_eu['ID_INTERPHONE'] = fix_bool($_REQUEST['interphone']);
+		}
+		if(isset($_REQUEST['internet_high'])) {
+			$tab_tour_eu['ID_INTERNET_HAUT_DEBIT'] = fix_bool($_REQUEST['internet_high']);
+		}
+		if(isset($_REQUEST['pool'])) {
+			$tab_tour_eu['ID_PISCINE'] = fix_bool($_REQUEST['pool']);
+			$tab_tour_us['ID_PISCINE'] = fix_bool($_REQUEST['pool']);
+		}
+		if(isset($_REQUEST['furnished'])) {
+			$tab_tour_eu['ID_BIEN_AMENAGE'] = fix_bool($_REQUEST['furnished']);
+			$tab_tour_us['ID_BIEN_AMENAGE'] = fix_bool($_REQUEST['furnished']);
+		}
+		if(isset($_REQUEST['need_work'])) {
+			$tab_tour_eu['ID_TRAVAUX'] = fix_bool($_REQUEST['need_work']);
+		}
+		if(isset($_REQUEST['refurbished'])) {
+			$tab_tour_eu['ID_REFAIT_NEUF'] = fix_bool($_REQUEST['refurbished']);
+		}
+		if(isset($_REQUEST['doorman'])) {
+			$tab_tour_eu['ID_GARDIEN'] = fix_bool($_REQUEST['doorman']);
+		}
+		if(isset($_REQUEST['disabled_people'])) {
+			$tab_tour_eu['ID_AMENAGEMENT_HANDICAP'] = fix_bool($_REQUEST['disabled_people']);
+		}
+		if(isset($_REQUEST['animals'])) {
+			$tab_tour_eu['ID_ANIMAUX'] = fix_bool($_REQUEST['animals']);
+		}
+		if(isset($_REQUEST['dpe_letter'])) {
+			$tab_tour_eu['DPE_LETTRE'] = fix_null(fix_dpeges($_REQUEST['dpe_letter']), 2, false);
+		}
+		if(isset($_REQUEST['dpe_value'])) {
+			$tab_tour_eu['DPE_VALEUR'] = fix_int($_REQUEST['dpe_value'], 2, true);
+		}
+		if(isset($_REQUEST['ges_letter'])) {
+			$tab_tour_eu['GES_LETTRE'] = fix_null(fix_dpeges($_REQUEST['ges_letter']), 2, false);
+		}
+		if(isset($_REQUEST['ges_value'])) {
+			$tab_tour_eu['GES_VALEUR'] = fix_int($_REQUEST['ges_value'], 2, true);
+		}
+		if(isset($_REQUEST['owner_age_m'])) {
+			$tab_tour_eu['AGE_PROPRIETAIRE_M'] = fix_int($_REQUEST['owner_age_m'], 1, false);
+		}
+		if(isset($_REQUEST['owner_age_f'])) {
+			$tab_tour_eu['AGE_PROPRIETAIRE_F'] = fix_int($_REQUEST['owner_age_f'], 1, false);
+		}
+		if(isset($_REQUEST['property_occupied'])) {
+			$tab_tour_eu['ID_LOGEMENT_OCCUPE'] = fix_bool($_REQUEST['property_occupied']);
+		}
+		if(isset($_REQUEST['monthly_annuity'])) {
+			$tab_tour_eu['RENTE_MENSUELLE'] = fix_int($_REQUEST['monthly_annuity'], 4, true);
+		}
+		if(isset($_REQUEST['total_floor'])) {
+			$tab_tour_eu['NOMBRE_ETAGES'] = fix_int($_REQUEST['total_floor'], 1, false);
+		}
+		if(isset($_REQUEST['num_floor'])) {
+			$tab_tour_eu['NUMERO_ETAGE'] = fix_int($_REQUEST['num_floor'], 2, true);
+		}
+		
+
+		
+		if(isset($_REQUEST['rent_period'])) {
+			switch(strtolower(trim($_REQUEST['rent_period']))){
+        case '4':	   $tab_tour_eu['ID_PERIODICITE_LOYER'] = 4; $tab_tour_us['ID_PERIODICITE_LOYER'] = 4; break;
+				case 'year': $tab_tour_eu['ID_PERIODICITE_LOYER'] = 4; $tab_tour_us['ID_PERIODICITE_LOYER'] = 4; break;
+				case '3':	   $tab_tour_eu['ID_PERIODICITE_LOYER'] = 3; $tab_tour_us['ID_PERIODICITE_LOYER'] = 3; break;
+				case 'day':  $tab_tour_eu['ID_PERIODICITE_LOYER'] = 3; $tab_tour_us['ID_PERIODICITE_LOYER'] = 3; break;
+				case '2':    $tab_tour_eu['ID_PERIODICITE_LOYER'] = 2; $tab_tour_us['ID_PERIODICITE_LOYER'] = 2; break;
+				case 'week': $tab_tour_eu['ID_PERIODICITE_LOYER'] = 2; $tab_tour_us['ID_PERIODICITE_LOYER'] = 2;break;
+				default:     $tab_tour_eu['ID_PERIODICITE_LOYER'] = 1; $tab_tour_us['ID_PERIODICITE_LOYER'] = 1; break; // default: month
+			}
+		}
+		if(isset($_REQUEST['listing_status'])) {
+			switch(strtolower(trim($_REQUEST['listing_status']))) {
+				case 'withdrawn': $tab_tour_eu['ID_STATUT_LISTING'] = 5; $tab_tour_us['ID_STATUT_LISTING'] = 5; break;
+				case 'sold':	    $tab_tour_eu['ID_STATUT_LISTING'] = 4; $tab_tour_us['ID_STATUT_LISTING'] = 4; break;
+				case 'pending':   $tab_tour_eu['ID_STATUT_LISTING'] = 3; $tab_tour_us['ID_STATUT_LISTING'] = 3; break;
+				case 'expired':   $tab_tour_eu['ID_STATUT_LISTING'] = 2; $tab_tour_us['ID_STATUT_LISTING'] = 2; break;
+				default:		      $tab_tour_eu['ID_STATUT_LISTING'] = 1; $tab_tour_us['ID_STATUT_LISTING'] = 1; break; // default: active
+			}
+		}
+		if(isset($_REQUEST['heating_type'])) {
+			switch(strtolower(trim($_REQUEST['heating_type']))) {
+				case '4':		   $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 4; break;
+				case 'fuel':   $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 4; break;
+				case '3':		   $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 3; break;
+				case 'ground': $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 3; break;
+				case '2':		   $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 2; break;
+				case 'electric': $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 2; break;
+				case '1':		     $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 1; break;
+				case 'gas':	     $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = 1; break;
+				default:		     $tab_tour_eu['ID_TYPE_CHAUFFAGE'] = (int)$_REQUEST['heating_type']; break; // default: non specified
+			}
+		}
+//		if(isset($_REQUEST['features'])) {
+//			$tab_tour_us['EQUIPEMENTS'] = fix_null($_REQUEST['features'], 200, true);
+//		}
+
+		if(isset($_REQUEST['kitchen_type'])) {
+			switch(strtolower(trim($_REQUEST['kitchen_type']))) {
+				case '1':  $tab_tour_eu['ID_TYPE_CUISINE'] = 1; break;
+				case 'us': $tab_tour_eu['ID_TYPE_CUISINE'] = 1; break;
+				case '2':  $tab_tour_eu['ID_TYPE_CUISINE'] = 2; break;
+				case '3':  $tab_tour_eu['ID_TYPE_CUISINE'] = 3; break;
+				case '4':  $tab_tour_eu['ID_TYPE_CUISINE'] = 4; break;
+				default:   $tab_tour_eu['ID_TYPE_CUISINE'] = (int)$_REQUEST['kitchen_type']; break;
+			}
+		}
+		if(isset($_REQUEST['area_house_unit'])) {
+			switch(strtolower(trim($_REQUEST['area_house_unit']))) {
+				case '4':	    $tab_tour_eu['ID_UNITE_SURFACE_HABITABLE'] = $tab_tour_us['ID_UNITE_SURFACE_HABITABLE'] = 4; break;
+				case 'ha':	  $tab_tour_eu['ID_UNITE_SURFACE_HABITABLE'] = $tab_tour_us['ID_UNITE_SURFACE_HABITABLE'] = 4; break;
+				case '3':	    $tab_tour_eu['ID_UNITE_SURFACE_HABITABLE'] = $tab_tour_us['ID_UNITE_SURFACE_HABITABLE'] = 3; break;
+				case 'acres': $tab_tour_eu['ID_UNITE_SURFACE_HABITABLE'] = $tab_tour_us['ID_UNITE_SURFACE_HABITABLE'] = 3; break;
+				case '2':	    $tab_tour_eu['ID_UNITE_SURFACE_HABITABLE'] = $tab_tour_us['ID_UNITE_SURFACE_HABITABLE'] = 2; break;
+				case 'sqft':  $tab_tour_eu['ID_UNITE_SURFACE_HABITABLE'] = $tab_tour_us['ID_UNITE_SURFACE_HABITABLE'] = 2; break;
+				default:	    $tab_tour_eu['ID_UNITE_SURFACE_HABITABLE'] = 1; $tab_tour_us['ID_UNITE_SURFACE_HABITABLE'] = 2; break; //m2 for EU, sqft for US
+			}
+		}
+		if(isset($_REQUEST['area_field_unit'])) {
+			switch(strtolower(trim($_REQUEST['area_field_unit']))) {
+				case '4':	  $tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'] = 4; break;
+				case 'ha':	$tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'] = 4; break;
+				case '3':	  $tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'] = 3; break;
+				case 'acres':  $tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'] = 3; break;
+				case '2':	     $tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'] = 2; break;
+				case 'sqft':   $tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'] = 2; break;
+				default:	     $tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'] = 1; break; //m2
+			}
+			$tab_tour_us['ID_UNITE_TAILLE_LOT'] = $tab_tour_eu['ID_UNITE_SURFACE_TERRAIN'];
+		}
+		if(isset($_REQUEST['orientation'])) {
+			switch(strtolower(trim($_REQUEST['orientation']))) {
+				case 'n':   $tab_tour_eu['ORIENTATION'] = fix_null('N',  2, false); break;
+				case 'ne':  $tab_tour_eu['ORIENTATION'] = fix_null('NE', 2, false); break;
+				case 'e':   $tab_tour_eu['ORIENTATION'] = fix_null('E',  2, false); break;
+				case 'se':  $tab_tour_eu['ORIENTATION'] = fix_null('SE', 2, false); break;
+				case 's':   $tab_tour_eu['ORIENTATION'] = fix_null('S',  2, false); break;
+				case 'sw':  $tab_tour_eu['ORIENTATION'] = fix_null('SW', 2, false); break;
+				case 'w':   $tab_tour_eu['ORIENTATION'] = fix_null('W',  2, false); break;
+				case 'nw':  $tab_tour_eu['ORIENTATION'] = fix_null('NW', 2, false); break;
+				default:	  $tab_tour_eu['ORIENTATION'] = fix_null('',   2, false); break;
+			}
+		}
+
+		if(isset($_REQUEST['mutation_tax'])) {
+			$tab_tour_us['TAXE_MUTATION'] = (float)$_REQUEST['mutation_tax'];
+		}
+
+		if(isset($_REQUEST['fee_agency'])) {
+			$tab_tour_eu['FRAIS_AGENCE'] = fix_int( (int)$_REQUEST['fee_agency'], 4, true);
+			$tab_tour_us['TAXES'] = fix_int( (int)$_REQUEST['fee_agency'], 4, true);
+		}
+
+		if(isset($_REQUEST['property_bond'])) {
+			$tab_tour_eu['CAUTION'] = fix_null(is_numeric($_REQUEST['property_bond']) ? (float)$_REQUEST['property_bond'] : '', 10, false);
+		}
+
+		if(isset($_REQUEST['rent_charges'])) {
+			$tab_tour_eu['CHARGES_MENSUELLES'] = fix_int( (int)$_REQUEST['rent_charges'], 4, true);
+		}
+		if(isset($_REQUEST['amount_work'])) {
+			$tab_tour_eu['MONTANT_TRAVAUX'] = fix_int( (int)$_REQUEST['amount_work'], 4, true);
+		}
+		if(isset($_REQUEST['terrace'])) {
+			$tab_tour_eu['NOMBRE_TERRASSE'] = fix_int( (int)$_REQUEST['terrace'], 1, false);
+			$tab_tour_us['NOMBRE_TERRASSE'] = fix_int( (int)$_REQUEST['terrace'], 1, false);
+		}
+		if(isset($_REQUEST['balcony'])) {
+			$tab_tour_eu['NOMBRE_BALCON'] = fix_int( (int)$_REQUEST['balcony'], 1, false);
+			$tab_tour_us['NOMBRE_BALCON'] = fix_int( (int)$_REQUEST['balcony'], 1, false);
+		}
+
+		if(isset($_REQUEST['rooms'])) {
+			$tab_tour_eu['NOMBRE_PIECE'] = fix_int((int)$_REQUEST['rooms'], 1, false);
+			$tab_tour_us['NOMBRE_PIECE'] = fix_int((int)$_REQUEST['rooms'], 1, false);
+		}
+
+		// Nouveaux champs Cushwake
+		if(isset($_REQUEST['build_class'])) {
+			$tab_tour_eu['CLASSE_BATIMENT'] = fix_null($_REQUEST['build_class'], 1, false);
+		}
+		if(isset($_REQUEST['rail'])) {
+			$tab_tour_eu['ID_RAIL'] = fix_bool($_REQUEST['rail']);
+		}
+		if(isset($_REQUEST['sublease'])) {
+			$tab_tour_eu['ID_SOUS_LOCATION'] = fix_bool($_REQUEST['sublease']);
+		}
+		if(isset($_REQUEST['negotiable'])) {
+			$tab_tour_eu['ID_PRIX_NEGOCIABLE'] = fix_bool($_REQUEST['negotiable']);
+		}
+		if(isset($_REQUEST['ceil_h_unit'])) {
+			$tab_tour_eu['ID_UNITE_HAUTEUR_PLAFOND'] = fix_int($_REQUEST['ceil_h_unit'], 1, false);
+		}
+		if(isset($_REQUEST['price_surface'])) {
+			$tab_tour_eu['PRIX_SURFACE'] = (float)$_REQUEST['price_surface'];
+		}
+		if(isset($_REQUEST['price_surface_unit'])) {
+			$tab_tour_eu['ID_UNITE_PRIX_SURFACE'] = fix_int($_REQUEST['price_surface_unit'], 1, false);
+		}
+		if(isset($_REQUEST['price_min'])) {
+			$tab_tour_eu['PRIX_MIN'] = (float)$_REQUEST['price_min'];
+		}
+		if(isset($_REQUEST['price_max'])) {
+			$tab_tour_eu['PRIX_MAX'] = (float)$_REQUEST['price_max'];
+		}
+		if(isset($_REQUEST['available_area'])) {
+			$tab_tour_eu['SURFACE_DISPONIBLE'] = (float)$_REQUEST['available_area'];
+			$tab_tour_us['ESPACE_TOTAL'] = fix_int($_REQUEST['available_area'], 4, true);
+		}
+//		if(isset($_REQUEST['total_build_area'])) {
+//			$tab_tour_eu['SURFACE_BATIMENT_TOTALE'] = (float)$_REQUEST['total_build_area'];
+//			$tab_tour_us['ESPACE_TOTAL'] = fix_int($_REQUEST['total_build_area'], 4, true);
+//		}
+		if(isset($_REQUEST['division_min'])) {
+			$tab_tour_eu['SURFACE_DIVISION_MIN'] = fix_int($_REQUEST['division_min'], 4, true);
+		}
+		if(isset($_REQUEST['division_max'])) {
+			$tab_tour_eu['SURFACE_DIVISION_MAX'] = fix_int($_REQUEST['division_max'], 4, true);
+		}
+		if(isset($_REQUEST['luxury'])) {
+			$tab_tour_eu['ID_PRESTIGE'] = $tab_tour_us['ID_PRESTIGE'] = fix_bool($_REQUEST['luxury']);			
+		}
+		if(isset($_REQUEST['tax_property'])) {
+			$tab_tour_eu['TAXE_FONCIERE'] = (float)$_REQUEST['tax_property'];
+		}
+		if(isset($_REQUEST['tax_housing'])) {
+			$tab_tour_eu['TAXE_HABITATION'] = (float)$_REQUEST['tax_housing'];
+		}
+		if(isset($_REQUEST['smallest_div'])) {
+			$tab_tour_eu['SURFACE_DIVISION_MIN'] = (float)$_REQUEST['smallest_div'];
+		}
+		if(isset($_REQUEST['largest_div'])) {
+			$tab_tour_eu['SURFACE_DIVISION_MAX'] = (float)$_REQUEST['largest_div'];
+		}
+		if(isset($_REQUEST['lot_size'])) {
+			$tab_tour_us['TAILLE_LOT_ACRES'] = (float)$_REQUEST['lot_size'];
+		}
+		if(isset($_REQUEST['orientation_windows'])) {
+			$cleaned = strtoupper(preg_replace('/[^nsew]/i', '', $_REQUEST['orientation_windows']));
+			$tab_tour_eu['ORIENTATION_FENETRES'] = fix_null($cleaned);
+		}
+
+		if(isset($_REQUEST['tenants_area'])) $tab_tour_cpt['TENANTS_AREA'] = $_REQUEST['tenants_area'];
+		if(isset($_REQUEST['tenant_improvements'])) $tab_tour_cpt['TENANT_IMPROVEMENTS'] = $_REQUEST['tenant_improvements'];
+		if(isset($_REQUEST['hauteur_plafond_min'])) $tab_tour_cpt['HAUTEUR_PLAFOND_MIN'] = $_REQUEST['hauteur_plafond_min'];
+		if(isset($_REQUEST['hauteur_plafond_max'])) $tab_tour_cpt['HAUTEUR_PLAFOND_MAX'] = $_REQUEST['hauteur_plafond_max'];
+		if(isset($_REQUEST['surface_disponible_bureaux'])) $tab_tour_cpt['SURFACE_DISPONIBLE_BUREAUX'] = $_REQUEST['surface_disponible_bureaux'];
+		if(isset($_REQUEST['surface_disponible_batiment'])) $tab_tour_cpt['SURFACE_DISPONIBLE_BATIMENT'] = $_REQUEST['surface_disponible_batiment'];
+		if(isset($_REQUEST['taux_occupation_batiment'])) $tab_tour_cpt['TAUX_OCCUPATION_BATIMENT'] = $_REQUEST['taux_occupation_batiment'];
+		if(isset($_REQUEST['suite_number'])) $tab_tour_cpt['SUITE_NUMBER'] = $_REQUEST['suite_number'];
+		if(isset($_REQUEST['clear_height'])) $tab_tour_cpt['CLEAR_HEIGHT'] = $_REQUEST['clear_height'];
+		if(isset($_REQUEST['lot_size_acres'])) $tab_tour_cpt['LOT_SIZE_ACRES'] = $_REQUEST['lot_size_acres'];
+		if(isset($_REQUEST['lot_size_sf'])) $tab_tour_cpt['LOT_SIZE_SF'] = $_REQUEST['lot_size_sf'];
+		if(isset($_REQUEST['total_gla'])) $tab_tour_cpt['TOTAL_GLA'] = $_REQUEST['total_gla'];
+		if(isset($_REQUEST['subtype'])) $tab_tour_cpt['SUBTYPE'] = $_REQUEST['subtype'];
+		if(isset($_REQUEST['building_type'])) $tab_tour_cpt['BUILDINGTYPE'] = $_REQUEST['building_type'];
+		if(isset($_REQUEST['parking_ratio'])) $tab_tour_cpt['PARKING_RATIO'] = $_REQUEST['parking_ratio'];
+		if(isset($_REQUEST['transaction_comment'])) $tab_tour_cpt['TRANSACTION_COMMENT'] = $_REQUEST['transaction_comment'];
+		if(isset($_REQUEST['caracteristiques'])) $tab_tour_cpt['CARACTERISTIQUES'] = $_REQUEST['caracteristiques'];
+		if(isset($_REQUEST['dock_high_doors'])) $tab_tour_cpt['DOCK_HIGH_DOORS'] = $_REQUEST['dock_high_doors'];
+		if(isset($_REQUEST['grade_level_doors'])) $tab_tour_cpt['GRADE_LEVEL_DOORS'] = $_REQUEST['grade_level_doors'];
+		if(isset($_REQUEST['lease_expiration'])) $tab_tour_cpt['LEASE_EXPIRATION'] = $_REQUEST['lease_expiration'];
+		if(isset($_REQUEST['id_etage_complet'])) $tab_tour_cpt['ID_ETAGE_COMPLET'] = $_REQUEST['id_etage_complet'];
+		if(isset($_REQUEST['possession_date'])) $tab_tour_cpt['POSSESSION_DATE'] = $_REQUEST['possession_date'];
+		if(isset($_REQUEST['availability_status'])) $tab_tour_cpt['AVAILABILITY_STATUS'] = $_REQUEST['availability_status'];
+		if(isset($_REQUEST['rental_rate'])) $tab_tour_cpt['RENTAL_RATE'] = $_REQUEST['rental_rate'];
+		if(isset($_REQUEST['frontage'])) $tab_tour_cpt['FRONTAGE'] = $_REQUEST['frontage'];
+		if(isset($_REQUEST['frontage2'])) $tab_tour_cpt['FRONTAGE2'] = $_REQUEST['frontage2'];
+		if(isset($_REQUEST['space_type'])) $tab_tour_cpt['SPACE_TYPE'] = $_REQUEST['space_type'];
+		if(isset($_REQUEST['secondarytype'])) $tab_tour_cpt['SECONDARYTYPE'] = $_REQUEST['secondarytype'];
+		if(isset($_REQUEST['md5_market'])) $tab_tour_cpt['MD5_MARKET'] = $_REQUEST['md5_market'];
+		if(isset($_REQUEST['id_condo'])) $tab_tour_cpt['ID_CONDO'] = $_REQUEST['id_condo'];
+		if(isset($_REQUEST['id_zone'])) $tab_tour_cpt['PREVISITEAR_ZONE'] = $_REQUEST['id_zone'];
+		if(isset($_REQUEST['mercado_zone'])) $tab_tour_cpt['MERCADO_ZONE'] = $_REQUEST['mercado_zone'];
+		if(isset($_REQUEST['mercado_city'])) $tab_tour_cpt['MERCADO_CITY'] = $_REQUEST['mercado_city'];
+		if(isset($_REQUEST['olx_zone'])) $tab_tour_cpt['OLX_ZONE'] = $_REQUEST['olx_zone'];
+		if(isset($_REQUEST['vivastreet_zone'])) $tab_tour_cpt['VIVASTREET_ZONE'] = $_REQUEST['vivastreet_zone'];
+		if(isset($_REQUEST['lumiere'])) $tab_tour_cpt['ECLAIRAGE'] = $_REQUEST['lumiere'];
+			
+		
+		// Special Zonaprop
+		if(isset($_REQUEST['zonaprop_location_id'])) $tab_tour_cpt['LOCATION_ID'] = $_REQUEST['zonaprop_location_id'];
+
+		// Special Limango
+		if(isset($_REQUEST['limango_price'])) $tab_tour_cpt['LIMANGO_PRICE'] = $_REQUEST['limango_price'];
+		if(isset($_REQUEST['limango_price_retail'])) $tab_tour_cpt['LIMANGO_PRICE_RETAIL'] = $_REQUEST['limango_price_retail'];
+		if(isset($_REQUEST['limango_start_date'])) $tab_tour_cpt['LIMANGO_START_DATE'] = $_REQUEST['limango_start_date'];
+		if(isset($_REQUEST['limango_discount'])) $tab_tour_cpt['LIMANGO_DISCOUNT'] = $_REQUEST['limango_discount'];
+		if(isset($_REQUEST['limango_tags'])) $tab_tour_cpt['LIMANGO_TAGS'] = $_REQUEST['limango_tags'];
+
+		// Special Allemagne
+		if(isset($_REQUEST['fee_agency_txt'])) $tab_tour_cpt['FEE_AGENCY_TXT'] = $_REQUEST['fee_agency_txt'];
+		if(isset($_REQUEST['fee_client_txt'])) $tab_tour_cpt['FEE_CLIENT_TXT'] = $_REQUEST['fee_client_txt'];
+
+		// id_market deprecated for cushwake
+		if(isset($_REQUEST['id_market'])) $tab_tour_cpt['ID_MARKET'] = $_REQUEST['id_market'];
+		if(isset($_REQUEST['url_print'])) $tab_tour_cpt['URL_PRINT'] = $_REQUEST['url_print'];
+
+		if(isset($_REQUEST['url_brochure'])) $tab_tour_cpt['URL_BROCHURE'] = $_REQUEST['url_brochure'];
+
+		$tab_params = array(
+			'TOUR'   => $tab_tour,
+			'EU'	 => $tab_tour_eu,
+			'US'	 => $tab_tour_us,
+			'CPT'	=> $tab_tour_cpt,
+			'AUTO' => $tab_tour_auto,
+			'TXT' => $tab_tour_txt,
+			'IMPORT' => array('NAME' => $_REQUEST['import_name'], 'COMM' => $_REQUEST['import_comm']),
+			'CONTACT_INFO' => $tab_tour_contact
+		);
+
+		if(isset($_REQUEST['contact_users'])) $tab_params['CONTACT_USER'] = $_REQUEST['contact_users'];
+		if(isset($_REQUEST['ref_master']))	$tab_params['REF_MASTER'] = $_REQUEST['ref_master'];
+		//ajout julien, pour mettre à jour table facebook app quand la diffusion est déjà faite
+		if(isset($_REQUEST['facebook_update']))	$tab_params['FACEBOOK_UPDATE'] = $_REQUEST['facebook_update'];   
+ 
+		$result = update_tour_data($partner, $ref, $_REQUEST['user'], $tab_params);
+		if($result['SUCCESS']) {
+			if($result['NEW']) {
+				header201();
+			}
+			$output_txt = 'true';
+			$operation_xml = xml_operation_result(true);
+			$operation_json = json_operation_result(true);
+		} else {
+			$output_txt = 'false';
+			$operation_xml = xml_operation_result(false, $error_mess);
+			$operation_json = json_operation_result(false, $error_mess);
+		}
+		$comment_ws = 'Ref:'.$ref."\n";
+		break;
+
+
+
+
+	case 'DisableUser':
+		$delete_all = isset($_REQUEST['full']);
+
+		if($delete_all) $comment_ws = 'Disable User '.$user;
+		else			$comment_ws = 'Delete User '.$user;
+
+		if(disable_user($partner, $user, $delete_all)) {
+			$output_txt = 'true';
+			$operation_xml = xml_operation_result(true);
+			$operation_json = json_operation_result(true);
+		} else {
+			$output_txt = 'false';
+			$operation_xml = xml_operation_result(false, $error_mess);
+			$operation_json = json_operation_result(false, $error_mess);
+		}
+		break;
+
+
+
+
+	case 'DeleteTour':
+		$comment_ws = 'Ref:'.$ref;
+		if(delete_tour($partner, $ref)) {
+			$output_txt = 'true';
+			$operation_xml = xml_operation_result(true);
+			$operation_json = json_operation_result(true);
+		} else {
+			$output_txt = 'false';
+			$operation_xml = xml_operation_result(false, $error_mess);
+			$operation_json = json_operation_result(false, $error_mess);
+		}
+		break;
+
+
+
+
+	case 'UpdateUser':
+		echo "oki";
+		$tab_user = array();
+		$tab_comp = array();
+		$tab_addr = array();
+		$tab_opts = array();
+
+		// doit etre non null si param fourni
+		if(!empty($_REQUEST['cny_name'])) $tab_comp['NOM_SOCIETE'] = fix_null($_REQUEST['cny_name'], 100, true);
+		if(!empty($_REQUEST['usr_login'])) $tab_user['LOGIN_UTILISATEUR'] = fix_null($_REQUEST['usr_login'], 50, false);
+		if(!empty($_REQUEST['usr_password'])) $tab_user['PASSWORD_UTILISATEUR'] = fix_null($_REQUEST['usr_password'], 50, false);
+		if(!empty($_REQUEST['usr_lang']) && check_language($_REQUEST['usr_lang']))  $tab_user['ID_LANGUE'] = fix_null($_REQUEST['usr_lang'], 2, false);
+		if(isset($_REQUEST['usr_fb_page_id'])) $tab_user['FACEBOOK_PAGE_ID'] = fix_null($_REQUEST['usr_fb_page_id'], 20, false);
+		if(isset($_REQUEST['usr_fb_page_url'])) $tab_user['FACEBOOK_PAGE_URL'] = fix_null($_REQUEST['usr_fb_page_url'], 350, false);
+
+
+		// champs nullables si param a vide
+		if(isset($_REQUEST['usr_lastname']))  $tab_user['NOM_UTILISATEUR'] = fix_null($_REQUEST['usr_lastname'], 100, true);
+		if(isset($_REQUEST['usr_firstname'])) $tab_user['PRENOM_UTILISATEUR'] = fix_null($_REQUEST['usr_firstname'], 100, true);
+		if(isset($_REQUEST['usr_phone']))  $tab_user['TELEPHONE_UTILISATEUR'] = fix_null($_REQUEST['usr_phone'], 30, false);
+		if(isset($_REQUEST['usr_bio']))  $tab_user['BIO_UTILISATEUR'] = fix_null($_REQUEST['usr_bio'], 2000, true);
+		if(isset($_REQUEST['usr_title']))  $tab_user['QUALITE_UTILISATEUR'] = fix_null($_REQUEST['usr_title'], 150, true);
+		if(isset($_REQUEST['usr_mobile']))  $tab_user['MOBILE_UTILISATEUR'] = fix_null($_REQUEST['usr_mobile'], 30, false);
+		if(isset($_REQUEST['usr_email']) && is_email($_REQUEST['usr_email']))  $tab_user['EMAIL_UTILISATEUR'] = fix_null($_REQUEST['usr_email'], 150, false);
+		if(isset($_REQUEST['usr_liscence']))  $tab_user['NUMERO_LISCENCE'] = fix_null($_REQUEST['usr_liscence'], 20, false);
+		if(isset($_REQUEST['usr_max_tours'])) $tab_user['NOMBRE_VV'] = fix_null(abs((int)$_REQUEST['usr_max_tours']));
+		// Creation utilisateur desactive (AVAL...)
+		if(isset($_REQUEST['usr_disabled'])) $tab_user['ID_STATUT_UTILISATEUR'] = empty($_REQUEST['usr_disabled']) ? 1 : -1;
+		//creation pour réactiver les utilisateurs sans modifier leurs données. 
+		//pour le cas ou l'utilisateur est en mode create only
+		if(isset($_REQUEST['usr_reactivation']) && $_REQUEST['usr_reactivation'] == "true") $tab_user['ID_STATUT_UTILISATEUR'] = 1;
+
+		if(isset($_REQUEST['cny_www'])) $tab_comp['SITEWEB_SOCIETE'] = fix_null($_REQUEST['cny_www'], 100, false);
+		if(isset($_REQUEST['cny_email'])) $tab_comp['EMAIL_SOCIETE'] = fix_null($_REQUEST['cny_email'], 200, false);
+		if(isset($_REQUEST['cny_address'])) $tab_addr['ADRESSE'] = fix_null($_REQUEST['cny_address'], 150, true);
+		if(isset($_REQUEST['cny_city'])) $tab_addr['VILLE'] = fix_null($_REQUEST['cny_city'], 100, true);
+		if(isset($_REQUEST['cny_zip'])) $tab_addr['CODE_POSTAL'] = fix_null($_REQUEST['cny_zip'], 25, false);
+		if(isset($_REQUEST['cny_state'])) $tab_addr['ETAT'] = fix_null($_REQUEST['cny_state'], 50, true);
+		if(isset($_REQUEST['cny_tva'])) $tab_comp['TVA_INTRA_SOCIETE'] = fix_null($_REQUEST['cny_tva'], 13, false);
+		if(isset($_REQUEST['cny_fax'])) $tab_addr['FAX'] = fix_null($_REQUEST['cny_fax'], 30, false);
+		if(isset($_REQUEST['cny_phone'])) $tab_addr['TELEPHONE'] = fix_null($_REQUEST['cny_phone'], 30, false);
+		if(isset($_REQUEST['cny_country']) && check_country($_REQUEST['cny_country'])) $tab_addr['ID_PAYS'] = fix_null($_REQUEST['cny_country'], 2, false);
+
+
+
+
+		// override distrib (only on create)
+		if(isset($_REQUEST['cny_distrib']) && check_distrib($_REQUEST['cny_distrib'])) {
+			$tab_comp['ID_DISTRIBUTEUR'] = fix_null($_REQUEST['cny_distrib'], 36, false);
+			$tab_comp['ID_AGENCE'] = fix_null(get_distrib_agency($_REQUEST['cny_distrib']), 36, false);
+		}
+		if(isset($_REQUEST['cny_group'])) $tab_comp['GROUPE_SOCIETE'] = fix_null($_REQUEST['cny_group'], 20, false);
+
+		if(!empty($_REQUEST['cny_lat']) && !empty($_REQUEST['cny_lon']) && is_numeric($_REQUEST['cny_lat']) && is_numeric($_REQUEST['cny_lon'])) {
+//			$tab_addr['GPS'] = fix_null($_REQUEST['cny_lat'].'#'.$_REQUEST['cny_lon'], 30, false);
+			$tab_addr['Latitude'] = (float)$_REQUEST['cny_lat'];
+			$tab_addr['Longitude'] = (float)$_REQUEST['cny_lon'];
+		} else {
+			$url_gps = str_replace(
+				$tab_pattern_url_gps,
+				array(urlencode($_REQUEST['cny_address']), urlencode($_REQUEST['cny_country']), urlencode($_REQUEST['cny_zip']), urlencode($_REQUEST['cny_city'])),
+				URL_FETCH_GPS
+			);
+			list($lat, $lon) = explode('#', @file_get_contents($url_gps));
+			if(is_numeric($lat) && is_numeric($lon)) {
+//				$tab_addr['GPS'] = fix_null($lat.'#'.$lon, 30, false);
+				$tab_addr['Latitude'] = (float)$lat;
+				$tab_addr['Longitude'] = (float)$lon;
+			}
+		}
+
+		if(isset($_REQUEST['opt_profil'])) {
+			$tab_opts['OPTION_BUNDLE#PROFILVIDEO'] = $_REQUEST['opt_profil'];
+		}
+		if(isset($_REQUEST['opt_diagcomp'])) {
+			$tab_opts['OPTION_BUNDLE#DIAGNOCOMP'] = $_REQUEST['opt_diagcomp'];
+		}
+		if(isset($_REQUEST['zonaprop_areacode'])) {
+			$tab_opts['OPTION_BUNDLE#AREACODEPHONE'] = $_REQUEST['zonaprop_areacode'];
+		}
+
+		$result = update_user($partner, $user, $tab_user, $tab_comp, $tab_addr, $tab_opts);
+
+		if($result['SUCCESS']) {
+			if($result['NEW']) {
+				header201();
+			}
+			$output_xml = xml_get_user( get_partner_users($partner, $user) );
+			$comment_ws = 'User updated:'.$user;
+		} else {
+			$output_txt = 'false';
+			$comment_ws = 'User unchanged:'.$user;
+			$operation_xml = xml_operation_result(false, $error_mess);
+			$operation_json = json_operation_result(false, $error_mess);
+		}
+		break;
+
+
+
+
+	case 'GetUserTours':
+		$comment_ws = 'User:'.$user;
+		$tab_tours = get_partner_tours($partner, $user);
+		$output_xml = xml_get_tours($tab_tours);
+		$output_json = json_get_tours($tab_tours);
+		break;
+
+
+
+
+
+	case 'GetPartnerTours':
+		$tab_tours = get_partner_tours($partner);
+		$output_xml = xml_get_tours($tab_tours);
+		$output_json = json_get_tours($tab_tours);
+		break;
+
+
+
+
+
+	case 'GetUserListings':
+		$tab_listings = get_partner_listings($partner, $user);
+		$output_xml = xml_get_listings($tab_listings);
+		$output_json = json_get_listings($tab_listings);
+		break;
+
+
+
+
+	case 'GetListing':
+		$tab_listing = get_partner_listing($partner, $ref);
+		$output_xml = xml_get_listing($tab_listing);
+		$output_json = json_get_listing($tab_listing);
+		break;
+
+
+
+	case 'GetTour':
+		$comment_ws = 'Ref:'.$ref;
+		$tab_tour = get_partner_tour($partner, $ref);
+		$output_xml = xml_get_tour($tab_tour);
+		$output_json = json_get_tour($tab_tour);
+		break;
+
+
+
+	case 'DeleteTourImage':
+		$comment_ws = 'Ref:'.$ref;
+		// delete_import_only
+		// http://dev.api.previsite.com/rest/p/images/rom-1513/1?partnerID=AB188012-3EC5-4069-24C5-5CA1E669D9C3&password=yasi902&delete
+
+		$delete_import_only  = !empty($_REQUEST['delete_import_only']);
+		$delete_import_only |= !empty($_REQUEST['replace_import_only']);
+
+		if(delete_tour_image($partner, $ref, $_GET['order'], $delete_import_only)) {
+			$output_txt = 'true';
+			$operation_xml = xml_operation_result(true);
+			$operation_json = json_operation_result(true);
+		} else {
+			$output_txt = 'false';
+			$operation_xml = xml_operation_result(false, $error_mess);
+			$operation_json = json_operation_result(false, $error_mess);
+		}
+		break;
+
+
+
+
+	case 'GetTourImages':
+		$comment_ws = 'Ref:'.$ref;
+		$tab_images = get_partner_tour_images($partner, $ref);
+		$output_xml = xml_get_tour_images($tab_images);
+		$output_json = json_get_tour_images($tab_images);
+		break;
+
+
+
+
+
+	case 'GetPartnerUsers':
+		// http://dev.api.previsite.com/rest/p/users.json?partnerID=C3187B7F-3F56-86C5-EF9D-BFECE5CC7FFA&password=tadl795
+		$tab_users = get_partner_users($partner, null, $active_user_only);
+		$output_xml = xml_get_users($tab_users);
+		$output_json = json_get_users($tab_users);
+		break;
+
+
+
+
+	case 'GetUser':
+		// http://dev.api.previsite.com/rest/p/users/rsordello34.json?partnerID=C3187B7F-3F56-86C5-EF9D-BFECE5CC7FFA&password=tadl795
+		$comment_ws = 'User:'.$user;
+		$tab_user = get_partner_users($partner, $user, $active_user_only);
+		$output_xml = xml_get_user($tab_user);
+		$output_json = json_get_user($tab_user);
+		break;
+}
+$tab_bench = log_time($tab_bench, 'query_total_time');
+
+// no log for internal calls...
+if(empty($_REQUEST['nolog'])) {
+	$tab_bench = log_time($tab_bench, 'insert_log_ws');
+	insert_log($partner, $method_name, $_SERVER['SERVER_NAME'], $_SERVER['SERVER_ADDR'], $_SERVER['REMOTE_ADDR'], $comment_ws);
+	$tab_bench = log_time($tab_bench, 'insert_log_ws');
+}
+
+if(!PEAR::isError($db)) {
+	$db_srv = (string)$db->dsn['hostspec'];
+	$tab_bench = log_time($tab_bench, 'db_close');
+	$db->disconnect();
+	$tab_bench = log_time($tab_bench, 'db_close');
+}
+
+
+
+if(SERVER_DEV && !empty($_GET['bench'])) {
+	echo json_encode($tab_bench);
+} else if($output=='json' && (!empty($output_json)||!empty($operation_json))) {
+	header('Content-type: application/json');
+	if(!empty($operation_json)) {
+		echo $operation_json;
+	} else {
+		echo $output_json;
+	}
+} else if(!empty($output_xml)||!empty($operation_xml)) {
+	header('Content-type: text/xml');
+	echo '<?xml version="1.0" encoding="utf-8"?>';
+	if(!empty($operation_xml)) {
+		echo $operation_xml;
+	} else {
+		echo $output_xml;
+	}
+} else {
+	header404();
+}
+
+

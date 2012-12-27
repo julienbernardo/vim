@@ -1,0 +1,225 @@
+<?php
+
+require_once 'DB.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('/var/www/gateway2.previsite.net/include/global.php');
+require_once(PATH_INCLUDE.'/function.php');
+require_once(PATH_INCLUDE.'/function.db.php');
+require_once(PATH_INCLUDE.'/function.cron.php');
+//http://gateway2.previsite.net/exec_cron?check_alert=true&no_mail=true
+$only_dev = ($_REQUEST['only_dev'] == "true");
+$check_alert = ($_REQUEST['check_alert'] == "true");
+$no_mail = ($_REQUEST['no_mail'] == "true");
+$do_alert = ($_REQUEST['do_alert'] == "true");
+
+if($only_dev){ $list_srv = array('dev' => '');}
+$types = array('import', 'export');
+if(!$check_alert && !$do_alert){
+	foreach($list_srv as $k=>$v){
+		if($list_srv[$k] == "" && $only_dev == false){ continue;}
+		foreach($types as $type){
+			$suffix = "";
+			if($type != "import"){ $suffix = "_".$type;}
+			$cmd = "sudo ".($list_srv[$k] != "" ? "ssh root@".$list_srv[$k]." " : "" )."php ".PATH_MAIN."cron".$suffix.".php > ".PATH_LOG."exec_cron_".$k.$suffix.".log &";
+			if($only_dev){ echo $cmd."<br />";}
+			else{ pclose(popen($cmd, 'r'));}
+		}
+	}
+}
+if($only_dev && !$check_alert){ exit;}
+$logs = array();
+$default_srv = get_server_name();
+if($default_srv == "dev"){
+	$main_script = "exec_cron";
+	$hour = "09";
+	$need_exec = (date('H') == $hour || $check_alert);
+	$infos = get_cron_infos($main_script, 'cron');
+	if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $infos['start'], $lastExec) > 0){
+		$need_exec &= ($lastExec[3] != date('d', mktime()-($check_alert ? 24*60*60 : 0)));
+	}
+	if($need_exec || $do_alert){
+		if(!$do_alert) update_cron($main_script, "start");
+		$logs = array();
+		$date_reference = "";
+		if($check_alert || $do_alert){
+			$date_reference = date('Y-m-d '.$hour.':00:00', mktime()-24*60*60);
+		}else if(count($lastExec) > 0){
+			$date_reference = date('Y-m-d '.$hour.':00:00', mktime( $lastExec[4], $lastExec[5], $lastExec[6], $lastExec[2], $lastExec[3], $lastExec[1]));
+		}
+
+		$executionFinish = getExecutionFinishSince($date_reference);
+		for($i=0; $i < count($executionFinish); $i++){
+			$cron = $executionFinish[$i];
+			$type = ($cron['ID_TYPE_SCRIPT'] > 0 ? "export" : "import");
+			$srv = $cron['SERVER_CRON'];
+			if(!is_array($logs[$type])){ $logs[$type] = array();}
+			if($cron['ID_STATUT_CRON_EXECUTION'] < 0){
+				if($cron['RESUME_CRON'] != "reset"){
+					if(!is_array($logs[$type][$cron['CODE_SCRIPT']])){ $logs[$type][$cron['CODE_SCRIPT']] = array();}
+					$logs[$type][$cron['CODE_SCRIPT']]['error'] = array('msg' => $cron['RESUME_CRON'], 'date' => $cron['DATE_FIN_CRON']);
+				}
+			}else{
+				$cron['RESUME_CRON'] = explode( ';', $cron['RESUME_CRON']);
+				$tmp = $logs[$type]['finish'][$cron['CODE_SCRIPT']];
+				if(!is_array($tmp)){ $tmp = array();}
+				for($k = 0; $k < count($cron['RESUME_CRON']); $k++){
+					$cron['RESUME_CRON'][$k] = trim(preg_replace('/[ ]*:[ ]*/i', ':', $cron['RESUME_CRON'][$k]));
+					if(preg_match('/([^:]+):(\d+)\/(\d+)/i', $cron['RESUME_CRON'][$k], $result) > 0){
+						if(preg_match('/^(USERS|TOURS|IMAGES|PLANS|TRANSACTIONS|FAILED)$/i',$result[1]) > 0){
+							if($result[2] > 0.2*$result[3] && $result[3] > 100 ){ 
+								if(count($tmp[$result[1]]) > 0 && $tmp[$result[1]]['total'] > $result[3]){
+									continue;
+								}
+								$tmp[$result[1]] = array('done' => $result[2], 'total' => $result[3]);
+							}
+						}else if(preg_match('/^(DONE|WAITING|DELETED)$/i', $result[1]) > 0 && $result[2] < 0.8*$result[3] ){ 
+							$tmp[$result[1]] = array('done' => $result[2], 'total' => $result[3]);
+						}
+					}
+				}				
+				if(count($tmp) > 0){ 
+					if(!is_array($logs[$type][$cron['CODE_SCRIPT']])){ $logs[$type][$cron['CODE_SCRIPT']] = array();}
+					$logs[$type][$cron['CODE_SCRIPT']]['finish'] = $tmp;
+				}
+				
+				if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $cron['DATE_DEBUT_CRON'], $date_start) > 0
+					&& preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $cron['DATE_FIN_CRON'], $date_end) > 0){
+					$lastExec = mktime( $date_end[4], $date_end[5], $date_end[6], $date_end[2], $date_end[3], $date_end[1])-mktime( $date_start[4], $date_start[5], $date_start[6], $date_start[2], $date_start[3], $date_start[1]);
+					$function = "get".ucFirst($type)."Infos";
+					$infosCron = $function($cron['CODE_SCRIPT'], false, false);
+					if($lastExec/60/60 > $infosCron['TEMPS_MAX_'.strtoupper($type)]){
+						if(!is_array($logs[$type])){ $logs[$type] = array();}
+						if(!is_array($logs[$type][$cron['CODE_SCRIPT']])){ $logs[$type][$cron['CODE_SCRIPT']] = array();}
+						$logs[$type][$cron['CODE_SCRIPT']]['toolong'] = array('start' => $infos['start'], 'duration' => convert_duration_for_print($lastExec, " "), 'duration_sec' => $lastExec);
+					}
+				}
+			}
+		}
+		
+		$executionInProgress = getExecutionInProgress();
+		for($i = 0; $i < count($executionInProgress); $i++){
+			$cron = $executionInProgress[$i];
+			$type = ($cron['ID_TYPE_SCRIPT'] == 0 ? "import" : "export" );
+			$infos = parse_execution_infos( $cron);
+			$srv = $cron['SERVER_CRON'];
+			if($infos['start'] != "" && $infos['start'] != "-"){
+				if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $infos['start'], $lastExec) > 0){
+					$lastExec = mktime()-mktime( $lastExec[4], $lastExec[5], $lastExec[6], $lastExec[2], $lastExec[3], $lastExec[1]);
+					if($lastExec/60/60 > $cron['TEMPS_MAX_'.strtoupper($type)]){
+						if(!is_array($logs[$type])){ $logs[$type] = array();}
+						if(!is_array($logs[$type][$cron['CODE_SCRIPT']])){ $logs[$type][$cron['CODE_SCRIPT']] = array();}
+						$logs[$type][$cron['CODE_SCRIPT']]['progress'] = array('start' => $infos['start'], 'duration' => convert_duration_for_print($lastExec, " "), 'duration_sec' => $lastExec);
+					}
+				}
+			}
+		}
+
+		$executionNotDone = getExecutionNotDone($date_reference);
+		for($i = 0; $i < count($executionNotDone); $i++){
+			$type = ($executionNotDone[$i]['ID_TYPE_SCRIPT'] == 0 ? "import" : "export" );
+			$cron = getLastExecution($executionNotDone[$i]['CODE_SCRIPT'] , $type);
+			$cron = $cron[0];
+			$infos = parse_execution_infos( $cron);
+			$srv = $cron['SERVER_CRON'];
+			if($infos['start'] != "" && $infos['start'] != "-"){
+				if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $infos['start'], $lastExec) > 0){
+					$lastExec = mktime()-mktime( $lastExec[4], $lastExec[5], $lastExec[6], $lastExec[2], $lastExec[3], $lastExec[1]);
+					if($lastExec/60/60 > $cron['TEMPS_MAX_'.strtoupper($type)]){
+						if(!is_array($logs[$type])) $logs[$type] = array();
+						if(!is_array($logs[$type][$cron['CODE_SCRIPT']])) $logs[$type][$cron['CODE_SCRIPT']] = array();
+						$logs[$type][$cron['CODE_SCRIPT']]['notdone'] = array('start' => $infos['start'], 'duration' => convert_duration_for_print($lastExec, " "), 'duration_sec' => $lastExec);
+					}
+				}
+			}
+		}
+		$resume = array('error' => array(), 'warning' => array(), 'notice' => array());
+		//TTS
+		$count = file_get_contents(URL_SOUND_COUNT);
+		$infos = "<li><a href=\"".URL_SOUND_DETAIL."\ target=\"_blank\">".$count."</a> TTS in generation</li>";
+		if($count < 1000) $resume['notice'][] = $infos;
+		else if($count < 3000) $resume['warning'][] = $infos;
+		else $resume['error'][] = $infos;
+
+		//Video
+		$count = file_get_contents(URL_VIDEO_CRON_COUNT);
+		$infos = "<li><a href=\"".URL_VIDEO_CRON_DETAIL."\" target=\"_blank\">".$count."</a>  videos in waiting</li>";
+		if($count < 2000) $resume['notice'][] = $infos;
+		else if($count < 4000) $resume['warning'][] = $infos;
+		else $resume['error'][] = $infos;
+
+		if(count($logs) > 0){
+			foreach($logs as $type=>$error_scripts){
+				if(count($error_scripts) > 0){
+					ksort($error_scripts);
+					foreach($error_scripts as $script => $scripts){
+						if(count($scripts) > 0){
+							foreach($scripts as $error => $infos){
+								$category = "notice";
+								switch($error){
+									case "notdone":
+										$txt = "<span style=\"color:red\"> not running</span> (last exec: <b>".$infos['duration']."</b>)";
+										if($infos['duration_sec'] > 7*24*60*60) $category = "error";
+										else if($infos['duration_sec'] > 3*24*60*60){ 
+											$category = "warning";
+											$txt = preg_replace('/color:red/', 'color:orange', $txt);
+										}else $txt = preg_replace('/<[^>]*>/', '', $txt);
+										$infos = $txt;
+										break;
+									case "toolong":
+										$infos = " took too long (during ".$infos['duration'].")";
+										$category = 'notice';
+										break;
+									case "progress":
+										$category = ($infos['duration_sec'] > 12*60*60 ? 'error' : 'warning');
+										$infos = "<span style=\"color:red;\"> taking too long</span> (during <b>".$infos['duration']."</b>)";
+										break;
+									case "finish":
+										if($type == "export") $tmp = " has an abnormally high rate of failure (";
+										else $tmp = " has an abnormally high rate of update (";
+										$isError = false;
+										foreach($infos as $k=>$v){
+											$isError |= (($type== "export" && $k == 'DONE' && $v['done'] == 0) || ($type=="import" && $v['done'] == $v['total']));
+											$tmp .= '#'.strtolower($k).': <b>'.$v['done'].'/'.$v['total']."</b>, ";
+										}
+										$category = ($isError ? 'error' : 'warning');
+										$infos = preg_replace('/, $/i', '', $tmp).")";
+										break;
+									default:
+										$category = ($infos['msg'] == "error in data array" ? 'error' : 'notice');
+										$infos = " <span style=\"color:".($category == 'error' ? 'red' : 'orange').";\">is in error</span> (last error at ".str_replace(date('Y-m-d ') ,'', $infos['date']).")";
+										break;
+								}
+								$resume[$category][] .= '<li><a target="_blank" href="'.URL_HOST.'/manage_'.$type.'?script='.$script.'" style="text-decoration:underline;text-weight:bold;" >'.$script.'</a>'.$infos.' <small>('.$type.')</small></li>';
+							}
+						}
+					}
+				}
+			}
+		}
+	
+		foreach($resume as $category => $msg){
+			if(count($msg) > 0){
+				$resume[$category] = "<li class=\"main\">".ucFirst($category)." (".count($msg).")<ul>".implode("\n", $msg)."</ul></li>";
+			}
+		}
+		$body = "<html><head><style> li{ margin-top:10px;} li.main{ margin:20px 0; } ul.main{ margin-bottom:20px;}</style></head><body><ul class=\"main\">".implode("\n",$resume)."</ul></body></html>";
+		if($check_alert) echo $body;
+		if($do_alert) update_cron($main_script, "end");
+		if($body != "" && !$no_mail){
+			$phpmail = new PHPMailer();
+			$phpmail->IsSMTP();
+			$phpmail->IsHTML(true);
+			$phpmail->Host      = SMTP_MAIL;
+			$phpmail->From      = "report@previsite.com";
+			$phpmail->FromName  = 'Import/Export Resume';
+			$phpmail->WordWrap  = 70;
+			$phpmail->Subject   = 'Import/Export Resume '.date('Y-m-d');
+	
+			$phpmail->Body = $body;
+			$phpmail->AddAddress((!$check_alert ? "report" : "julien")."@previsite.com",(!$check_alert ? "Report" : "julien"));
+			$phpmail->Send();
+		}
+	}
+}
+exit;
+?>

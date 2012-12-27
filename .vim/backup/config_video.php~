@@ -1,0 +1,142 @@
+<?php
+
+$videos_options = array(
+	'VOICES' => array('EN'=>'heather', 'ES'=>'maria', 'FR'=>'bruno', 'IT'=>'chiara', 'PT'=>'ester'),
+	'PARTNER' => array(
+		'611D9ECC-D339-1339-4136-69C5EA5B4CFA' => array('db_name' => 'c21', 'LOGO' => 'E97D8F0F-A5DD-C9A7-55B6-A6635E330C50'),
+		'6E7BC18E-E5AE-D6A1-93D9-FFE6F1BE2261' => array('db_name' => 'citya'),
+		'7575C1D5-4C5A-0B92-66BF-0AB5163FF622' => array('db_name' => 'immoliaison')
+	),
+	'GOOGLE_API_KEYS' => array(
+		array('NAME' =>'PREVISITE',		'KEY'=>'ABQIAAAAWwEis_juCmJ9anicMOCDqxTWNGeFwNHgMXpCK2-bh6l3YhEZrhQSnxG2FWmjXhXRBdvuxaoctU_WOA'),
+		array('NAME' =>'PREVISITE_1', 	'KEY'=>'ABQIAAAAjiHXFOUWICFk0zjA5l-cPxSBqTjeD2hkFoMtvImpirLwGC6pfhSudry7Rp5PlWj34QAE_lToduIcGA'),
+		array('NAME' =>'CITIHABITATS', 	'KEY'=>'ABQIAAAAjiHXFOUWICFk0zjA5l-cPxQqvHstT3aT3sWHN9zFcIUIUDkjRxRxCVzP4h9lv-FviVzFULAR05gHiA'),
+		array('NAME' =>'SIBOREALTORS', 	'KEY'=>'ABQIAAAAjiHXFOUWICFk0zjA5l-cPxQMeRIWxXI43tTmE3ntll8nUiN_JBTCd0hxPieH6bIlFpZK3qnEp-PfRg'),
+		array('NAME' =>'CENTURY21',		'KEY'=>'ABQIAAAAjiHXFOUWICFk0zjA5l-cPxRvtbogezIWQ1hCUXjlTFitUY1t5BS0iwwMR4LMLmc9iXhylzEDo_8H3Q'),
+		array('NAME' =>'CENTURY21AZ',	'KEY'=>'ABQIAAAAWwEis_juCmJ9anicMOCDqxQAhfJOZHeVv8evz6L8D_ai_5t9CRTTUkBHdcaXU-LvVRMra0emoZfrZA'),
+		array('NAME' =>'BLOTIMMOBILIER','KEY'=>'ABQIAAAAWwEis_juCmJ9anicMOCDqxSDe2MklA7rhX1cyR1RbH-XcdeMAxTrmgEvnni14WPUy_dQ3LovhCcfog'),
+		array('NAME' =>'EFFICTY',		'KEY'=>'ABQIAAAAWwEis_juCmJ9anicMOCDqxRTGdH3P1G9O5_dvwows-0yea3uWhSic7yoZr8pANQph_XJV_tLbRKK7w'),
+		array('NAME' =>'PERICLES',		'KEY'=>'ABQIAAAAjiHXFOUWICFk0zjA5l-cPxSHNKOvSpo8Rt18mVFykaf_-iZDFxRryL78DiyrFyOYZk6o6tMsTQ3Vow'),
+		array('NAME' =>'4%',			'KEY'=>'ABQIAAAAjiHXFOUWICFk0zjA5l-cPxS2OAcjP62CBMCFCOzPWUixQpCCNxTlZCfLrXjdDKl7StCBH3lF4VgilQ'),
+		array('NAME' =>'PROPRIVEE',		'KEY'=>'ABQIAAAAjiHXFOUWICFk0zjA5l-cPxRvuoYVqfi1k1O_A28SaA8tsTBxbRSumZBskjY3xkS0F6jAKQ-Br7Os3g')
+	),
+	'DIFFUSION_EXT' => 'mp4',
+	'DIFFUSION' => array( 'DAILYMOTION', 'VIEWTHISHOME', 'YOUTUBE', 'KEWEGO', 'YAHOO', 'WATTV', 'VIMEO'),
+	'DEFAULT' => array('PROFIL' => '480p'),
+	'TYPE' => array(
+		'AGENCE' => array("ONLY_USER" => true),
+		'AUTO' => array("ONLY_STILL_IMAGE" => true),
+		'ADELE'	=> array('PROFIL'=>"mobile;flash-med-16-9"),
+		'AGENCEPLUS' => array(
+				'DIFFUSION'	=> array(
+					'AUTH' => array(
+						'YOUTUBE'		=> array('LOGIN'=>'VisiteVirtuelleImmo','PASSWORD'=>'youtube007!'),
+						'DAILYMOTION'	=> array('LOGIN'=>'VisiteVirtuelleImmo','PASSWORD'=>'dailymotion007!'),
+						'VIEWTHISHOME'	=> array('LOGIN'=>'viewthishome@previsite.com','PASSWORD'=>'viewthishome007!'),
+						'KEWEGO'		=> array('LOGIN'=>'kewego@previsite.com','PASSWORD'=>'Previsite2010'),
+						'YAHOO'			=> array('LOGIN'=>'previsitevideo@yahoo.com','PASSWORD'=>'Previsite2010!')
+					),
+					'TAGS'	=> array("agenceplus")
+				)
+			),
+		
+		'FR' => array(
+				'DIFFUSION'	=> array(
+					'AUTH' => array(
+						'YOUTUBE'		=> array('LOGIN'=>'VisiteVirtuelleImmo', 'PASSWORD'=>'youtube007!'),
+						'DAILYMOTION'	=> array('LOGIN'=>'VisiteVirtuelleImmo', 'PASSWORD'=>'dailymotion007!'),
+						'VIMEO'			=> array('LOGIN'=>'VisiteVirtuelleImmo', 'PASSWORD'=>'vimeo007!'),
+						'VIEWTHISHOME'	=> array('LOGIN'=>'viewthishome@previsite.com', 'PASSWORD'=>'viewthishome007!'),
+						'KEWEGO'		=> array('LOGIN'=>'kewego@previsite.com', 'PASSWORD'=>'Previsite2010'),
+						'YAHOO'			=> array('LOGIN'=>'previsitevideo@yahoo.com', 'PASSWORD'=>'Previsite2010!'),
+						'WATTV'			=> array('LOGIN'=>'wattv@previsite.com', 'PASSWORD'=>'Previsite2010!')
+					)
+				)
+			),
+		'FR_CUSTOM' => array(
+				'DIFFUSION'	=> array(
+					'AUTH' => array(
+						'YOUTUBE'		=> array('LOGIN'=>'VisiteVirtuelleImmo','PASSWORD'=>'youtube007!'),
+						'DAILYMOTION'	=> array('LOGIN'=>'VisiteVirtuelleImmo','PASSWORD'=>'dailymotion007!'),
+						'VIEWTHISHOME'	=> array('LOGIN'=>'viewthishome@previsite.com','PASSWORD'=>'viewthishome007!'),
+						'KEWEGO'		=> array('LOGIN'=>'kewego@previsite.com','PASSWORD'=>'Previsite2010'),
+						'YAHOO'			=> array('LOGIN'=>'previsitevideo@yahoo.com','PASSWORD'=>'Previsite2010!')
+					)
+				)
+			),
+		'FR_CUSTOM_C21FR' => array(
+				'DIFFUSION'	=> array('TAGS' => array("century21", "france"))
+			),
+		'FR_CUSTOM_LAFORET' => array(
+				'DIFFUSION'	=> array('TAGS' => array("laforet", "france"))
+			),
+		'FR_CUSTOM_ERA' => array(
+				'DIFFUSION'	=> array('TAGS' => array("era"))
+			),
+		'HE_CUSTOM' => array(),
+		'ES_CUSTOM_VALLEHER' => array(
+				'DIFFUSION'	=> array('TAGS' => array("Vallehermoso", "spain"))
+			),
+		'CUSTOM_ERAFR' => array(),
+		'DOOR' => array(),
+		'FR_DOOR' => array(),
+		'FR_TV' => array(),
+		'TV' => array(),
+		'TV_PARISATTITUDE' =>array(),
+		'TV_123WEBIMMO' => array(),
+		'REMAX' =>array(),
+		'IPAD' => array(),
+		'PARTICULIERS' => array(),
+		'PACIFIC' => array('MAIN_TEMPLATE'=>'DEFAULT'),
+		'ROOMORAMA' => array('ONLY_STILL_IMAGE' => true, 'NO_TTS' => true),
+		'US' => array(
+				'DIFFUSION'	=> array(
+					'AUTH' => array(
+						'YOUTUBE'		=> array('LOGIN'=>'PrevisiteChannel','PASSWORD'=>'youtube007!'),
+						'DAILYMOTION'	=> array('LOGIN'=>'PrevisiteChannel','PASSWORD'=>'dailymotion007!'),
+						'VIEWTHISHOME'	=> array('LOGIN'=>'viewthishome@previsite.com','PASSWORD'=>'viewthishome007!')
+					)
+				)
+			),
+		'US_CUSTOM' => array(
+				'DIFFUSION'	=> array(
+					'AUTH' => array(
+						'YOUTUBE'		=> array('LOGIN'=>'PrevisiteChannel','PASSWORD'=>'youtube007!'),
+						'DAILYMOTION'	=> array('LOGIN'=>'PrevisiteChannel','PASSWORD'=>'dailymotion007!'),
+						'VIEWTHISHOME'	=> array('LOGIN'=>'viewthishome@previsite.com','PASSWORD'=>'viewthishome007!')
+					)
+				)
+			),
+		'US_CUSTOM_C21AZ' => array(
+				'DIFFUSION'	=> array(
+					'TAGS' => array("century21", "arizona")
+				)
+			),
+		'US_CUSTOM_CUSHWAKE' => array(
+				'DIFFUSION'	=> array(
+					'TAGS' => array("cushwake")
+				)
+			),
+		'CUSTOM_PETERSON' => array(),
+		'SMART' => array('ONLY_STILL_IMAGE' => true, 'NO_TTS' => true),
+		'LIMANGO' => array(
+			'ONLY_STILL_IMAGE' => true,
+			'DIFFUSION'	=> array(
+				'TAGS' => array("limango")
+			)
+		),
+		'VIDEOTOUR'	=> array(
+				'PROFIL'=>"flash-hq;480p",
+				'DIFFUSION'	=> array(
+					'AUTH' => array(
+						'YOUTUBE'		=> array('LOGIN'=>'videotour.channel@gmail.com','PASSWORD'=>'gmail007!'),
+						'DAILYMOTION'	=> array('LOGIN'=>'videotourchannel','PASSWORD'=>'dailymotion007!'),
+						'VIEWTHISHOME'	=> array('LOGIN'=>'viewthishome@previsite.com','PASSWORD'=>'viewthishome007!')
+					),
+					'TAGS' => array("video tour","videotour")
+				)
+			),
+		'VIDEOTOURDEMO'	=> array('PROFIL'=>"flash-hq")
+	)
+);
+?>

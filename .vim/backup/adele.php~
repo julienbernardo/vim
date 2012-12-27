@@ -1,0 +1,54 @@
+<?php
+
+//main function
+
+//xml function
+function write_stupeflix_xml_content_adele($options){
+	$tab_images = $options['IMAGES'];
+	$url_sound = $options['MUSIC'];
+	$url_logo = $options['URL_LOGO_START'];
+	$url_logo_end = URL_VIDEO_LOGO_DEFAULT;
+	$result = array();
+	if(count($tab_images) > 0){
+		$handle = fopen($filename,"a");
+		$transitionsMade = array();
+		
+		if($url_logo == "") { $url_logo = $url_logo_end;}
+		$content = "		<stack>\n";
+		$content .=	"			<sequence>\n";
+		$content .= "				<effect type=\"none\" duration=\"2.0\">\n";
+		$content .= "					<image filename=\"".fix_xml($url_logo)."\" />\n";
+		$content .= "				</effect>\n";
+		$content .= "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+		$duree = 0;
+		$nb_images = 0;
+		foreach($tab_images as $k=> $image){
+			if($image['TYPE'] == '360'){ 
+				list($width,$height) = getimagesize($image['URL_IMAGE']);
+				$duration = 13;
+				if(round($width/$height) > 5){ $duration += round($width/$height)-5;}
+			}else{
+				$duration = 10;
+			}
+			$content .= "	 			<stack>\n";
+			$content .= "					<effect type=\"".($listEffects[$k] ? $listEffects[$k] : "kenburns")."\" duration=\"".$duration.".0\" ".$direction.">\n";
+			$content .= "						<image filename=\"".fix_xml($image['URL_IMAGE'])."\" />\n";
+			$content .= "					</effect>\n";
+			$content .= " 				<text type=\"legend\" height=\"".VIDEO_LEGEND_HEIGHT."\"  backgroundcolor =\"#00000055\"><![CDATA[".$image['TITLE']."]]></text>\n";
+			$content .= "	 			</stack>\n";
+			$content .= "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+			$duree += $duration;
+			$nb_images++;
+		}
+		
+		
+		$content .= "				<effect type=\"none\" duration=\"2.0\">\n";
+		$content .= "					<image filename=\"".fix_xml($url_logo_end)."\" />\n";
+		$content .= "				</effect>\n";
+		$content .= " 		</sequence>\n";
+		$content .= "			<audio filename=\"".fix_xml($url_sound)."\" duration=\"".($duree-$nb_images/2)."\" fadein=\"2.0\" fadeout=\"2.0\" volume=\"0.5\"/>\n";
+		$content .= "		</stack>\n";
+	}
+	return $content;
+}
+?>

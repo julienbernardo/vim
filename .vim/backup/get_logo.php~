@@ -1,0 +1,12 @@
+<?php
+/* code includes */
+require_once('./include/global.php');
+
+$logo = $_REQUEST['logo'];
+if($logo != "" && preg_match('/\.(.*)$/i', $logo, $ext) > 0){
+	$content = file_get_contents( str_replace('#LOGO#', $logo, URL_REDIRECT_LOGOAGENT));
+	header('Content-Type: image/'.$ext[1]);
+	echo $content;
+	exit;
+}
+?>

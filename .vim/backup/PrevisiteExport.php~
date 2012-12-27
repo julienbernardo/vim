@@ -1,0 +1,1097 @@
+<?php
+
+require_once 'previsite/fonctions.url.php';
+
+class PrevisiteExport {
+	/**
+	 *
+	 * @partners  array() OR guid
+	 * @tab_opt  array (
+	 *  'NEED_IMAGES' => boolean       // return tour with image (default)
+	 *	'REF_MASK' => string					 // Mask for the publication reference
+	 *	'DATE' => string               // YYYY-mm-dd 
+	 *  'NB_RESULT' => int              // Num of tours per step (250 default)
+	 *  'ORDER_BY_DATE'	=> bool
+	 *	'ID_VISITES'	=> array()
+	 *	'PAYS'	=> array() / String,
+	 *	'PARTIAL'		=>	bool,  // example ( vivastreet, oodle ,mitula ,idealista ..)
+	 *	'OPTIONS_DISTRIB'	=> bool // verif options distributeur
+	 *	'ID_UTILISATEURS'	=> array(),
+	 *	'STATUT_DIFFUSION' => array(), // return tours with id_statut_diffusion in STATUT_DIFFUSION's array,
+	 *	'FIELDS' => array(
+	 *	'USER' => boolean            // return user info
+	 *  'USER_OPTION' => string      // create tab with user options
+	 *	'PARTNER' => boolean				 // return partner info
+	 *	'USER_PARTNER' => boolean    // return user login & password on partner
+	 *	'COMPANY' => boolean         // return company info
+	 *	'LOGO_SOCIETE' => bool 		
+	 *	'TOUR' => boolean            // return tour basic info
+	 *	'DIFFUSION_PORTAIL_OPTION' => bool // verif options diffusion
+	 *	'TOUR_CPT' => array()       //  Nom des champs en complement
+	 *	'TOUR_DETAIL' => boolean     // return tour advanced detail
+	 *	'TOUR_DETAIL_AR' => boolean     // return tour advanced detail for argentina
+	 *  'TYPE_DISTRIB' => booleen     // return nom_type_bien distributeur
+	 *  'EXCEPT_PARTNER'  => list of partners that tours should not be diffused on (ex: vivastreet )
+	 *  'EXCEPT_GROUP_SOCIETE'   => list of GROUP_SOCIETE that tours should not be exported on (ex: classifiedadventures )
+	 *  'GROUP_SOCIETE'	=> list of GROUP_SOCIETE to export (ex: classifiedadventures_seloger )
+	 *	 'ID_UTILISATEURS'	=> list of ID_UTILISATEUR to export
+	 *	 'ID_VISITES'	=> list of ID_VISITE to export
+	 *	 'ID_DISTRIBUTEURS'	=> list of ID_DISTRIBUTEUR to export
+	 *  'DIFFUSION_CHECK_LINK'	=> GET DIFFUSION_PORTAIL_CHECK_LINKS status (if done)
+	 *	//'IMAGE' => boolean           // return image list
+	 *	//'IMAGE_DETAIL' => boolean    // return imge list with names
+	 *	)
+	 * )
+	 *
+	**/
+	private $tab_dsn = array(DSN_SOFTWARE, DSN_SQL01EU, DSN_SQL01US, DSN_SQL07EU, DSN_SQL09EU, DSN_SQL11EU);
+	private $tab_errors = array();
+	private $tab_all_ids;
+	private $tab_opt,$tab_select,$tab_join,$dsn,$tab_where,$tab_order,$tab_subqueries,$tab_pattern,$tab_replace,$mypid;
+	public $last_request;
+	public $user_options = array();
+	public $tours_unset = array();
+		
+	private function isConn() {
+		return !is_null($this->db) && !PEAR::isError($this->db);
+	}	
+	private function fix_text($str) {
+		return str_replace("'", "''", $str);
+	}
+	public function buildCustomURL($row, $partner=null) {
+		$diff = isset($row['DIFFUSIONS'][$partner]) ? $row['DIFFUSIONS'][$partner]['ID_DIFFUSION_PORTAIL'] : $row['ID_DIFFUSION_PORTAIL'];
+		$domain = $this->user_options[ $row['ID_UTILISATEUR'] ]['URLCUSTOMLISTING'];
+
+		return build_url_custom_listing($diff, $domain, $row);
+		
+//		if(!empty($domain) && stripos($domain, 'http://')===false) {
+//			$domain = 'http://'.$domain;
+//		}
+	
+//		$tab_url = @parse_url($domain);
+//		if(!empty($tab_url['host'])) {
+//			$url = 'http://'.$tab_url['host'].'/';
+//		} else {
+//			$url = 'http://pvt.fm/';
+//		}
+//		$url .= strtolower(substr(str_replace('-', '', $diff), 0, 12));
+	
+	
+//		$tab_url = array();
+//		if(!empty($row['NOM_VISITE'])) {
+//			$tab_url[] = $row['NOM_VISITE'];
+//		}
+//		if(!empty($row['ADRESSE']) && strpos(implode('', $tab_url), $row['ADRESSE'])===false) {
+//			$tab_url[] = $row['ADRESSE'];
+//		}
+//		if(!empty($row['VILLE']) && strpos(implode('', $tab_url), $row['VILLE'])===false) {
+//			$tab_url[] = $row['VILLE'];
+//		}
+//		if(!empty($row['CODE_POSTAL']) && strpos(implode('', $tab_url), $row['CODE_POSTAL'])===false) {
+//			$tab_url[] = $row['CODE_POSTAL'];
+//		}
+	
+//		if(!empty($tab_url)) {
+//			$url .= '_'.preg_replace('/[^a-z0-9]+/i', '-', implode('-', $tab_url)).'.html';
+//			$url = preg_replace('/--+/', '-', $url);
+//		}
+//		return $url;
+	}
+	public function __construct($tab_dsn = array(),$partial = false/*, $nb_result = 250*/) {
+		if(!empty($tab_dsn)) {
+			$this->tab_dsn = $tab_dsn;
+		}		
+		$this->tab_select = array();
+		$this->tab_join = array();
+		$this->tab_where = array();
+		$this->id_dsn = 0;
+		
+		$this->tab_subqueries = array();
+		$this->tab_order = array();
+		$this->tab_pattern = array('%SELECT%', '%JOIN%', '%WHERE%');
+		$this->tab_replace = array();
+		$this->mypid  = getmypid();
+		$this->tab_all_ids = null;
+	}
+	private function addError($mess) {
+		$this->tab_errors[] = date('Y-m-d H:i:s').' - '.$mess;
+		$this->addLog($mess);
+	}
+	public function getErrors() {
+		return $this->tab_errors;
+	}
+	public function hasError() {
+		return isset($this->tab_errors[0]);
+	}
+
+	private function addLog($str) {
+		$is_html = !isset($_SERVER['argv']);
+		if($this->debug) {
+			$str .= "\n";
+			if($is_html) {
+				echo nl2br($str);
+			} else {
+				echo $str;
+			}
+		}
+	}
+
+	private function tryConnect($dsn, $max_retry=8) {
+            $nb_retry = 0;
+            do {
+                    $db = DB::connect($dsn);
+                    if(DB::isError($db)) {
+                            $delay = pow($nb_retry++, 2);
+                            $this->addLog('DB connect error, retry in '.$delay.'s');
+                            sleep($delay);
+                    }
+            } while(DB::isError($db) && $nb_retry<$max_retry);
+
+            if(DB::isError($db)) {
+                    $this->addLog('DB connect error from last attempt');
+            }
+            return $db;
+	}
+
+	public function getPartnerTours($partners, $tab_opt) {
+		$this->tab_opt	=	$tab_opt;
+		$this->nb_result = ($this->tab_opt['NB_RESULT'] > 0  && $this->tab_opt['NB_RESULT'] < 250 )? $this->tab_opt['NB_RESULT'] : 250;
+		$this->partial	=	!empty($this->tab_opt['PARTIAL']);
+		$this->debug	=	!empty($this->tab_opt['DEBUG']);
+		
+		if(!empty($this->tab_opt['EXCEPT_PARTNER'])){
+			$this->expect_partners = explode(';',$this->tab_opt['EXCEPT_PARTNER']);			
+			$partners = array_merge($partners,$this->expect_partners);			
+		}
+		$this->status_diffusion = !empty($this->tab_opt['STATUT_DIFFUSION']) ? $this->tab_opt['STATUT_DIFFUSION']: ($this->tab_opt['ONLY_WAITING'] === true ?  0 : 1);
+		
+		$tab_additional_diffs = !empty($this->tab_opt['ADDITIONNAL_DIFF']) ? explode(',', $this->tab_opt['ADDITIONNAL_DIFF']) : array();
+		
+		if(count($tab_additional_diffs) > 0){
+		    $bind_additional_diffs = array_fill(0, count($tab_additional_diffs), '?');
+		    $bind_additional_diffs = count($bind_additional_diffs)>0 ? implode(',', $bind_additional_diffs) : '';
+		}else{
+		    $bind_additional_diffs = '';
+		}
+		
+		$tab_rows = array();
+		$tab_result = array();
+		$tab_diff = array();
+		$tab_img = array();
+//		$tab_languages = !empty($this->tab_opt['LANG']) ? explode(';', $this->tab_opt['LANG']) : array();
+		if(!isset($this->tab_opt['NEED_IMAGES'])) $this->tab_opt['NEED_IMAGES'] = true;
+		if(!is_array($partners)){
+			$this->partners = array($partners);
+		} else {
+			$this->partners = $partners;	
+		}
+		if(!is_array($this->status_diffusion)){
+        	$this->status_diffusion = array($this->status_diffusion);
+		}
+		$this->bind_partners = implode(',', array_fill(0, count($this->partners), '?'));
+		$this->id_status_visite = ' = 1';
+//		$this->id_status_listing = ' AND (vte.ID_STATUT_LISTING IN (1,3) OR vtu.ID_STATUT_LISTING IN (1,3) OR VISITE.ID_TEMPLATE=23)';
+		$this->id_status_listing = ' AND ISNULL(vdt.ID_STATUT_LISTING, 1) IN (1, 3)';
+		$this->id_active = 'd.ID_VISITE_ACTIVE = 1';
+		if($this->tab_opt['EXPORT_TYPE'] == 'DIFF'){
+			$this->id_status_visite = ' is not null ';
+			$this->id_status_listing = '';
+			$this->id_active = '( d.ID_VISITE_ACTIVE is null or d.ID_VISITE_ACTIVE = 1 )';
+			if($this->tab_opt['ONLY_WAITING']){
+				$this->status_diffusion  = array(0);
+			}
+			else{
+				$this->status_diffusion  = array('1','2','3','0','-1','-2','-3');
+			}
+		}
+		$this->bind_status_diffusion = implode(',', array_fill(0, count($this->status_diffusion), '?'));
+
+		////////////////////////////////////////////////////////////////////////////////////////
+		// Premier appel : Recuperation de tous les id_visite diffusees dans toutes les bases //
+		////////////////////////////////////////////////////////////////////////////////////////
+		if(!is_array($this->tab_all_ids)) {
+			if($this->tab_opt['NEED_IMAGES']) {                                                            
+				$sql_all = "
+-- GATEWAY GATEWAY 2012 V2
+SELECT
+	d.ID_VISITE,v.DATE_MODIFICATION_VISITE
+FROM
+	DIFFUSION_PORTAIL d
+	INNER JOIN VISITE v ON d.ID_VISITE=v.ID_VISITE AND v.ID_STATUT_VISITE{$this->id_status_visite}";
+	if(!empty($this->tab_opt['ID_DISTRIBUTEURS']) || !empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) || $this->tab_opt['DEV'] !== true || !empty($this->tab_opt['GROUP_SOCIETE'])){
+		$sql_all .= "
+	INNER JOIN SOCIETE s ON v.ID_SOCIETE = s.ID_SOCIETE";
+	}
+		$sql_all .="
+	WHERE
+		d.ID_PORTAIL in ({$this->bind_partners}) AND {$this->id_active} AND ID_STATUT_DIFFUSION in ({$this->bind_status_diffusion})";
+		
+				if(!empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) || $this->tab_opt['DEV'] !== true){
+					if($this->tab_opt['DEV'] !== true){
+						$this->tab_opt['EXCEPT_GROUP_SOCIETE'] .= (!empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) ? ';': '').'DEMO;PARTNER';
+					}
+					$this->expect_society = "'".str_replace(';',"','",$this->tab_opt['EXCEPT_GROUP_SOCIETE'])."'";
+					$sql_all .="
+		AND GROUPE_SOCIETE NOT IN (".$this->expect_society.")
+					";
+				}
+				if(!empty($this->tab_opt['GROUP_SOCIETE'])){					
+					$this->group_societe = "'".str_replace(';',"','",$this->tab_opt['GROUP_SOCIETE'])."'";
+					$sql_all .="
+		AND GROUPE_SOCIETE IN (".$this->group_societe.")
+					";
+				}				
+			} else {
+			$sql_all = "
+-- GATEWAY GATEWAY 2012 V2
+SELECT
+	d.ID_VISITE,v.DATE_MODIFICATION_VISITE
+FROM
+	DIFFUSION_PORTAIL d
+	INNER JOIN VISITE v ON d.ID_VISITE=v.ID_VISITE AND v.ID_STATUT_VISITE{$this->id_status_visite}";
+				if( !empty($this->tab_opt['ID_DISTRIBUTEURS']) || !empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) || $this->tab_opt['DEV'] !== true || !empty($this->tab_opt['GROUP_SOCIETE'])){
+					$sql_all .= "
+	INNER JOIN SOCIETE s ON v.ID_SOCIETE = s.ID_SOCIETE";
+				}
+	$sql_all .="
+	WHERE
+		d.ID_PORTAIL in ({$this->bind_partners})  AND d.ID_STATUT_DIFFUSION in({$this->bind_status_diffusion})";
+				if(!empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) || $this->tab_opt['DEV'] !== true){
+					if($this->tab_opt['DEV'] !== true){
+						$this->tab_opt['EXCEPT_GROUP_SOCIETE'] .= (!empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) ? ';': '').'DEMO;PARTNER';
+					}
+					$this->expect_society = "'".str_replace(';',"','",$this->tab_opt['EXCEPT_GROUP_SOCIETE'])."'";
+					$sql_all .="
+		AND GROUPE_SOCIETE NOT IN (".$this->expect_society.")
+					";
+				}
+				if(!empty($this->tab_opt['GROUP_SOCIETE'])){
+					$this->group_societe = "'".str_replace(';',"','",$this->tab_opt['GROUP_SOCIETE'])."'";
+					$sql_all .="
+		AND GROUPE_SOCIETE IN (".$this->group_societe.")
+					";
+				}
+			}
+			
+			if(!empty($this->tab_opt['ID_DISTRIBUTEURS'])){					
+				$this->id_distribs = "'".str_replace(';',"','",$this->tab_opt['ID_DISTRIBUTEURS'])."'";
+				$sql_all .="
+		AND s.ID_DISTRIBUTEUR IN (".$this->id_distribs.")
+					";
+			}
+			if(!empty($this->tab_opt['ID_VISITES']) && is_array($this->tab_opt['ID_VISITES'])) {
+				$sql_all .= "
+		AND d.ID_VISITE in ('".str_replace(',',"','",implode(',',$this->tab_opt['ID_VISITES']))."')";
+			}
+
+			if(!empty($this->tab_opt['ID_UTILISATEURS']) && is_array($this->tab_opt['ID_UTILISATEURS'])) {
+				$sql_all .= "
+		AND v.ID_UTILISATEUR in ('".str_replace(',',"','",implode(',',$this->tab_opt['ID_UTILISATEURS']))."')";
+			}
+         if(!empty($this->tab_opt['DATE_MODIF']) &&  (date('Y-m-d',strtotime($this->tab_opt['DATE_MODIF'])) == $this->tab_opt['DATE_MODIF'] || date('Y-m-d H:i:s',strtotime($this->tab_opt['DATE_MODIF'])) == $this->tab_opt['DATE_MODIF'])) {
+				$sql_all .= "
+		AND (v.DATE_MODIFICATION_VISITE > '".$this->tab_opt['DATE_MODIF']."' OR d.DATE_CREATION > '".$this->tab_opt['DATE_MODIF']."')";
+			}
+
+			if(!empty($this->tab_opt['PAYS'])) {
+				if(!is_array($this->tab_opt['PAYS'])) {
+				 $this->tab_opt['PAYS'] = array($this->tab_opt['PAYS']);
+				}
+				$countries = implode("', '", $this->tab_opt['PAYS']);
+
+				$sql_all .= "
+		AND EXISTS (
+			SELECT VISITE_DETAIL_LOC.ID_VISITE FROM VISITE_DETAIL_LOC WHERE v.ID_VISITE=VISITE_DETAIL_LOC.ID_VISITE AND VISITE_DETAIL_LOC.ID_PAYS IN ('$countries')
+		)";
+			}
+
+
+			$sql_all .= "
+		GROUP BY d.ID_VISITE,v.DATE_MODIFICATION_VISITE";
+			$params_all = array_merge($this->partners, $this->status_diffusion);
+		
+			// Tableau contenant toutes les id_visite diffusees par base
+			$this->tab_all_ids = array();
+
+			for($i=0; isset($this->tab_dsn[$i]); $i++) {
+				$this->tab_all_ids[$i] = array();
+				
+				$db = $this->tryConnect($this->tab_dsn[$i]);
+                             
+				if(!DB::isError($db)) {
+					$tmp = $db->query($sql_all, $params_all);
+					$this->last_request = $db->last_query;
+					if(DB::isError($tmp)) {                                              
+                                            $this->addLog($tmp->getMessage());
+                                            $this->addLog($db->last_query);
+					} else {
+                                            while($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)) {
+                                                    $this->tab_all_ids[$i][] = $row['ID_VISITE'];
+
+                                            }                                                
+					}
+					$db->disconnect();
+				}
+
+				if(!empty($this->tab_all_ids[$i])) {
+					if($this->partial) {
+						// Mode partiel, decoupe en sous tableau
+						$this->tab_all_ids[$i] = array_chunk($this->tab_all_ids[$i], $this->nb_result);
+					} else {
+						// Mode complet, le sous tableau est le tableau lui meme
+						$this->tab_all_ids[$i] = array( $this->tab_all_ids[$i] );
+					}
+				}
+			}
+		}
+		/////////////////////
+		// Fin 1er passage //		
+		/////////////////////
+
+		////////////////////////////////////////
+		// Construction requete detail visite //
+		////////////////////////////////////////
+		$this->tab_select = array();
+		$this->tab_join = array();
+		$this->tab_where = array();
+		$this->tab_order = array();
+		
+		
+		if(!empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) || $this->tab_opt['DEV'] !== true){
+			if($this->tab_opt['DEV'] !== true){
+				$this->tab_opt['EXCEPT_GROUP_SOCIETE'] .= (!empty($this->tab_opt['EXCEPT_GROUP_SOCIETE']) ? ';': '').'DEMO;PARTNER';
+			}			 
+			$this->expect_society = "'".str_replace(';',"','",$this->tab_opt['EXCEPT_GROUP_SOCIETE'])."'";
+		}	
+		if(!empty($this->expect_society)){
+			$this->tab_where[] = "AND GROUPE_SOCIETE NOT IN (".$this->expect_society.")";
+		}				
+		
+		if(!empty($this->tab_opt['GROUP_SOCIETE'])){			
+			$this->group_societe = "'".str_replace(';',"','",$this->tab_opt['GROUP_SOCIETE'])."'";
+			$this->tab_where[] = "AND GROUPE_SOCIETE IN (".$this->group_societe.")";
+		}
+		
+		if(!empty($this->tab_opt['ID_DISTRIBUTEURS'])){			
+			$this->id_distribs = "'".str_replace(';',"','",$this->tab_opt['ID_DISTRIBUTEURS'])."'";
+			$this->tab_where[] = "AND SOCIETE.ID_DISTRIBUTEUR IN (".$this->id_distribs.")";
+		}
+		
+		if(!empty($this->tab_opt['REF_MASK'])) {
+			$this->tab_where[] = "AND DIFFUSION_PORTAIL.REF_PORTAIL LIKE '".$this->fix_text($this->tab_opt['REF_MASK'])."'";
+		}
+		if(!empty($this->tab_opt['DATE'])) {
+			$ts = strtotime($this->tab_opt['DATE']);
+			if($ts !== false && $ts <= time()) {
+				$this->tab_where[] = "AND DIFFUSION_PORTAIL.DATE_DIFFUSION>='".date('Y-m-d', $ts)."'";
+			}
+		}
+		if(!empty($this->tab_opt['FIELDS']['PARTNER'])) {
+			$this->tab_select[] = "\nPORTAIL.URL_VIEWER, PORTAIL.CODE_PORTAIL, PORTAIL.SSII_PORTAIL as NOM_PORTAIL, PORTAIL.CLE_PORTAIL";
+			$this->tab_join[] = "INNER JOIN PORTAIL ON DIFFUSION_PORTAIL.ID_PORTAIL=PORTAIL.ID_PORTAIL";
+		}
+		if(!empty($this->tab_opt['FIELDS']['USER_PARTNER'])  ) {
+			$this->tab_select[] = "\nCLIENT_PORTAIL.PREFIXE_PORTAIL, CLIENT_PORTAIL.PREFIXE_DIFFUSION, CLIENT_PORTAIL.PASSWORD_PORTAIL, CLIENT_PORTAIL.DSN_IMAP,CLIENT_PORTAIL.LIMITE_DIFFUSION,CLIENT_PORTAIL.ORDRE_DIFFUSION,CLIENT_PORTAIL.ID_AUTOPUBLICATION";
+			$this->tab_join[] = "INNER JOIN CLIENT_PORTAIL ON CLIENT_PORTAIL.ID_UTILISATEUR=VISITE.ID_UTILISATEUR AND CLIENT_PORTAIL.ID_PORTAIL=DIFFUSION_PORTAIL.ID_PORTAIL";
+		}
+		if(!empty($this->tab_opt['FIELDS']['USER'])) {
+			$this->tab_select[] = "\nUTILISATEUR.ID_SHORT AS ID_SHORT_USER, UTILISATEUR.LOGIN_UTILISATEUR, UTILISATEUR.PASSWORD_UTILISATEUR, UTILISATEUR.NOM_UTILISATEUR, UTILISATEUR.PRENOM_UTILISATEUR, UTILISATEUR.TELEPHONE_UTILISATEUR, UTILISATEUR.EMAIL_UTILISATEUR,UTILISATEUR.FACEBOOK_PAGE_ID, UTILISATEUR.FACEBOOK_PAGE_URL, UTILISATEUR.BIO_UTILISATEUR, UTILISATEUR.DATE_MODIFICATION AS DATE_MODIFICATION_UTILISATEUR";
+			$this->tab_select[] = "\nvic.NOM_UTILISATEUR AS NOM_UTILISATEUR_CUSTOM, vic.PRENOM_UTILISATEUR AS PRENOM_UTILISATEUR_CUSTOM, vic.EMAIL_UTILISATEUR AS EMAIL_UTILISATEUR_CUSTOM";
+			$this->tab_select[] = "\nuo3.VALEUR_OPTION AS ID_LOGO_UTILISATEUR, uo4.VALEUR_OPTION AS ID_LOGO_UTILISATEUR_EXT";
+			$this->tab_join[] = "LEFT JOIN UTILISATEUR_OPTION uo3 ON VISITE.ID_UTILISATEUR=uo3.ID_UTILISATEUR AND uo3.REF_OPTION='IDLOGOUSER'";
+			$this->tab_join[] = "LEFT JOIN UTILISATEUR_OPTION uo4 ON VISITE.ID_UTILISATEUR=uo4.ID_UTILISATEUR AND uo4.REF_OPTION='IDLOGOUSEREXT'";
+		}
+		if(!empty($this->tab_opt['FIELDS']['LOGO_SOCIETE'])) {
+			$this->tab_select[] = "\nuo1.VALEUR_OPTION AS ID_LOGO_SOCIETE, uo2.VALEUR_OPTION AS ID_LOGO_SOCIETE_EXT";
+			$this->tab_join[] = "LEFT JOIN UTILISATEUR_OPTION uo1 ON VISITE.ID_UTILISATEUR=uo1.ID_UTILISATEUR AND uo1.REF_OPTION='IDLOGOSOCIETE'";
+			$this->tab_join[] = "LEFT JOIN UTILISATEUR_OPTION uo2 ON VISITE.ID_UTILISATEUR=uo2.ID_UTILISATEUR AND uo2.REF_OPTION='IDLOGOSOCIETEEXT'";
+		}
+		if(!empty($this->tab_opt['FIELDS']['COMPANY'])) {
+			$this->tab_select[] = "\nSOCIETE.NOM_SOCIETE,SOCIETE.TVA_INTRA_SOCIETE,SOCIETE.ID_PAYS as ID_PAYS_SOCIETE, SOCIETE.EMAIL_SOCIETE, SOCIETE.SITEWEB_SOCIETE, SOCIETE.ID_DISTRIBUTEUR, SOCIETE.GROUPE_SOCIETE";
+			$this->tab_select[] = "\nADRESSE.ADRESSE AS ADRESSE_SOCIETE, ADRESSE.VILLE AS VILLE_SOCIETE, ADRESSE.ID_PAYS AS ID_PAYS_SOCIETE, ADRESSE.CODE_POSTAL AS CODE_POSTAL_SOCIETE, ADRESSE.TELEPHONE AS TELEPHONE_SOCIETE, ADRESSE.FAX AS FAX_SOCIETE";
+			$this->tab_join[] = "INNER JOIN ADRESSE ON SOCIETE.ID_ADRESSE_VIEWER=ADRESSE.ID_ADRESSE";
+			$this->tab_select[] = "\nvic.TELEPHONE_SOCIETE AS TELEPHONE_SOCIETE_CUSTOM, vic.NOM_SOCIETE AS NOM_SOCIETE_CUSTOM, vic.ADRESSE_SOCIETE AS ADRESSE_SOCIETE_CUSTOM, vic.VILLE_SOCIETE AS VILLE_SOCIETE_CUSTOM, vic.CODE_POSTAL_SOCIETE AS CODE_POSTAL_SOCIETE_CUSTOM";
+		}
+
+		if(!empty($this->tab_opt['FIELDS']['COMPANY']) || !empty($this->tab_opt['FIELDS']['USER'])) {
+			// RS 2012-03-22 : Info custom
+			$this->tab_join[] = "LEFT JOIN VISITE_INFO_CONTACT vic ON VISITE.ID_VISITE=vic.ID_VISITE";
+		}
+		if(!empty($this->tab_opt['FIELDS']['DISTRIB_DETAIL'])){
+			//'ref_type_distributeur'
+			$this->tab_select[] = "\nDISTRIBUTEUR.REF_TYPE_DISTRIBUTEUR";
+			$this->tab_join[] = "LEFT JOIN DISTRIBUTEUR on SOCIETE.ID_DISTRIBUTEUR = DISTRIBUTEUR.ID_DISTRIBUTEUR";
+		}
+
+		if(!empty($this->tab_opt['FIELDS']['TOUR']) || !empty($this->tab_opt['FIELDS']['TOUR_DETAIL'])) {
+//			$this->tab_select[] = "\nvt.NOM_VISITE, vt.DESCRIPTION, vt.VOISINNAGE, VISITE_URL.URL_ANNONCE, VISITE.REF_DEVISE,VISITE.NOM_SECTEUR,VISITE.ID_SHORT as ID_SHORT_VISITE, VISITE.DATE_CREATION_VISITE, VISITE.DATE_MODIFICATION_VISITE, VISITE.ADRESSE, VISITE.VILLE, VISITE.CODE_POSTAL, VISITE.REF_ETAT,  VISITE.NB_ACTIVE_IMAGE, VISITE.PRIX_BIEN, VISITE.ID_PRIX_CACHE";
+			$this->tab_select[] = "\nvt.NOM_VISITE, vt.DESCRIPTION, vt.VOISINNAGE, VISITE_URL.URL_ANNONCE, VISITE.ID_SHORT as ID_SHORT_VISITE, VISITE.DATE_CREATION_VISITE, VISITE.DATE_MODIFICATION_VISITE, VISITE.NB_ACTIVE_IMAGE, vdps.PRIX_BIEN, vdps.REF_DEVISE";
+			$this->tab_select[] = "\nvdl.ID_PAYS, vdl.NOM_SECTEUR, vdl.ADRESSE, vdl.VILLE, vdl.CODE_POSTAL, vdl.REF_ETAT";
+			$this->tab_join[] = "LEFT JOIN VISITE_TEXTE vt ON VISITE.ID_VISITE=vt.ID_VISITE AND VISITE.ID_LANGUE COLLATE FRENCH_CI_AS=vt.ID_LANGUE COLLATE FRENCH_CI_AS";
+			$this->tab_join[] = "LEFT JOIN VISITE_URL ON VISITE.ID_VISITE=VISITE_URL.ID_VISITE";
+		}
+		if( !empty($this->tab_opt['FIELDS']['PRIX_DETAIL']) ) {
+			$this->tab_select[]	=	"\nvdps.CAUTION, vdps.PRIX_SURFACE, vdps.CHARGES_MENSUELLES, vdps.TAXE_HABITATION, vdps.TAXE_FONCIERE, vdps.FRAIS_AGENCE ";
+		}
+		if(is_guid($this->tab_opt['NEED_DIFFUSION'])) {
+			$this->tab_select[] = "\nd2.REF_PORTAIL AS REF_DIFFUSION";
+			$this->tab_select[] = "\nd2.ID_STATUT_DIFFUSION AS REF_DIFFUSION_STATUT";
+			if(count($this->expect_partners) > 0){
+				$this->tab_join[] = "INNER JOIN DIFFUSION_PORTAIL d2 ON DIFFUSION_PORTAIL.ID_VISITE=d2.ID_VISITE AND d2.ID_PORTAIL='".$this->tab_opt['NEED_DIFFUSION']."' AND d2.ID_STATUT_DIFFUSION IN (-3,-2,0,1,2)";
+			}
+			else {
+				$this->tab_join[] = "INNER JOIN DIFFUSION_PORTAIL d2 ON DIFFUSION_PORTAIL.ID_VISITE=d2.ID_VISITE AND d2.ID_PORTAIL='".$this->tab_opt['NEED_DIFFUSION']."' AND d2.ID_STATUT_DIFFUSION>0";
+			}
+		}
+
+		if(!empty($tab_opt['MSG_DIFFUSION'])) {
+			$this->tab_join[] = "INNER JOIN DIFFUSION_PORTAIL_OPTION on DIFFUSION_PORTAIL.Id_diffusion_portail = DIFFUSION_PORTAIL_OPTION.Id_diffusion_portail and DIFFUSION_PORTAIL_OPTION.Ref_option='PUB_ERROR_MESS' and DIFFUSION_PORTAIL_OPTION.Valeur_option='".$tab_opt['MSG_DIFFUSION']."'";
+		}
+
+		if(!empty($this->tab_opt['FIELDS']['TOUR_DETAIL'])){
+//			$this->tab_select[] = "\nVISITE.NUMERO_MLS,VISITE.LATITUDE,VISITE.LONGITUDE";
+			$this->tab_select[] = "\nVISITE.NUMERO_MLS, vdl.LATITUDE, vdl.LONGITUDE";
+			$this->tab_select[] = "\nvdb.ID_PRIX_CACHE, vdb.ID_BIEN_AMENAGE, vdb.ID_ADRESSE_CACHEE, vdb.ID_TRAVAUX, vdb.ID_IMMEUBLE_RECENT, vdb.ID_TOILETTE_SEPARE, vdb.ID_ANIMAUX, vdb.ID_AMENAGEMENT_HANDICAP, vdb.ID_CHAMBRE_BLINDEE, vdb.ID_DIGICODE, vdb.ID_PRESTIGE, vdb.ID_NEUF, vdb.ID_REFAIT_NEUF, vdb.ID_CLIMATISATION, vdb.ID_INTERPHONE, vdb.ID_PISCINE, vdb.ID_ASCENSEUR, vdb.ID_GARDIEN, vdb.ID_CAVE, vdb.ID_INTERNET_HAUT_DEBIT, vdb.ID_EXCLUSIVITE";
+			$this->tab_select[] = "\nvdt.ID_STATUT_LISTING, vdt.ID_TYPE_LISTING, vdt.ID_TYPE_BIEN, vdt.ID_TYPE_TRANSACTION, vdt.ID_TYPE_CHAUFFAGE, vdt.ID_TYPE_CUISINE, vdp.NOMBRE_PIECE, vdp.NOMBRE_CHAMBRE, vdp.NUMERO_ETAGE, vdp.NOMBRE_ETAGES, vdp.NOMBRE_DEMI_PIECE, vdp.NOMBRE_SALLE_BAIN, vdp.NOMBRE_DEMI_SALLE_BAIN AS NOMBRE_SALLE_EAU";
+			$this->tab_select[] = "\nvdd.DPE_VALEUR, vdd.DPE_LETTRE, vdd.GES_VALEUR, vdd.GES_LETTRE, vdd.ORIENTATION_FENETRES, vdd.ORIENTATION, vdd.ANNEE_CONSTRUCTION";
+			$this->tab_select[] = "\nvdps.FRAIS_AGENCE, vdps.ID_PERIODICITE_LOYER, vdps.SURFACE_HABITABLE, vdps.ID_UNITE_SURFACE_HABITABLE AS SURFACE_HABITABLE_UNITE, vdps.SURFACE_TERRAIN, vdps.ID_UNITE_SURFACE_TERRAIN AS SURFACE_TERRAIN_UNITE, vdps.TAILLE_LOT_ACRES, vdps.SURFACE_DISPONIBLE AS ESPACE_TOTAL";
+
+			
+//			$this->tab_select[] = 
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_STATUT_LISTING ELSE vte.ID_STATUT_LISTING END AS ID_STATUT_LISTING,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_TYPE_BIEN ELSE vte.ID_TYPE_BIEN END AS ID_TYPE_BIEN,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_TYPE_TRANSACTION ELSE vte.ID_TYPE_TRANSACTION END AS ID_TYPE_TRANSACTION,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_PIECE ELSE vte.NOMBRE_PIECE END AS NOMBRE_PIECE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_ADRESSE_CACHEE ELSE vte.ID_ADRESSE_CACHEE END AS ID_ADRESSE_CACHEE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.TAXES ELSE vte.FRAIS_AGENCE END AS FRAIS_AGENCE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_CHAMBRE ELSE vte.NOMBRE_CHAMBRE END AS NOMBRE_CHAMBRE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ANNEE_CONSTRUCTION ELSE vte.ANNEE_CONSTRUCTION END AS ANNEE_CONSTRUCTION,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ESPACE_UTILE ELSE vte.SURFACE_HABITABLE END AS SURFACE_HABITABLE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_UNITE_SURFACE_HABITABLE ELSE vte.ID_UNITE_SURFACE_HABITABLE END AS SURFACE_HABITABLE_UNITE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ESPACE_TOTAL ELSE vte.SURFACE_TERRAIN END AS SURFACE_TERRAIN,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_UNITE_TAILLE_LOT ELSE vte.ID_UNITE_SURFACE_TERRAIN END AS SURFACE_TERRAIN_UNITE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ESPACE_TOTAL ELSE vte.SURFACE_DISPONIBLE END AS ESPACE_TOTAL,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ORIENTATION COLLATE FRENCH_CI_AI ELSE vte.ORIENTATION COLLATE FRENCH_CI_AI END AS ORIENTATION,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.TAILLE_LOT_ACRES END AS TAILLE_LOT_ACRES,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_TYPE_LISTING END AS ID_TYPE_LISTING,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_BIEN_AMENAGE ELSE vte.ID_BIEN_AMENAGE END AS ID_BIEN_AMENAGE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.DPE_VALEUR END AS DPE_VALEUR,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.DPE_LETTRE END AS DPE_LETTRE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.GES_VALEUR END AS GES_VALEUR,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.GES_LETTRE END AS GES_LETTRE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_TYPE_CUISINE END AS ID_TYPE_CUISINE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_TYPE_CHAUFFAGE END AS ID_TYPE_CHAUFFAGE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.NUMERO_ETAGE END AS NUMERO_ETAGE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.NOMBRE_ETAGES END AS NOMBRE_ETAGES,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_TRAVAUX END AS ID_TRAVAUX,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_IMMEUBLE_RECENT END AS ID_IMMEUBLE_RECENT,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_DIGICODE END AS ID_DIGICODE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_INTERPHONE END AS ID_INTERPHONE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_ASCENSEUR END AS ID_ASCENSEUR,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_GARDIEN END AS ID_GARDIEN,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_CAVE END AS ID_CAVE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_INTERNET_HAUT_DEBIT END AS ID_INTERNET_HAUT_DEBIT,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_EXCLUSIVITE END AS ID_EXCLUSIVITE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_PISCINE END AS ID_PISCINE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_CLIMATISATION END AS ID_CLIMATISATION,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_REFAIT_NEUF END AS ID_REFAIT_NEUF,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_NEUF END AS ID_NEUF,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_PRESTIGE END AS ID_PRESTIGE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_CHAMBRE_BLINDEE END AS ID_CHAMBRE_BLINDEE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_AMENAGEMENT_HANDICAP END AS ID_AMENAGEMENT_HANDICAP,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_ANIMAUX END AS ID_ANIMAUX,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ID_TOILETTE_SEPARE END AS ID_TOILETTE_SEPARE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.ORIENTATION_FENETRES END AS ORIENTATION_FENETRES,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN null ELSE vte.NOMBRE_DEMI_PIECE END AS NOMBRE_DEMI_PIECE,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_SALLE_BAIN ELSE vte.NOMBRE_SALLE_BAIN END AS NOMBRE_SALLE_BAIN,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_PERIODICITE_LOYER ELSE vte.ID_PERIODICITE_LOYER END AS PERIODICITE_LOCATION,".
+//				"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_DEMI_SALLE_BAIN ELSE vte.NOMBRE_SALLE_EAU END AS NOMBRE_SALLE_EAU";
+				
+				if(!empty($this->tab_opt['FIELDS']['TOUR_DETAIL_AR'])){
+					$this->tab_select[] = "\nvdb.ID_SALLE_GYM, vdb.ID_PATIO, vdb.ID_CUISINE, vdb.ID_SUITE_PARENTALE, vdb.ID_RECEPTION, vdb.ID_VAISSELIER, vdb.ID_HALL, vdb.ID_JARDIN, vdb.ID_CHAUFFAGE, vdb.ID_EQUIPEMENT_GRILL, vdb.ID_EQUIPEMENT_BARBECUE, vdb.ID_USAGE_COMMERCIAL, vdb.ID_USAGE_PRO, vdb.ID_SURVEILLANCE, vdb.ID_SOLARIUM, vdb.ID_SAUNA, vdb.ID_SALLE_JEU, vdb.ID_BUANDERIE, vdb.ID_JACUZZI, vdb.ID_TERRAIN_SPORT, vdb.ID_ALARME, vdb.ID_CABLE, vdb.ID_TROTTOIR, vdb.ID_LUMIERE, vdb.ID_GAZ_NATUREL, vdb.ID_ASSAINISSEMENT, vdb.ID_EAU_COURANTE";
+					$this->tab_select[] = "\nvdp.NOMBRE_BALCON, vdp.NOMBRE_GARAGE, vdt.ID_TYPE_ETAT";
+//					$this->tab_select[] =
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_BALCON  ELSE vte.NOMBRE_BALCON  END AS NOMBRE_BALCON,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_EAU_COURANTE  ELSE vte.ID_EAU_COURANTE  END AS ID_EAU_COURANTE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_ASSAINISSEMENT ELSE vte.ID_ASSAINISSEMENT END AS ID_ASSAINISSEMENT,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_GAZ_NATUREL ELSE vte.ID_GAZ_NATUREL END AS ID_GAZ_NATUREL,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_LUMIERE ELSE vte.ID_LUMIERE END AS ID_LUMIERE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.NOMBRE_GARAGE ELSE vte.NOMBRE_GARAGE END AS NOMBRE_GARAGE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_TROTTOIR ELSE vte.ID_TROTTOIR END AS ID_TROTTOIR,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_CABLE ELSE vte.ID_CABLE END AS ID_CABLE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_ALARME ELSE vte.ID_ALARME END AS ID_ALARME,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_TERRAIN_SPORT ELSE vte.ID_TERRAIN_SPORT END AS ID_TERRAIN_SPORT,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_SALLE_GYM ELSE vte.ID_SALLE_GYM END AS ID_SALLE_GYM,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_JACUZZI ELSE vte.ID_JACUZZI END AS ID_JACUZZI,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_BUANDERIE  ELSE vte.ID_BUANDERIE  END AS ID_BUANDERIE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_SALLE_JEU ELSE vte.ID_SALLE_JEU END AS ID_SALLE_JEU,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_SAUNA ELSE vte.ID_SAUNA END AS ID_SAUNA,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_SOLARIUM ELSE vte.ID_SOLARIUM END AS ID_SOLARIUM,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_SURVEILLANCE ELSE vte.ID_SURVEILLANCE END AS ID_SURVEILLANCE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_USAGE_PRO ELSE vte.ID_USAGE_PRO END AS ID_USAGE_PRO,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_USAGE_COMMERCIAL ELSE vte.ID_USAGE_COMMERCIAL END AS ID_USAGE_COMMERCIAL,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_EQUIPEMENT_BARBECUE  ELSE vte.ID_EQUIPEMENT_BARBECUE  END AS ID_EQUIPEMENT_BARBECUE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_EQUIPEMENT_GRILL ELSE vte.ID_EQUIPEMENT_GRILL END AS ID_EQUIPEMENT_GRILL,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_CHAUFFAGE ELSE vte.ID_CHAUFFAGE END AS ID_CHAUFFAGE,".					
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_TOILETTE_SEPARE ELSE vte.ID_TOILETTE_SEPARE END AS ID_TOILETTE_SEPARE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_JARDIN ELSE vte.ID_JARDIN END AS ID_JARDIN,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_HALL ELSE vte.ID_HALL END AS ID_HALL,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_VAISSELIER ELSE vte.ID_VAISSELIER END AS ID_VAISSELIER,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_RECEPTION ELSE vte.ID_RECEPTION END AS ID_RECEPTION,".					
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_SUITE_PARENTALE ELSE vte.ID_SUITE_PARENTALE END AS ID_SUITE_PARENTALE,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_CUISINE ELSE vte.ID_CUISINE END AS ID_CUISINE,".					
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_PATIO ELSE vte.ID_PATIO END AS ID_PATIO,".
+//						"\nCASE VISITE.ID_TEMPLATE WHEN 21 THEN vtu.ID_TYPE_ETAT ELSE vte.ID_TYPE_ETAT END AS ID_TYPE_ETAT";
+				}
+		}
+		if(!empty($this->tab_opt['FIELDS']['TYPE_DISTRIB'])){
+			$this->tab_select[] = "\nTYPE_BIEN_DISTRIBUTEUR.NOM_TYPE_BIEN as NOM_TYPE_DISTRIB ,TYPE_BIEN_DISTRIBUTEUR.ID_LANGUE as ID_LANGUE_DISTRIB, TYPE_BIEN_DISTRIBUTEUR.ID_TYPE_BIEN as ID_TYPE_BIEN_DISTRIB";
+//			$this->tab_join[] = "\nLEFT JOIN TYPE_BIEN_DISTRIBUTEUR ON TYPE_BIEN_DISTRIBUTEUR.ID_DISTRIBUTEUR=SOCIETE.ID_DISTRIBUTEUR
+//			AND (vtu.ID_TYPE_BIEN=TYPE_BIEN_DISTRIBUTEUR.ID_TYPE_BIEN OR VTE.ID_TYPE_BIEN=TYPE_BIEN_DISTRIBUTEUR.ID_TYPE_BIEN)
+//			AND TYPE_BIEN_DISTRIBUTEUR.ID_LANGUE COLLATE FRENCH_CI_AS = VISITE.ID_LANGUE COLLATE FRENCH_CI_AS";
+			$this->tab_join[] = "\nLEFT JOIN TYPE_BIEN_DISTRIBUTEUR ON TYPE_BIEN_DISTRIBUTEUR.ID_DISTRIBUTEUR=SOCIETE.ID_DISTRIBUTEUR AND vdt.ID_TYPE_BIEN=TYPE_BIEN_DISTRIBUTEUR.ID_TYPE_BIEN AND TYPE_BIEN_DISTRIBUTEUR.ID_LANGUE COLLATE FRENCH_CI_AS = VISITE.ID_LANGUE COLLATE FRENCH_CI_AS";
+		}
+		if(!empty($this->tab_opt['DIFFUSION_CHECK_LINK'])){
+			$this->tab_select[] = "\nID_LAST_STATUS as ID_STATUS_LAST_CHECK,LINK_CHECK_ERROR, DATE_LAST_CHECK"; //diffusion_portail_check_links
+			$this->tab_join[] = "\nLEFT JOIN DIFFUSION_PORTAIL_CHECK_LINKS ON DIFFUSION_PORTAIL_CHECK_LINKS.ID_DIFFUSION_PORTAIL=DIFFUSION_PORTAIL.ID_DIFFUSION_PORTAIL";
+		}
+
+
+		// Rajout des jointures si necessaires
+		$all_selected_fields = implode(' ', $this->tab_select);
+
+		if(stripos($all_selected_fields, 'vdl.')!==false) {
+			$this->tab_join[] = "LEFT JOIN VISITE_DETAIL_LOC vdl ON VISITE.ID_VISITE=vdl.ID_VISITE";
+		}
+		if(stripos($all_selected_fields, 'vdb.')!==false) {
+			$this->tab_join[] = "LEFT JOIN VISITE_DETAIL_BOOL vdb ON VISITE.ID_VISITE=vdb.ID_VISITE";
+		}
+		if(stripos($all_selected_fields, 'vdp.')!==false) {
+			$this->tab_join[] = "LEFT JOIN VISITE_DETAIL_PIECE vdp ON VISITE.ID_VISITE=vdp.ID_VISITE";
+		}
+		if(stripos($all_selected_fields, 'vdd.')!==false) {
+			$this->tab_join[] = "LEFT JOIN VISITE_DETAIL_DIVERS vdd ON VISITE.ID_VISITE=vdd.ID_VISITE";
+		}
+		if(stripos($all_selected_fields, 'vdps.')!==false) {
+			$this->tab_join[] = "LEFT JOIN VISITE_DETAIL_PRIX_SURFACE vdps ON VISITE.ID_VISITE=vdps.ID_VISITE";
+		}
+		
+		
+
+
+
+		if(!empty($this->tab_opt['FIELDS']['TOUR_CPT']) && is_array($this->tab_opt['FIELDS']['TOUR_CPT']) && $this->tab_opt['FIELDS']['TOUR_CPT'][0] != true) {
+			$this->tab_subqueries = array();
+			foreach($this->tab_opt['FIELDS']['TOUR_CPT'] as $nom_champ) {
+				$nom_champ = $this->fix_text($nom_champ);
+				$this->tab_subqueries[] = "(SELECT VALEUR_CHAMP FROM VISITE_COMPLEMENT WHERE VISITE_COMPLEMENT.ID_VISITE=VISITE.ID_VISITE AND VISITE_COMPLEMENT.NOM_CHAMP='".$nom_champ."') AS ".$nom_champ;
+			}
+			if(!empty($this->tab_subqueries)) {
+				$this->tab_select[] = implode(",\n", $this->tab_subqueries);
+			}
+		}
+		if(!empty($this->tab_select)) $this->tab_replace[] = ",".implode(',', $this->tab_select);
+		else $this->tab_replace[] = '';
+
+		if(!empty($this->tab_join)) $this->tab_replace[] = "\n".implode("\n", $this->tab_join);
+		else $this->tab_replace[] = '';
+		
+		if(!empty($this->tab_where)) $this->tab_replace[] = "\n".implode("\n", $this->tab_where);
+		else $this->tab_replace[] = '';
+		$final_results = array();
+		//////////////////////////////
+		// Fin construction requete //
+		//////////////////////////////
+
+
+
+
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////
+		// Recuperation : Pour chaque base, traiter le premier sous tableau par appel de getPartnerTours //
+		///////////////////////////////////////////////////////////////////////////////////////////////////
+		$stop_loop = false;
+		$all_empty = true;
+		$to_unset= array('ID_STATUS_LAST_CHECK','LINK_CHECK_ERROR','DATE_LAST_CHECK','PREFIXE_PORTAIL','PREFIXE_DIFFUSION','ID_DIFFUSION_PORTAIL','DSN_IMAP','ID_PORTAIL','ID_STATUT_DIFFUSION','REF_PORTAIL','PASSWORD_PORTAIL','EXPIRATION_DIFFUSION','ID_SHORT','DATE_DIFFUSION','CLE_PORTAIL','LIMITE_DIFFUSION','ORDRE_DIFFUSION','ID_AUTOPUBLICATION','DATE_CREATION');
+		for($i=0; !$stop_loop && isset($this->tab_dsn[$i]); $i++) {
+			if(!empty($this->tab_all_ids[$i])) {
+				$tab_id_to_process = array_shift($this->tab_all_ids[$i]);
+
+				if(!empty($tab_id_to_process)) {
+					$db = $this->tryConnect($this->tab_dsn[$i]);
+					
+					if(!DB::isError($db)) {                                               
+						$remaining = count($this->tab_all_ids[$i]);
+
+						$this->addLog('Remaining: '.$remaining.' loops on '.$db->dsn['hostspec']);
+
+						$params = array_merge($this->partners, $tab_id_to_process);
+						$bind_tours = implode(',', array_fill(0, count($tab_id_to_process), "?"));
+						$sql = <<<SQL
+-- GATEWAY 2012 V2 FETCH TOURS : $remaining remaining loops
+SELECT
+	DIFFUSION_PORTAIL.ID_DIFFUSION_PORTAIL,DIFFUSION_PORTAIL.ID_STATUT_DIFFUSION,DIFFUSION_PORTAIL.ID_SHORT,DIFFUSION_PORTAIL.DATE_EXPIRATION as EXPIRATION_DIFFUSION, DIFFUSION_PORTAIL.ID_PORTAIL, 	DIFFUSION_PORTAIL.REF_PORTAIL, DIFFUSION_PORTAIL.DATE_DIFFUSION,DIFFUSION_PORTAIL.DATE_CREATION,
+	VISITE.CACHER_LOCALISATION, VISITE.ID_PREMIERE_IMAGE,
+	VISITE.ID_VISITE, VISITE.REF_VISITE, VISITE.ID_LANGUE, VISITE.ID_STATUT_VISITE,VISITE.ID_UTILISATEUR,VISITE.ID_SOCIETE
+	%SELECT%
+FROM
+	VISITE
+	INNER JOIN DIFFUSION_PORTAIL ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE AND DIFFUSION_PORTAIL.ID_PORTAIL in({$this->bind_partners})
+	INNER JOIN UTILISATEUR ON VISITE.ID_UTILISATEUR=UTILISATEUR.ID_UTILISATEUR AND ID_STATUT_UTILISATEUR=1
+	INNER JOIN SOCIETE ON UTILISATEUR.ID_SOCIETE=SOCIETE.ID_SOCIETE
+
+--	LEFT JOIN VISITE_TPL_EU vte ON VISITE.ID_TEMPLATE<>21 AND VISITE.ID_VISITE=vte.ID_VISITE
+--	LEFT JOIN VISITE_TPL_US vtu ON VISITE.ID_TEMPLATE=21 AND VISITE.ID_VISITE=vtu.ID_VISITE
+
+	LEFT JOIN VISITE_DETAIL_TYPE vdt ON VISITE.ID_VISITE=vdt.ID_VISITE
+
+	%JOIN%
+WHERE
+	VISITE.ID_VISITE IN ($bind_tours) AND ID_STATUT_VISITE{$this->id_status_visite}
+	-- Active or Pending or empty ( case Differencial )
+	{$this->id_status_listing}
+	%WHERE%
+SQL;
+						$sql = str_replace($this->tab_pattern, $this->tab_replace, $sql);
+
+						$res = $db->query($sql, $params);
+						$this->last_request = $db->last_query;
+          
+						$tab_matches = array(
+							'NOM_UTILISATEUR_CUSTOM' => 'NOM_UTILISATEUR',
+							'PRENOM_UTILISATEUR_CUSTOM' => 'PRENOM_UTILISATEUR',
+							'EMAIL_UTILISATEUR_CUSTOM' => 'EMAIL_UTILISATEUR',
+							'NOM_SOCIETE_CUSTOM' => 'NOM_SOCIETE'
+						);
+
+						$tab_id = array();
+						$tab_id_diffus = array();
+						$tab_users = array();
+						$tab_logins = array();
+						$tour_found = 0;
+
+						if(!DB::isError($res)) {
+							while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)){
+								if(is_array($this->expect_partners) && in_array($row['ID_PORTAIL'],$this->expect_partners)){
+									$this->tours_unset[$row['ID_VISITE']][1] = $row['NOM_PORTAIL'];
+									continue;
+								}
+								elseif( is_guid($this->tab_opt['NEED_DIFFUSION']) &&  $row['ID_PORTAIL'] == $this->tab_opt['NEED_DIFFUSION']) {										
+									$this->tours_unset[$row['ID_VISITE']][0] = $row['ID_SHORT'];									
+								}
+								
+								if($this->tab_opt['FIELDS']['FULL_DB_NAME']){
+									$row['DB'] = $this->tab_dsn[$i];
+								}
+								else{
+									$row['DB'] = $db->dsn['hostspec'];
+								}
+
+								if(!empty($row['NOM_TYPE_DISTRIB'])) {
+									$row['NOM_TYPE_BIEN'] = $row['NOM_TYPE_DISTRIB'];
+								}
+
+								// Default extension
+								if(!empty($row['ID_LOGO_SOCIETE'])) {
+									if(empty($row['ID_LOGO_SOCIETE_EXT'])) {
+										$row['ID_LOGO_SOCIETE_EXT'] = 'jpg';
+									}
+								}
+
+								foreach($tab_matches as $key => $val) {
+									if(!empty($row[$key])) {
+										$row[$val] = $row[$key];
+									}
+								}
+
+								// Todo : OPTIONS DISTRIB;
+								if(empty($final_results[$row['ID_VISITE']])){
+									$final_results[$row['ID_VISITE']] = $row;
+									$tour_found++;
+									$tab_id[] = $row['ID_VISITE'];
+									
+									// Rajouter le user dans le tableau pour recuperer les options
+									if(!isset($this->user_options[ $row['ID_UTILISATEUR'] ])) {
+										$tab_users[] = $row['ID_UTILISATEUR'];
+									}
+								}
+								if(!is_array($tab_logins[$row['PREFIXE_PORTAIL']])){
+									$tab_logins[$row['PREFIXE_PORTAIL']] = array();
+								}
+								$tab_logins[$row['PREFIXE_PORTAIL']][] = $row['ID_VISITE'];
+								foreach($to_unset as $v){
+									$final_results[$row['ID_VISITE']]['DIFFUSIONS'][$row['ID_PORTAIL']][$v] = $row[$v];
+								}			
+								
+								if(!empty($this->tab_opt['FIELDS']['DIFFUSION_PORTAIL_OPTION']) && !in_array($row['ID_DIFFUSION_PORTAIL'],$tab_id_diffus)){
+									$tab_info_diffus[$row['ID_DIFFUSION_PORTAIL']] = array($row['ID_PORTAIL'],$row['ID_VISITE']);
+									$tab_id_diffus[] = $row['ID_DIFFUSION_PORTAIL'];
+								}								
+							}
+							$res->free();
+						} else {			
+							$this->addError($res->userinfo);
+						}
+
+						$this->addLog('Found: '.$tour_found.' tours from '.count($tab_id_to_process).' ids');
+
+						if(!empty($this->tab_opt['USER_OPTION']) && !empty($tab_users)) {
+							$all_options = explode(';', $this->tab_opt['USER_OPTION']);
+							$all_options_bind = implode(', ', array_fill(0, count($all_options), '?'));
+							$all_users_bind = implode(', ', array_fill(0, count($tab_users), '?'));
+							$sql = <<<SQL
+-- GATEWAY 2012 V2 FETCH USER_OPTION : $remaining remaining loops
+SELECT
+	u.ID_UTILISATEUR,
+	o.REF_OPTION,
+	o.VALEUR_OPTION,
+	uo.REF_OPTION AS REF_OPTION_U,
+	uo.VALEUR_OPTION AS VALEUR_OPTION_U,
+	do.REF_OPTION AS REF_OPTION_D,
+	do.VALEUR_OPTION AS VALEUR_OPTION_D
+FROM
+	OPTION_GLOBAL o 
+	JOIN UTILISATEUR u ON u.ID_UTILISATEUR IN ($all_users_bind)
+	INNER JOIN SOCIETE s ON u.ID_SOCIETE=s.ID_SOCIETE
+	LEFT JOIN UTILISATEUR_OPTION uo ON u.ID_UTILISATEUR=uo.ID_UTILISATEUR AND o.REF_OPTION COLLATE FRENCH_CI_AS=uo.REF_OPTION COLLATE FRENCH_CI_AS
+	LEFT JOIN DISTRIBUTEUR_OPTION do ON s.ID_DISTRIBUTEUR=do.ID_DISTRIBUTEUR AND o.REF_OPTION COLLATE FRENCH_CI_AS=do.REF_OPTION COLLATE FRENCH_CI_AS
+WHERE
+	o.REF_OPTION IN ($all_options_bind)
+SQL;
+							$tmp = $db->query($sql, array_merge($tab_users, $all_options));
+							if(DB::isError($tmp)) {
+								$this->addError($tmp->getMessage());
+								$this->addError($db->last_query);
+							} else {
+								while($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)) {
+									// Valeur defaut
+									$this->user_options[ $row['ID_UTILISATEUR'] ][ $row['REF_OPTION'] ] = $row['VALEUR_OPTION'];
+									// Valeur distrib si existe
+									if(!empty($row['REF_OPTION_D'])) {
+										$this->user_options[ $row['ID_UTILISATEUR'] ][ $row['REF_OPTION'] ] = $row['VALEUR_OPTION_D'];
+									}
+									// Valeur user si existe
+									if(!empty($row['REF_OPTION_U'])) {
+										$this->user_options[ $row['ID_UTILISATEUR'] ][ $row['REF_OPTION'] ] = $row['VALEUR_OPTION_U'];
+									}
+								}
+							}
+						}
+
+						if(!empty($this->tab_opt['VIDEO_AVAILABLE']) && count($tab_id) > 0){
+							$bind_tours = implode(',', array_fill(0, count($tab_id), '?'));
+							$sql_playlist = <<<SQL
+-- GATEWAY 2012 V2 FETCH VIDEO : $remaining remaining loops
+SELECT 
+	DISTINCT ID_VISITE
+FROM 
+	VIDEO
+WHERE 
+	ID_VISITE IN ($bind_tours) AND PROFIL_AVAILABLE LIKE ? AND ID_STATUT_VIDEO > 0
+SQL;
+							//$this->partners[] = $this->partners[0];
+							$res = $db->query($sql_playlist, array_merge($tab_id, array('%'.$this->tab_opt['VIDEO_AVAILABLE'].'%')));
+							if(DB::isError($res)) {
+								$this->addError($res->getMessage());
+							} else {
+								$rows = array();
+								while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) $rows[] = $row;
+								for($i=0;$i < count($rows); $i++){
+									if(is_array($final_results[$rows[$i]['ID_VISITE']]))
+										$final_results[$rows[$i]['ID_VISITE']]['VIDEO_AVAILABLE'] = true;
+								}
+							}
+						}
+
+						if(!empty($this->tab_opt['PARTNER_PLAYLIST']) && count($tab_logins) > 0) {
+							foreach($tab_logins as $login => $tours){
+								$playlist_params = array_merge($this->partners, array($login));
+								$sql_playlist = <<<SQL
+-- GATEWAY 2012 V2 FETCH DIFFUSION_PORTAIL_OPTION : $remaining remaining loops
+SELECT 
+	ID_PORTAIL, NOM_PLAYLIST, FILTRE_PLAYLIST
+FROM 
+	PORTAIL_PLAYLIST
+WHERE 
+	ID_PORTAIL IN ($this->bind_partners) AND LOGIN_PORTAIL=? AND ID_STATUT_PLAYLIST > 0
+SQL;
+								//$this->partners[] = $this->partners[0];
+								$res = $db->query($sql_playlist, $playlist_params);
+								if(DB::isError($res)) {
+									$this->addError($res->getMessage());
+								} else {
+									$rows = array();
+									while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) $rows[] = $row;
+									for($i=0;$i < count($rows); $i++){
+										$row = $rows[$i];
+										foreach($tours as $id_visite){
+											if(!is_array($final_results[$id_visite]['DIFFUSIONS'][$row['ID_PORTAIL']]['PLAYLIST'])){ 
+												$final_results[$id_visite]['DIFFUSIONS'][$row['ID_PORTAIL']]['PLAYLIST'] = array();
+											}
+											$final_results[$id_visite]['DIFFUSIONS'][$row['ID_PORTAIL']]['PLAYLIST'][] = array('NOM_PLAYLIST' => $row['NOM_PLAYLIST'], 'FILTRE_PLAYLIST' => $row['FILTRE_PLAYLIST']);
+										}
+									}
+								}
+							}
+						}
+
+						if(!empty($tab_id_diffus)){
+							$bind_id_diffus= implode(',', array_fill(0, count($tab_id_diffus), "?"));
+							$sql_option_diffus = <<<SQL
+-- GATEWAY 2012 V2 FETCH DIFFUSION_PORTAIL_OPTION : $remaining remaining loops
+SELECT
+	DIFFUSION_PORTAIL_OPTION.VALEUR_OPTION,DIFFUSION_PORTAIL_OPTION.REF_OPTION,ID_DIFFUSION_PORTAIL
+FROM
+	DIFFUSION_PORTAIL_OPTION
+WHERE
+	DIFFUSION_PORTAIL_OPTION.ID_DIFFUSION_PORTAIL IN ($bind_id_diffus)
+SQL;
+							$res = $db->query($sql_option_diffus, $tab_id_diffus);
+							if(DB::isError($res)) {
+								$this->addError($res->getMessage());
+							} else {
+								foreach($tab_info_diffus as $id_diffusion=>$detail){
+									$final_results[$detail[1]]['DIFFUSIONS'][$detail[0]]['OPTIONS_DIFFUSION'] = array();
+								}
+								while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+									$id_portail = $tab_info_diffus[$row['ID_DIFFUSION_PORTAIL']][0];
+									$id_visite = $tab_info_diffus[$row['ID_DIFFUSION_PORTAIL']][1];
+									$final_results[ $id_visite ]['DIFFUSIONS'][$id_portail]['OPTIONS_DIFFUSION'][$row['REF_OPTION']] = $row['VALEUR_OPTION'];				
+								}
+								$res->free();
+							}
+						}
+						if(!empty($tab_id)){
+							$bind_tours = implode(',', array_fill(0, count($tab_id), '?'));
+							if(true || !empty($tab_languages)) {
+								$this->addLog('Fetch texts');
+							
+								$sql_txt = <<<SQL
+-- GATEWAY 2012 V2 FETCH TEXTES : $remaining remaining loops
+SELECT
+	ID_VISITE, ID_LANGUE, NOM_VISITE, DESCRIPTION
+FROM
+	VISITE_TEXTE
+WHERE
+	ID_VISITE IN($bind_tours) 
+SQL;
+								$res = $db->query($sql_txt, $tab_id);
+								if(DB::isError($res)) {
+									$this->addError($res->getMessage());
+								} else {
+									while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+										$language = $row['ID_LANGUE'];
+										$id_visite = $row['ID_VISITE'];
+										unset($row['ID_LANGUE']);
+										unset($row['ID_VISITE']);
+										$final_results[ $id_visite ]['TEXTES'][$language] = $row;
+									}
+								}
+							}
+							
+							
+							
+							
+							
+							if(!empty($this->tab_opt['FIELDS']['IMAGE'])){
+								if(!empty($this->tab_opt['FIELDS']['IMAGE_DETAIL'])) {
+									$sql_img = <<<SQL
+-- GATEWAY 2012 V2 FETCH IMAGES : $remaining remaining loops
+SELECT
+	IMAGE.ID_VISITE, IMAGE.ID_IMAGE, IMAGE.ID_TYPE_IMAGE,IMAGE.POIDS,IMAGE.DATE_MODIFICATION_IMAGE, TITRE_IMAGE.NOM_IMAGE
+FROM
+	VISITE
+	INNER JOIN IMAGE ON VISITE.ID_VISITE=IMAGE.ID_VISITE AND IMAGE.ID_STATUT_IMAGE=1
+	LEFT JOIN TITRE_IMAGE ON IMAGE.ID_IMAGE=TITRE_IMAGE.ID_IMAGE AND VISITE.ID_LANGUE=TITRE_IMAGE.ID_LANGUE
+WHERE
+	VISITE.ID_VISITE IN ($bind_tours)
+SQL;
+								} else {
+								$sql_img = <<<SQL
+-- GATEWAY 2012 V2 FETCH IMAGES : $remaining remaining loops
+SELECT
+	IMAGE.ID_VISITE, IMAGE.ID_IMAGE, IMAGE.ID_TYPE_IMAGE,IMAGE.POIDS,IMAGE.DATE_MODIFICATION_IMAGE
+FROM
+	IMAGE
+WHERE
+	IMAGE.ID_VISITE IN ($bind_tours) AND IMAGE.ID_STATUT_IMAGE=1
+SQL;
+								}
+								$res = $db->query($sql_img, $tab_id);
+
+								$this->addLog('Fetch images');
+
+								if(DB::isError($res)) {
+									$this->addError($res->getMessage());
+								} else {
+									$images = array();
+									while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+										$idx = (int)$row['POIDS'];							
+										if(!isset($images[$row['ID_VISITE']])) {
+											$images[$row['ID_VISITE']] = array();
+										}
+										while(isset($images[$row['ID_VISITE']][$idx])) {
+											$idx++;
+										}
+										$images[$row['ID_VISITE']][$idx] = array(
+											'POIDS' => $row['POIDS'],
+											'ID_IMAGE' => $row['ID_IMAGE'],
+											'ID_TYPE_IMAGE' => $row['ID_TYPE_IMAGE'],
+											'DATE_MODIFICATION' => $row['DATE_MODIFICATION_IMAGE'],
+											'NOM_IMAGE' => $row['NOM_IMAGE']
+										);
+									}
+									$res->free();
+									
+									for($j=0; isset($tab_id[$j]); $j++) {
+										foreach($final_results as $id_visite=>$infos){
+											if(!empty($final_results[ $id_visite ]) && !empty($images[$id_visite])) {
+												$debut = time();
+												// Reorder
+												ksort($images[$id_visite], SORT_NUMERIC);												
+												// Assoc 2 numeric												
+												//$final_results[ $id_visite ]['TAB_IMAGES'] = array_values($images[$id_visite]);
+												$final_results[ $id_visite ]['TAB_IMAGES'] = array();
+												if (!empty($images[$id_visite])){
+													foreach($images[$id_visite] as $tab_img) {
+														$final_results[ $id_visite ]['TAB_IMAGES'][] = $tab_img;
+													}
+												}
+											}
+										}
+									}
+									unset($images);
+								}
+								$rows = null;
+							}
+
+					
+							// Recupere les diffusions sur autre portail
+							if(!empty($tab_additional_diffs)) {
+								$sql_diffs = <<<SQL
+-- GATEWAY 2012 V2 FETCH DIFFS : $remaining remaining loops
+SELECT
+	ID_DIFFUSION_PORTAIL, ID_VISITE, ID_PORTAIL, REF_PORTAIL, ID_STATUT_DIFFUSION
+FROM
+	DIFFUSION_PORTAIL
+WHERE
+	ID_VISITE IN ($bind_tours) AND ID_PORTAIL IN($bind_additional_diffs)
+ORDER BY
+	ID_VISITE, DATE_CREATION DESC
+SQL;
+								$res = $db->query($sql_diffs, array_merge($tab_id, $tab_additional_diffs));
+
+								if(DB::isError($res)) {
+									$this->addError($res->getMessage());
+								} else {
+									$images = array();
+									while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+										if(!isset($final_results[ $id_visite ]['DIFFS'][$row['ID_PORTAIL']])) {
+											$final_results[ $row['ID_VISITE'] ]['DIFFS'][$row['ID_PORTAIL']] = $row;
+										}
+									}
+								}
+							}
+						}
+						$this->addLog('End fetch tours');
+						$db->disconnect();
+					}
+				}
+			}
+			
+			// En mode partiel, stopper des que 1 resultat trouvé pour eviter le melange des annonces entre les bases
+			$stop_loop = $this->partial && !empty($final_results);
+		}
+
+		// Check si reste des resultats
+		$this->next_step = false;
+		for($i=0; !$this->next_step && isset($this->tab_dsn[$i]); $i++) {
+			$this->next_step = !empty($this->tab_all_ids[$i]) ? true : false;
+		}
+		if(count($this->tours_unset) > 0){			
+			foreach($this->tours_unset as $id_visite=>$infoDiffusion){
+				if(!empty($infoDiffusion[1])){
+					unset($final_results[$id_visite]);
+				}
+				else{
+					unset($this->tours_unset[$id_visite]);	
+				}
+			}
+		}
+		$return_result = array();
+		if(!empty($final_results)) {
+			foreach( $final_results as $value ){
+				$return_result[] =	 $value;
+			}
+			//$final_results = array_values($final_results);
+		}
+
+		return $return_result;
+		//return $final_results;
+	}
+}
+
+if($argv[1]==='test' || $_GET['test'] == "true") {
+	$debut = time();
+	//ini_set('memory_limit', '3G');
+	require_once 'DB.php';
+	require_once dirname(__FILE__).'/global.php';
+	require_once dirname(__FILE__).'/function.php';
+
+	$dsn = array(DSN_SQL09EU, DSN_SOFTWARE, DSN_SQL07EU);
+
+	$export = new PrevisiteExport($dsn);
+
+	$tab_opt = array(
+		'NEED_IMAGES'	=>  true,
+		'DEBUG'		=>  false,
+		'ORDER_BY_DATE'	=>  false,
+		//'ID_VISITES'    =>  null,
+                //'ID_UTILISATEURS'   => array('070CE6C8-A33B-D4E7-06AE-8388BA87AB94'),
+		//'LANG' => 'EN;FR;ES',
+		'PARTIAL'       =>	true,
+                //'EXPORT_TYPE'   =>  '',
+                //'DATE_MODIF'    =>  '2011-09-05',
+                'STATUT_DIFFUSION'=> array(),
+		'USER_OPTION'   =>  'URLEXPORTLISTING;URLCUSTOMLISTING;DOMAINMAILLEAD;TEMPLATEEXPORT',
+                //'ID_UTILISATEURS'   => array('0848C622-82BA-6B0E-DB03-7414818E08E5'),                
+		'FIELDS' =>	array(
+			'IMAGE' => true,
+			'USER' => true,
+			'COMPANY' => true,
+			'PARTNER' => true,
+			'TOUR' => true,
+			'TOUR_DETAIL' => true,
+			'TYPE_DISTRIB' => true
+		),
+	);		
+	do{
+            $partners = array('90B17372-5734-C0AA-D67F-D139E176E8CE');
+            $partners = array('20A9997F-507C-052B-C8D3-3DFCF88EBA2E');
+            $tab_tours = $export->getPartnerTours($partners, $tab_opt);
+            
+            if(isset($tab_tours[0])) {
+                if ($tab_opt['DEBUG'])
+                    echo date('H:i:s')." (".getmypid().") ".count($tab_tours)." found (".convert(memory_get_usage()).")\n";		
+                    print_p($tab_tours[0]);
+                    
+                    echo "\n".$export->buildCustomURL($tab_tours[0], '20A9997F-507C-052B-C8D3-3DFCF88EBA2E')."\n";
+                    
+                    die();
+                
+            }
+                
+            $total += count($tab_tours);
+	}while($export->next_step === true);
+
+//	print_r($export->user_options);
+
+}
+
+function convert($size){
+    $unit=array('b','kb','mb','gb','tb','pb');
+    return @round($size/pow(1024,($i=floor(log($size,1024)))),2).' '.$unit[$i];
+}
+
+
+

@@ -1,0 +1,279 @@
+<?php
+require_once 'DB.php';
+require_once 'HTTP/Request.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once '/var/www/cron.previsite.net/include/global.php';
+require_once '/var/www/cron.previsite.net/include/fonctions.php';
+require_once '/var/www/cron.previsite.net/include/fonction.cron.php';
+
+define('PURGE_WS_URL', 'http://api.previsite.com/rest/');
+define('PURGE_WS_GET_TOUR', 	PURGE_WS_URL.'p/listing/#REF_PORTAIL#');
+define('PURGE_WS_DELETE_TOUR', 	PURGE_WS_URL.'p/tour/#REF_PORTAIL#');
+define('PURGE_WS_GET_TOUR_DIFFUSIONS', 	PURGE_WS_URL.'pub/#TOUR#');
+define('PARTNERID',			'020666EC-0D5E-546D-CFB5-875CEDF2A8CA');
+define('PASSWORD_WS',		'cxek214');
+
+if(!checkScriptAlone()){ exit;}
+
+/*event_log("---------START--------");
+$nb_files = exec("sudo ls /mnt/ftp/_cache_import/aval/|wc -l");
+if($nb_files > 0){
+	event_log($nb_files." found");
+	exec("sudo ssh root@10.0.4.150 ps ax| grep aval", $output);
+	event_log(count($output)." in process");
+	if(count($output) < 4){
+		event_log("1 script launched");
+		$cmd = "sudo ssh root@10.0.4.150 php /var/www/gateway2.previsite.net/cron.php aval &";
+		pclose(popen($cmd,'r'));
+	}
+}
+event_log("----------END---------");
+exit;
+ */
+
+$debug = false;
+$date_reference = date('Y-m-d H:i:s');
+
+//fix immovente
+$db = array('name' => 'video', 'dsn'=>'odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_IMPORT?unicode=yes');
+$db = array('name' => 'video', 'dsn'=>'odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_SOFTWARE?unicode=yes');
+
+event_log("---------START--------");
+$date_reference = '2012-12-05 10:30:00';
+$listUserWithImages = array('10049', '10281', '10667', '10802', '11054', '111', '11166', '11269', '11388', '11413', '11510', '11543', '11607', '11783', '11899', '11987', '12114', '12115', '12440', '12675', '13225', '13353', '13633', '13670', '13802', '13962', '14051', '14069', '14167', '14187', '14359', '14415', '14462', '14490', '14540', '14544', '14661', '1483', '15466', '15574', '15631', '16752', '16947', '16977', '17229', '17292', '17456', '17767', '17922', '17923', '17924', '17925', '17937', '18126', '18174', '1876', '1909', '19429', '19563', '19716', '19780', '19783', '19848', '19868', '19885', '19918', '19919', '19999', '20000', '20001', '20013', '20015', '20073', '20109', '20110', '20113', '20136', '20156', '20160', '20165', '20166', '20169', '20170', '20173', '20174', '20175', '20185', '20189', '20190', '20229', '20240', '20241', '20242', '20243', '20333', '20356', '20379', '20381', '20597', '20598', '20608', '20617', '20630', '20687', '20688', '20689', '20690', '20691', '20695', '20726', '20754', '20770', '20779', '20824', '20832', '20865', '20866', '20904', '20939', '20973', '20975', '21073', '21096', '21270', '21271', '2306', '2829', '2852', '3011', '3910', '4336', '4623', '5618', '5687', '6328', '6735', '7043', '7661', '8605', '8679', '8859', '8986', '9545', '9879');
+$sql = "SELECT UTILISATEUR.ID_UTILISATEUR FROM UTILISATEUR 
+	inner join client_portail on client_portail.id_utilisateur=utilisateur.id_utilisateur 
+	where utilisateur.date_modification > '2012-12-04 15:00:00' and utilisateur.date_modification < '".$date_reference."' and prefixe_portail not in ('".implode("', '", $listUserWithImages)."') order by date_modification asc";
+$listUsers = array();
+$result = sql_query($sql , $db, true);
+while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)) $listUsers[] = $r['ID_UTILISATEUR'];
+$last_checkpoint = 0;
+$nb_done = 0;
+foreach($listUsers as $user){
+	if(($last_checkpoint+count($listUsers)/5) < ++$nb_done){
+		event_log(round(($nb_done/count($listUsers))*100).'% done');
+		$last_checkpoint = $nb_done;
+	}
+	$sql = "select ID_VISITE FROM VISITE WHERE DATE_MODIFICATION_VISITE > '2012-12-04 00:00:00' and date_modification_visite < '".$date_reference."' and id_utilisateur='".$user."' order by date_modification_visite asc";
+	$listTours = array();
+	$result = sql_query($sql , $db, true);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)) $listTours[] = $r['ID_VISITE'];
+	if(count($listTours) > 0){
+		foreach($listTours as $tour){
+			$sql = "update visite set id_statut_visite=1, date_modification_visite='".$date_reference."' where id_visite='".$tour."'";
+			sql_query($sql , $db, true);	
+			$sql = "update diffusion_portail set id_visite_active=1 where id_statut_diffusion >= 0 and id_visite='".$tour."'";
+			sql_query($sql , $db, true);	
+			$sql = "exec sp_facebook_update_row @tour='".$tour."'";
+			sql_query($sql , $db, true);	
+		}
+	}
+	$sql = "UPDATE UTILISATEUR SET DATE_MODIFICATION='".$date_reference."' WHERE ID_UTILISATEUR='".$user."'";
+	sql_query($sql , $db, true);	
+}
+event_log("----------END---------");
+exit;
+
+$tour_delete = 0;
+$tour_delete_failed = 0;
+$tour_already_deleted = 0;
+
+//diffusion on video
+$sql = "SELECT REF_PORTAIL, USERCODE FROM IMPORT_TOURS WHERE NOM_SCRIPT='aval' AND ID_STATUT_TOUR='-2' order by date_last_import_tour asc";
+$sql = "SELECT REF_PORTAIL, USERCODE FROM IMPORT_TOURS WHERE NOM_SCRIPT='aval' AND USERCODE='19918' AND ID_STATUT_TOUR='-1' AND MD5_TOUR='manual purge' order by date_last_import_tour asc";
+$sql = "SELECT REF_PORTAIL, USERCODE FROM IMPORT_TOURS WHERE NOM_SCRIPT='aval' AND ID_STATUT_TOUR='-1' AND MD5_TOUR='manual purge' order by date_last_import_tour asc";
+$sql = "SELECT REF_PORTAIL, USERCODE FROM IMPORT_TOURS WHERE nom_script='aval_19918' and date_last_import_tour < '2012-11-30 14:00:00'";
+
+$list_id = array();
+$result = sql_query($sql , $db, $debug);	
+
+while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+	$list_id[] = $r;
+}
+
+event_log(count($list_id)." tours to delete");
+for($i=0, $last_checkpoint = 0; $i < count($list_id); $i++){
+	$make_update = false;
+	//if($debug) event_log("[DEBUG] ".$list_id[$i]['REF_PORTAIL']);
+	if(($last_checkpoint+count($list_id)/5) < ($i+1)){
+		$last_checkpoint = $i+1;
+		event_log(round(($last_checkpoint/count($list_id))*100).'% done');
+	}
+	if($debug) event_log('[DEBUG] '.get_tour_infos($list_id[$i]['REF_PORTAIL'], PARTNERID, PASSWORD_WS, true));
+	$tour_infos = get_tour_infos($list_id[$i]['REF_PORTAIL'], PARTNERID, PASSWORD_WS);
+	if(is_guid($tour_infos['id'])){
+		//dédiffusion
+		$url = str_replace('#TOUR#', urlAPIencode($tour_infos['id']), PURGE_WS_GET_TOUR_DIFFUSIONS);
+		$response = make_ws_request($url, $params, "GET");
+		if($debug) event_log('[DEBUG] '.make_ws_request($url, $params, "GET", true).":".$response);
+		$xml = @simplexml_load_string($response);
+		if($xml && count($xml) > 0){
+			foreach($xml->pub as $v){
+				$row = $v->attributes();
+				if($row->partner.'' == PARTNERID) continue;
+				$replace = array(
+					'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#MODE#'),
+					'replace' => array(urlencode($row->partner.''), urlencode($tour_infos['id']), urlencode($tour_infos['user']), 'auto')
+				);
+				$url_base = str_replace($replace['search'], $replace['replace'], URL_UNPUBLISH);
+				$result = file_get_contents($url_base);
+				if($debug) event_log('[DEBUG] '.$url_base.":".$result);
+				if($result != "true"){
+					event_log('[ERROR][UNPUBLICATION] '.$tour_infos['id'].' ('.$url_base.':'.$result.')');
+				}
+			}
+		}
+
+		//suppression de l'annonce
+		$url = str_replace('#REF_PORTAIL#', urlAPIencode($list_id[$i]['REF_PORTAIL']), PURGE_WS_DELETE_TOUR);
+		$params = array('partnerID' => PARTNERID, 'password' => PASSWORD_WS, 'delete' => true, 'import_name'=>'purge_manual');
+		$response = make_ws_request($url, $params, "GET");
+		if($debug) event_log('[DEBUG] '.make_ws_request($url, $params, "GET", true).":".$response);
+		$xml = @simplexml_load_string($response);
+		if(count($xml) > 0 && $xml->success.'' == "true"){
+			$tour_delete++;
+			$make_update = true;
+		}else $tour_delete_failed++;
+	}else{ 
+		$tour_already_deleted++;
+		$make_update = true;
+	}
+
+	if($make_update){
+		if($debug) event_log('[DEBUG] make update');
+		$sql = "UPDATE IMPORT_TOURS SET ID_STATUT_TOUR='-1',MD5_TOUR='manual purge v2' WHERE nom_script='aval' and ref_portail='".$list_id[$i]['REF_PORTAIL']."'";
+		sql_query($sql , $db, $debug && false);
+	}
+	if($debug) break;
+}
+event_log('--------------RESUME--------------');
+event_log($tour_delete.'/'.count($list_id).' deleted');
+event_log($tour_already_deleted.'/'.count($list_id).' already deleted');
+event_log($tour_delete_failed.'/'.count($list_id).' delete failed');
+event_log('----------------------------------');
+db_close();
+exit;
+
+function make_ws_request($url, $data = array(), $method = "POST", $get_url = false, $tour_update = true, $nolog = true){
+	$params = "";
+	if(is_array($data) && count($data) >0){
+		foreach($data as $k=>$v){ $data[$k] = str_replace('\'\'', '\'', $v);}
+	}
+	if($nolog){ 
+		$data['nolog'] = 1;
+	}
+	if($method == "GET" && is_array($data) && count($data) >0){
+		$params = "?".http_build_query($data);
+	}
+	if($get_url){ return $url.$params;}
+	if($tour_update && $method == "POST"){
+		$c = curl_init($url);
+		//curl_setopt($c, CURLOPT_URL, $url);
+		curl_setopt($c, CURLOPT_HEADER, 0);
+		curl_setopt($c, CURLOPT_POST, count($data));
+		curl_setopt($c, CURLOPT_POSTFIELDS, http_build_query($data));
+		curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
+		$response = curl_exec ($c);
+		curl_close ($c);
+	}else{
+		$req = new HTTP_Request($url.$params);
+		$req->setMethod($method);
+		if($method == "POST" && is_array($data) && count($data) >0){
+			foreach($data as $k=>$v){ $req->addPostData( $k, $v);}
+		}
+		$req->sendRequest();
+		$response = $req->getResponseBody();
+	}
+	return $response;
+}
+
+function urlAPIencode($text){
+	$text = urlencode($text);
+	$text = str_replace('%2F', '/', $text);
+	return $text;
+}
+function get_tour_infos($ref_portail, $partner_id, $password, $get_url = false){
+	$return = array();
+	$url = str_replace('#REF_PORTAIL#', urlAPIencode($ref_portail), PURGE_WS_GET_TOUR);
+	$params = array('partnerID' => $partner_id, 'password' => $password);
+	$response = make_ws_request($url, $params, "POST");
+	if($get_url){ return make_ws_request($url, $params, "GET", true).":".$response;}
+	$xml = @simplexml_load_string($response);
+	if($xml !== false){
+		$return = array('desc' => (string)$xml->desc, 'lock_tts' => (string)$xml->lock_tts, 'lock' => (string)$xml->lock, 'nb_images' => (string)$xml->images, 'id' => (string)$xml->tourID, 'user' => (string)$xml->userID);
+	}
+	return $return;
+}
+function sql_connect(&$db, $debug = false){
+	$log_function = $type."_log";
+	if($db['dsn'] != ""){
+		if(!isset($db['conn'])){
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] '.$db['name']);}
+			//PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'pear_error_handler');
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] CONNECT TO '.$db['dsn']);}
+			$db['conn'] = DB::connect($db['dsn']);
+		}
+		if(!PEAR::isError($db['conn'])){ 
+			return false;
+		}else{
+			event_log('[SQL_CONNECT][ERROR] '.$db['name'].': '.$db['conn']->getCode().'. '.$db['conn']->getMessage().' ('.$db['dsn'].')');
+		}
+	}
+	unset($db['conn']);
+	return false;
+}
+
+function sql_disconnect(&$db, $debug = false){
+	$log_function = "event_log";
+	if($debug){ 
+		$log_function('[DEBUG][SQL_DISCONNECT] '.$db['name']);
+	}
+	if(isset($db['conn'])){
+		$db['conn']->disconnect();
+		unset($db['conn']);
+	}
+}
+
+function sql_query($sql, &$db, $debug = false, $r = 0, $nbTry = 0){
+	if($sql != ""){
+		$log_function = "event_log";
+		$log_error = "";
+		sql_connect($db, $debug);
+		if(isset($db['conn'])){
+			if($r == 0){
+				if($debug){ $log_function('[DEBUG][SQL_QUERY] '.$db['name'].':'.$sql);}
+				$result = $db['conn']->query($sql);
+			}else{
+				if($debug){ $log_function('[DEBUG][SQL_GETONE] '.$db.':'.$sql);}
+				$result = $db['conn']->getOne($sql);
+			}
+			if(!PEAR::isError($result)){ return $result;}
+			else{
+				$log_error = '[SQL_QUERY][ERROR] '.$db['name'].':'.$result->getCode().". ".$result->getMessage().' ('.$result->getUserInfo().') ';
+				$log_function($log_error, $script_name);
+			}
+		}else{
+			$log_error = '[SQL_QUERY][ERROR] '.$db['name'].': Connection failed';
+			$log_function($log_error, $script_name);
+		}
+		if($nbTry < 10 && !$debug){
+			$nbTry++;
+			sql_disconnect($db, $debug);
+			$log_function('[SQL_QUERY][ERROR] wait '.($nbTry*60).'s before next try ('.$nbTry.')');
+			sleep($nbTry*60);
+			return sql_query($sql, $db, $debug,$r, $nbTry);
+		}else{
+			sql_disconnect($db, $debug);
+			event_log('[SQL_QUERY][ERROR] '.$db['name'].' SCRIPT STOPPED');
+			event_log('REQUEST:'.$sql);
+			event_log($log_error, "", $debug);
+			exit;
+		}
+	}
+	return false;
+}
+
+function sql_getOne($sql, &$db, $debug = false){
+	return sql_query($sql, $db, $debug, 1);
+}
+?>

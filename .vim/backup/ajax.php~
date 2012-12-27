@@ -1,0 +1,75 @@
+<?php
+require_once('DB.php');
+require_once('previsite/GetDsn.php');
+require_once('./include/function.php');
+
+define('URL_TRANSLATE', 'http://api.previsite.com/clean_description/?todo=translate&id=#ID#&lang=#LANG#');
+define('URL_TRANSLATE_LANG_AVAILABLE', 'http://api.previsite.com/clean_description/?todo=translate&getLang=true');
+define('URL_GET_TOUR_INFOS', 'http://api.previsite.com/rest/video/#ID#');
+define('URL_MICROSOFT_TRANSLATE', 'http://geoloc.previsite.net/translate.php?text=#TEXT#&from=#FROM#&to=#TO#');
+
+$id = trim($_REQUEST['id']);
+$todo = $_REQUEST['todo'];
+$limit = $_REQUEST['limit'];
+$only_prev = ($limit == "prev");
+
+$out = "tour not found";
+if(is_guid($id) && $todo == "translate"){
+	$getDsn = new GetDsn(false);
+
+	$byTour = true;
+	$db_dsn = $getDsn->byTourID($id);
+	if($db_dsn == ""){	
+		$db_dsn = $getDsn->byTourPub($id);
+		$byTour = false;
+	}
+	if($db_dsn != ""){
+		$db_conn = DB::connect($db_dsn);
+		if(!PEAR::isError($db_conn)){ 
+			if(!$byTour){
+				$sql = "SELECT ID_VISITE FROM DIFFUSION_PORTAIL WHERE ID_DIFFUSION_PORTAIL='".$id."'";
+				$id = $db_conn->getOne($sql);
+			}
+			if(is_guid($id)){
+				$out = '';
+				$url = str_replace('#ID#', $id, URL_GET_TOUR_INFOS);
+				$content = file_get_contents($url);
+				$json = json_decode($content, true);
+				if($json['TOUR']['DESCRIPTION'] != ""){
+					$out .= '<div class="source"><div class="label">Description source:</div><div class="desc">'.$json['TOUR']['DESCRIPTION'].'</div></div>';
+				}
+				$out .= '<br /><br/>';
+				$langs = file_get_contents(URL_TRANSLATE_LANG_AVAILABLE);
+				$out .= '<div class="subtitle">Previsite translation</div>';
+				$langs = explode( ';', $langs);
+				$out .= '<div class="generated">';
+				for( $i=0; $i < count($langs); $i++){
+					$desc = file_get_contents(str_replace(array('#ID#', '#LANG#'), array($id, $langs[$i]), URL_TRANSLATE));
+					if($desc != false){
+						$out .=  '<div class="label">description '.strtoupper($langs[$i]).':</div><div class="desc">'.$desc.'</div><hr />';
+					}
+				}
+				if(!$only_prev){
+					$out .= '<div class="subtitle">Bing translation</div>';
+					$langs = array('ar', 'cs', 'da', 'de', 'en', 'et', 'fi', 'fr', 'nl', 'el', 'he', 'ht', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'no', 'pl', 'pt', 'ro', 'es', 'ru', 'sk', 'sl', 'sv', 'th', 'tr', 'uk', 'vi', 'zh-CHS', 'zh-CHT');
+					$replace = array(
+						'search' => array('#TEXT#', '#FROM#', '#TO#'),
+						'replace' => array(urlencode($json['TOUR']['DESCRIPTION']), urlencode($json['TOUR']['ID_LANGUE']), urlencode(implode(',',$langs))),
+					);
+					$url_crosoft = str_replace( $replace['search'], $replace['replace'], URL_MICROSOFT_TRANSLATE);
+					$content = file_get_contents($url_crosoft);
+					$json_crosoft = json_decode($content, true);
+					if($json_crosoft['success'] == 'true' && count($json_crosoft['texts']) > 0){
+						foreach ($json_crosoft['texts'] as $lang => $desc){
+							$out .=  '<div class="label">description '.strtoupper($lang).':</div><div class="desc">'.$desc.'</div><hr />';
+						}
+					}
+				}
+			}
+			$db_conn->disconnect();
+		}
+	}
+}
+echo $out;
+exit;
+?>

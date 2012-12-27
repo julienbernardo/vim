@@ -1,0 +1,42 @@
+<?php
+
+function unpublish_deleted_tours($scriptName, $workPath, $config, $debug = false){
+	global $db_data;
+	global $_REQUEST;
+
+	if(!$_REQUEST['test'] != "")$debug = true;
+
+	$db_name = "unpublish";
+	$return = array('DONE' => 0, 'FAILED' => '0', 'TOTAL' => '0');
+	for($k=0; $k < count($config['DNS']); $k++){
+		echo "oki";
+		sql_disconnect($db_name, $scriptName, $debug);
+		$dsn = preg_replace('/.+@\d+.\d+.\d+.([^\/]+).+/i', '$1', $config['DNS'][$k]);
+		$db_data['pool'][$db_name] = array( 'STATUS'=>'normal', 'NAME'=>$db_name, 'DSN'=> $config['DNS'][$k]); 
+		$sql = <<<SQL
+SELECT
+	TOP 250 d.Id_visite, d.Id_portail
+FROM
+	VISITE v
+	INNER JOIN DIFFUSION_PORTAIL d ON v.Id_visite=d.Id_visite AND d.Id_statut_diffusion=1
+WHERE
+	v.Id_statut_visite IN (-1)
+SQL;
+		import_log('[DSN] '.$dsn.' START ', $scriptName, $debug);
+		$tours = unpublish_deleted_tours_query($sql, $scriptName, $debug);
+		import_log('[DSN] '.$dsn.' END ', $scriptName, $debug);
+		break;
+	}
+	return $return;
+}
+
+function unpublish_deleted_tours_query($sql, $scriptName, $debug, $r=0){
+	$return =  array();
+	$result = sql_query( $sql, 'unpublish', preg_replace('/^export_/i', '',$scriptName), $debug, "export", $r, $debug);
+	if($r == 0){
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+	}else{ $return = $result;}
+	return $return;
+}
+
+?>

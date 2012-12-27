@@ -1,0 +1,10 @@
+<?php
+
+function aval_corp($script_name="", $allowed_users = array(), $workPath="", $archive_path="", $archive_file="", $prefixe_archive=""){
+	if(!function_exists('aval')) require_once(PATH_IMPORT.'aval.php');
+	$import = getConfigImport('aval');
+	$allowed_users = $import['USERS'];
+	return aval( $script_name, $allowed_users, $workPath, $archive_path, $archive_file, $prefixe_archive);
+}
+
+?>

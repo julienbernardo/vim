@@ -1,0 +1,366 @@
+<?php
+/* login */
+$password = "Prev2011";
+if(!($_COOKIE['sms'] == "sms".date('Ymd')) && !($_REQUEST['action'] == "login" && $_REQUEST['pwd'] == $password)) {
+  setcookie("sms", "", time()+3600);
+  $logged = false;
+  header('Location: index.php');
+}
+
+require_once('include/global.php');
+require_once('include/fonctions.php');
+require_once('include/fonction.cron.php');
+
+$todo		= $_REQUEST['todo'];
+$server 	= $_REQUEST['server'];
+$id			= $_REQUEST['id'];
+$log		= $_REQUEST['log'];
+$command 	= $_REQUEST['command'];
+$title		= $_REQUEST['title'];
+$period 	= $_REQUEST['min']."   ".$_REQUEST['hour']."   ".$_REQUEST['dom']."   ".$_REQUEST['nom']."   ".$_REQUEST['dow'];
+$status		= $_REQUEST['status'];
+$pid		= $_REQUEST['pid'];
+
+$list_cron = parseCrontab($server);
+
+if($todo == "delete"){
+	$new_list = array();
+	foreach($list_cron['cron'] as $k=>$cron){
+		if($k != $id){ $new_list[] = $cron;}
+	}
+	$list_cron['cron'] = $new_list;
+	saveCrontab($list_cron['cron'],$server);
+	header("location: cron.php");
+	exit;
+}else if($todo == 'execute'){
+	$cmd = 'sudo '.$servers[$server]['cmd'].' '.$list_cron['cron'][$id]['cmd'].' &';
+	exec($cmd);
+	echo 'true';
+	exit;
+}else if($todo == 'kill_cron'){
+	$key = array_search($pid,$list_cron['cron'][$id]['pid']);
+	if($key !== null){
+		exec('sudo '.$servers[$server]['cmd'].' kill -9 '.$list_cron['cron'][$id]['pid'][$key]);
+	}
+	echo 'true';
+	exit;
+}else if($todo == "save"){
+	$redirect = false;
+	if($id == ""){ 
+		$id = count($list_cron['cron']);
+		$redirect = true;
+	}
+	$list_cron['cron'][$id]['id'] 		= $id;
+	$list_cron['cron'][$id]['period'] 	= $period;
+	$list_cron['cron'][$id]['cmd'] 		= $command;
+	$list_cron['cron'][$id]['title']	= $title;
+	$list_cron['cron'][$id]['status']	= $status;
+	saveCrontab($list_cron['cron'],$server);
+	if($redirect){
+		header("location: cron_detail.php?server=".$server."&id=".$id);
+	}
+}else if($id != ""){
+	$server 	= $list_cron['cron'][$id]['server'];
+	$command 	= $list_cron['cron'][$id]['cmd'];
+	$period 	= $list_cron['cron'][$id]['period'];
+	$title	 	= $list_cron['cron'][$id]['title'];
+	$status   = ($list_cron['cron'][$id]['status'] < 0 ? "-1" : "1");
+}else{
+	$period = "* * * * *";
+}
+
+preg_match_all('/([\d\/\-\*,]+)/',$period,$period);
+
+
+preg_match('/^.+\/(.*)\/(.+)\.php/i',$command,$result);
+if(count($result) == 0){ preg_match('/^\/[0-9A-Z\._\-\/]+\/([0-9A-Z\._-]+)\/([0-9A-Z\._-]+)/i',$command,$result);}
+$script_name = $result[2];
+$script_type = $result[1];
+$log_files_name = str_replace('#NAME#',$script_name,str_replace('#TYPE#',$script_type,$servers[$server]['log']));	
+$log_files = listCronLog($log_files_name,$servers[$server]);
+if($todo == "get_log"){
+echo $log_files[$log];exit;
+	echo getCronLog($log_files[$log],$servers[$server]);
+	exit;
+}
+
+if($list_cron['cron'][$id]['status'] == 0){
+	$img = "ico_wait.gif";
+	$title_img = "in progress...";
+}else if($list_cron['cron'][$id]['status'] == 1){
+	$img = "ico_ok.png";
+	$title_img = "ready";
+}else{
+	$img = "delete.png";
+	$title_img = "stop";
+}
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Previsite Cron</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="images/video.ico" rel="shortcut icon" />
+	<link href="images/video.ico" rel="icon" type="image/x-icon" />
+	<link href="styles/styles.css" rel="stylesheet" type="text/css" />
+	<script type="text/javascript" src="scripts/prototype-1.5.0.js"></script>
+	<script type="text/javascript" src="scripts/AC_RunActiveContent.js"></script>
+</head>
+<body>
+<div id="barre">&nbsp;</div>
+<div id="global">
+    <div id="logo"><a href="/"><img src="images/logo_cron.png" alt="Cron" width="175" height="70" border="0" /></a></div>
+    <div id="contact">&nbsp;</div>
+    <div id="content">
+        <div id="content_header"></div>
+        <div id="content_text" style="height:auto;">
+					<h1>Previsite Cron</h1>
+					<form method="post" action="">
+						<input type="hidden" name="id" value="<?=$id;?>">
+						<input type="hidden" id="status" name="status" value="<?=$status;?>">
+						<input type="hidden" id="todo" name="todo" value="save">
+						<div id="statut">
+							Server : 
+<?php
+	if($id != ""){
+		echo $server;
+	}else{
+?>
+									<select name="server">		
+<?php
+		foreach($servers as $k=>$v){
+?>
+										<option <?=($k == $server ? "selected" : "");?> ><?=$k;?></option>
+<?php
+		}
+?>
+									</select>
+<?php } ?>
+						</div>
+						<div class="text">
+							Status: 
+<?php
+	if($id!=""){
+?>
+										<img id="img_statut" style="cursor:pointer;" src="images/<?=$img;?>" title="<?=$title_img;?>" OnClick="changeStatut();" />
+<?php
+	}else{ echo "-";}
+?>
+						</div>
+						<div class="text">Name</div>
+						<div class="input"><input type="text" name="title" value="<?=$title;?>" /></div>
+						<div class="text">Command-line</div>
+						<div class="input"><input type="text" name="command" value="<?=$command;?>" /><img src="images/stitch_start.gif" OnClick="launchScript();" title="launch"/></div>
+						<div class="text">Period</div>
+						<div class="period">
+							<div>min<br/>	<input type="text" OnKeyUp="checkPeriod(this.value,'min')" OnChange="checkPeriod(this.value,'min')"		id="min" 	name="min" 	title="Min"							value="<?=$period[0][0];?>" /></div>
+							<div>hour<br/><input type="text" OnKeyUp="checkPeriod(this.value,'hour')"OnChange="checkPeriod(this.value,'hour')"		id="hour"	name="hour"	title="Hour" 						value="<?=$period[0][1];?>" /></div>
+							<div>dom<br/>	<input type="text" OnKeyUp="checkPeriod(this.value,'dom')"	OnChange="checkPeriod(this.value,'dom')"		id="dom" 	name="dom" 	title="Day of month"		value="<?=$period[0][2];?>" /></div>
+							<div>nom<br/>	<input type="text" OnKeyUp="checkPeriod(this.value,'nom')"	OnChange="checkPeriod(this.value,'nom')"		id="nom" 	name="nom" 	title="Number of month"	value="<?=$period[0][3];?>" /></div>
+							<div>dow<br/>	<input type="text" OnKeyUp="checkPeriod(this.value,'dow')"	OnChange="checkPeriod(this.value,'dow')"		id="dow" 	name="dow" 	title="Day of week"			value="<?=$period[0][4];?>" /></div>
+						</div>
+						<br/>
+						<br/>
+						<script type="text/javascript">
+							function launchScript(){
+								var params = 'todo=execute&id=<?=$id;?>&server=<?=$server;?>';
+								new Ajax.Request('cron_detail.php', {
+								  asynchronous: true,
+								  postBody: params,
+								  method: 'post',
+								  onSuccess: function(t) {
+								  	if(t.responseText != 'true'){ alert('An error as occured');}
+								  	else{
+								  		window.location.href= 'cron_detail.php?server=<?=$server;?>&id=<?=$id;?>'; 
+								  	}
+								  }
+								});
+							}
+							
+							function checkPeriod(period,myId){
+								if(myId == "min"){
+									//var expPeriod = /^[0-5]?\d$/;	
+									var expPeriod = /^((\*(\/[1-9]\d*)?)|[0-5]?\d(,[0-5]?\d)*|[0-5]?\d-[0-5]?\d)$/;	
+								}else if(myId == "hour"){
+									//var expPeriod = /^(1?\d|2[0-3])$/;	
+									var expPeriod = /^(\*(\/[1-9]\d*)?|(1?\d|2[0-3])(,(1?\d|2[0-3]))*|(1?\d|2[0-3])-(1?\d|2[0-3]))$/;	
+								}else if(myId == "dom"){
+									//var expPeriod = /^([1-2]?[1-9]|3[0-1])$/;	
+									var expPeriod = /^(\*(\/[1-9]\d*)?|([1-2]?[1-9]|3[0-1])(,([1-2]?[1-9]|3[0-1]))*|([1-2]?[1-9]|3[0-1])-([1-2]?[1-9]|3[0-1]))$/;	
+								}else if(myId == "nom"){
+									//var expPeriod = /^([1-9]|1[0-2])$/;	
+									var expPeriod = /^(\*(\/[1-9]\d*)?|([1-9]|1[0-2])(,([1-9]|1[0-2]))*|([1-9]|1[0-2])-([1-9]|1[0-2]))$/;	
+								}else if(myId == "dow"){
+									//var expPeriod = /^([0-6])$/;	
+									var expPeriod = /^(\*(\/[1-9]\d*)?|[0-6](,[0-6])*|[0-6]-[0-6])$/;	
+								}
+								
+								if(!expPeriod.test(period)){
+									$(myId).className = "error";
+								}else{
+									$(myId).className = "";
+								}
+							}
+							function changeStatut(){
+								if($('status').value < 0){ 									
+						  		$('img_statut').src = "images/ico_ok.png";
+						  		$('status').value = 1;
+						  	}else{
+						  		$('img_statut').src = "images/delete.png";
+						  		$('status').value = -1;
+						  	}		
+/*								var params = 'todo=change_status&id=<?=$id;?>&server=<?=$server;?>&status='+gb_state;
+								new Ajax.Request('cron_detail.php', {
+								  asynchronous: true,
+								  postBody: params,
+								  method: 'post',
+								  onSuccess: function(t) {
+								  	if(t.responseText != 'true'){ alert('An error as occured');}
+								  	else if(gb_state < 0){ 
+								  		$('img_statut').src = "images/delete.png";
+								  		gb_state = 1;
+								  	}else{
+								  		$('img_statut').src = "images/ico_ok.png";
+								  		gb_state = -1;
+								  	}
+								  }
+								});
+*/
+							}
+							function changeTodo(todo,frm,confirmation){
+								if(confirmation){
+									result = confirm('Are you ready?');
+								}else{
+									result = true;
+								}
+								if(result){
+									$('todo').value = todo;
+									frm.submit();
+								}
+							}
+						</script>
+						<div align="right" style="margin:-20px 50px 0 0;">
+<?php
+if($id != ""){
+?>
+							<input type="button" name="btn_delete" value="Delete" OnClick="changeTodo('delete',this.form,true);"/>
+<?php
+}
+?>
+							<input type="button" name="btn_save" value="Save"  OnClick="changeTodo('save',this.form,false);"/>
+						</div>
+						<br/>
+<?php
+if($id != ""){
+	if(count($list_cron['cron'][$id]['pid']) > 0){
+?>
+        		<script type="text/javascript">
+		        	function killCron(pid){
+		        		var params = 'todo=kill_cron&id=<?=$id;?>&server=<?=$server;?>&pid='+pid;
+								new Ajax.Request('cron_detail.php', {
+								  asynchronous: true,
+								  postBody: params,
+								  method: 'post',
+								  onSuccess: function(t) {
+								  	if(t.responseText != 'true'){ alert('An error as occured');}
+								  	else{
+								  		$('pid_'+pid).style.display = 'none';
+								  	}
+								  }
+								});
+		        	}
+						</script>
+						<div id="pid" class="text">
+							<div >PID :</div>
+							
+<?php
+		foreach($list_cron['cron'][$id]['pid'] as $pid){
+?>
+							<div id="pid_<?=$pid;?>" class="list_pid" OnClick="killCron('<?=$pid;?>')"><?=$pid;?></div>
+<?php
+		}
+?>
+						</div>
+<?php
+	}
+?>
+						<br /><br />
+<?php
+	if(count($log_files) > 0){
+?>
+			      <div class="text">
+			      	Log :
+				      <div id="log" >
+				        <div class="listlog">
+				        	<ul>
+<?php
+		foreach($log_files as $k=>$file){
+?>
+										<li OnClick="getLogFile('<?=$k;?>')"><?=str_replace($script_name."-",'',basename($file,".log"));?></li>
+<?php
+		}
+?>
+									</ul>
+				        </div>
+				        <div class="detaillog">
+				        	<textarea id="detail_log" readonly style="width:500px;height:300px;"><?=getCronLog($log_files[0],$servers[$server]);?></textarea>
+				        </div>
+				        <script type="text/javascript">
+				        	function getLogFile(myId){
+				        		var params = 'todo=get_log&id=<?=$id;?>&server=<?=$server;?>&log='+myId;
+										new Ajax.Request('cron_detail.php', {
+										  asynchronous: true,
+										  postBody: params,
+										  method: 'post',
+										  onSuccess: function(t) {
+										  	$('detail_log').innerHTML = t.responseText;
+										  }
+										});
+				        	}
+				        	
+				        	function killCron(pid){
+				        		var params = 'todo=kill_cron&id=<?=$id;?>&server=<?=$server;?>&pid='+pid;
+										new Ajax.Request('cron_detail.php', {
+										  asynchronous: true,
+										  postBody: params,
+										  method: 'post',
+										  onSuccess: function(t) {
+										  	if(t.responseText != 'true'){ alert('An error as occured');}
+										  	else{
+										  		$('pid_'+pid).style.display = 'none';
+										  	}
+										  }
+										});
+				        	}
+				        </script>
+				      </div>
+				    </div>
+<?php
+	}
+}
+?>		
+						
+						<br />
+						<div align="center">
+							<a href="<?=URL_HOST;?>cron.php">back</a>
+						</div>
+					</form>
+		    </div>
+        <div id="content_footer">
+        	
+<?php      
+	if(BENCH_MODE && count($bench) > 0){
+		echo "<table align=\"center\">";
+		echo "<th>Bench</th><th>&nbsp;</th>";
+		foreach($bench as $k=>$v){
+			echo "<tr><td>".$k." :</td><td align=\"right\">".number_format(round(($v), 5),4,'.','')."s</td></tr>";
+		}
+		echo "</table>";
+	}
+?>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+

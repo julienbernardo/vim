@@ -1,0 +1,1009 @@
+<?php
+function sql_IMPORT_OPTION_GLOBAL($c = false) {
+    global $db;    
+    $req = "SELECT Ref_categorie_option, Ref_option, Valeur_option, Description_option FROM IMPORT_OPTION_GLOBAL ";
+    if (isset($c['ref_categorie_option'])) $req .= " WHERE REF_CATEGORIE_OPTION = '".$c['ref_categorie_option']."' ";
+    if (isset($c['ref_option'])) $req .= " AND REF_OPTION = '".$c['ref_option']."' ";
+    if (isset($c['valeur_option'])) $req .= " AND VALEUR_OPTION = '".$c['valeur_option']."' ";
+    if (isset($c['description_option'])) $req .= " AND DESCRIPTION_OPTION = '".$c['description_option']."' ";
+    $req .= " ORDER BY REF_OPTION ASC";
+    if (isset($c['affiche'])) echo $req.'<br />';
+    if (isset($c['ref_categorie_option']) && isset($c['ref_option'])) $infos = $db->getRow($req,DB_FETCHMODE_OBJECT);
+    else $infos = $db->getAll($req,DB_FETCHMODE_OBJECT);
+    return $infos;
+}
+
+function sql_IMPORT_USER($c = false) {
+    global $db;    
+    $req = "SELECT UserCode, Code_import, Id_statut_user, date_creation_user, date_modification_user FROM IMPORT_USER ";
+    if (isset($c['usercode'])){ $req .= " WHERE USERCODE = '".$c['usercode']."' ";}
+    else{ return array();}    
+    if (isset($c['code_import'])) $req .= " AND CODE_IMPORT = '".$c['code_import']."' ";
+    if (isset($c['statut'])) $req .= " AND ID_STATUT_USER = '".$c['statut']."' ";
+    if (isset($c['date_creation_user'])) $req .= " DATE_CREATION_USER = '".$c['date_creation_user']."' ";
+    if (isset($c['date_modification_user'])) $req .= " DATE_MODIFICATION_USER = '".$c['date_modification_user']."' ";
+    $req .= " ORDER BY USERCODE ASC";
+    if (isset($c['affiche'])) echo $req.'<br />';
+    if (isset($c['usercode']) && isset($c['code_import'])) $infos = $db->getRow($req, DB_FETCHMODE_OBJECT);
+    else $infos = $db->getAll($req,DB_FETCHMODE_OBJECT);    
+    return $infos;
+}
+
+function sql_IMPORT_USER_DIFFUSION_OPTION($c = false) {
+    global $db;
+    
+    $req = "SELECT Id_portail, Code_import, UserCode, Ref_import_option, Valeur_import_option, Id_statut_import_user_diffusion_option FROM IMPORT_USER_DIFFUSION_OPTION ";
+    if (isset($c['usercode'])){ $req .= " WHERE USERCODE = '".$c['usercode']."' ";  }  
+    else{ return array();}
+    if (isset($c['code_import'])) $req .= " AND CODE_IMPORT = '".$c['code_import']."' ";
+    if (isset($c['id_portail'])) $req .= " AND ID_PORTAIL = '".$c['id_portail']."' ";    
+    if (isset($c['ref_import_option'])) $req .= " AND REF_IMPORT_OPTION = '".$c['ref_import_option']."' ";        
+    if (isset($c['valeur_import_option'])) $req .= " AND VALEUR_IMPORT_OPTION = '".$c['valeur_import_option']."' ";
+    if (isset($c['statut'])) $req .= " AND ID_STATUT_IMPORT_USER_DIFFUSION_OPTION = '".$c['statut']."' ";
+    $req .= " ORDER BY USERCODE ASC";
+    if (isset($c['affiche'])) echo $req.'<br />';
+    if (isset($c['usercode']) && isset($c['code_import']) && isset($c['id_portail']) && isset($c['ref_import_option'])) $infos = $db->getRow($req,DB_FETCHMODE_OBJECT);
+    else $infos = $db->getAll($req,DB_FETCHMODE_OBJECT);
+    return $infos;
+}
+
+function sql_IMPORT_USER_OPTION($c = false) {
+    global $db;
+    
+    $req = "SELECT UserCode, Code_import, Ref_import_user_option, Ref_categorie_option, Valeur_import_user_option FROM IMPORT_USER_OPTION ";
+    if (isset($c['usercode'])){ $req .= " WHERE USERCODE = '".$c['usercode']."' "; }
+    else{ return array();}
+    if (isset($c['code_import'])) $req .= " AND CODE_IMPORT = '".$c['code_import']."' ";
+    if (isset($c['ref_import_user_option'])) $req .= " AND REF_IMPORT_USER_OPTION = '".$c['ref_import_user_option']."' ";
+    if (isset($c['ref_categorie_option'])) $req .= " AND REF_CATEGORIE_OPTION = '".$c['ref_categorie_option']."' ";        
+    if (isset($c['valeur_import_user_option'])) $req .= " AND VALEUR_IMPORT_USER_OPTION = '".$c['valeur_import_user_option']."' ";
+    $req .= " ORDER BY USERCODE ASC";
+    if (isset($c['affiche'])) echo $req.'<br />';
+    if (isset($c['usercode']) && isset($c['code_import']) && isset($c['ref_import_user_option']) && isset($c['ref_categorie_option'])) $infos = $db->getRow($req,DB_FETCHMODE_OBJECT);
+    else $infos = $db->getAll($req,DB_FETCHMODE_OBJECT);
+    return $infos;
+}
+
+function sql_IMPORT_USER_DIFFUSION($c = false) {
+    global $db;
+    
+    $req = "SELECT Id_portail, UserCode, Code_import, Prefixe_portail, Password_portail, Nb_images_limit, Date_modification_import_user_diffusion, Id_statut_import_user_diffusion FROM IMPORT_USER_DIFFUSION ";    
+    if (isset($c['usercode'])){ $req .= " WHERE USERCODE = '".$c['usercode']."' ";}
+    else{ return array();}
+	if (isset($c['id_portail'])) $req .= " AND ID_PORTAIL = '".$c['id_portail']."' ";  
+	//if (isset($c['nom_portail'])) $req .= " AND NOM_PORTAIL = '".$c['nom_portail']."' ";  
+    if (isset($c['code_import'])) $req .= " AND CODE_IMPORT = '".$c['code_import']."' ";    
+    if (isset($c['prefixe_portail'])) $req .= " AND PREFIXE_PORTAIL = '".$c['prefixe_portail']."' ";
+    if (isset($c['password_portail'])) $req .= " AND PASSWORD_PORTAIL = '".$c['password_portail']."' ";
+    if (isset($c['nb_images_limit'])) $req .= " AND NB_IMAGES_LIMIT = '".$c['nb_images_limit']."' ";    
+    if (isset($c['statut'])) $req .= " AND ID_STATUT_IMPORT_USER_DIFFUSION = '".$c['statut']."' ";
+    //if (isset($c['flag'])) $req .= " AND FLAG = '".$c['flag']."' ";
+    if (isset($c['date_modification'])) $req .= " AND DATE_MODIFICATION_IMPORT_USER_DIFFUSION = '".$c['date_modification']."' ";
+    $req .= " ORDER BY USERCODE ASC";
+    if (isset($c['affiche'])) echo $req.'<br />';
+    if (isset($c['usercode']) && isset($c['id_portail']) && isset($c['code_import'])) $infos = $db->getRow($req,DB_FETCHMODE_OBJECT);
+    else $infos = $db->getAll($req,DB_FETCHMODE_OBJECT); 
+    return $infos;
+}
+
+/* Fonctions de traitement d'erreurs pour PEAR */
+function pear_error_handler($error_obj) {
+	global $db_data;
+	echo $error_obj->getMessage().": ".$error_obj->getDebugInfo()."<br />";
+	write_cron_log('DB ERROR - '.$error_obj->getMessage().": ".$error_obj->getDebugInfo());
+	die('DB ERROR');
+//	write_cron_log($error_obj->getMessage().": ".$error_obj->getDebugInfo());
+    switch($error_obj->getCode()) {
+        case "-24": // Erreur connexion
+        	/*
+        	if($db_data['mode']=='normal' || $db_data['mode']=='degraded'){
+	        	// mise ?jout du fichier connector.php
+	        	if($db_data['mode']=='degraded') $new_mode = 'down';
+	        	else $new_mode ='degraded';
+	        	$line = "<?php\n";
+				$line.= "$"."db_data 						= array();\n";
+				foreach($db_data['pool'] as $key => $value){
+					if($key==$db_data['name']){
+						$line.= "$"."db_data['pool']['".$key."'] 		= array('STATUS'=>'".$new_mode."','NAME'=>'".$value['NAME']."','DSN'=> '".$value['DSN']."', 'DSN_DEGRADED'=> '".$value['DSN_DEGRADED']."');\n";
+					}else{
+						$line.= "$"."db_data['pool']['".$key."'] 		= array('STATUS'=>'".$value['STATUS']."','NAME'=>'".$value['NAME']."','DSN'=> '".$value['DSN']."', 'DSN_DEGRADED'=> '".$value['DSN_DEGRADED']."');\n";
+					}
+				}
+				$line.= "?>";
+				$fh = fopen(DB_CONNECTOR, 'w');
+				fwrite($fh, $line);
+				fclose($fh);
+				// reload viewer
+				if($db_data['mode']=='normal'){
+					header("Location:".$_SERVER['REQUEST_URI']);
+					exit;
+				}
+			}
+			*/
+			header('Location: /unavailable.php');
+			exit;
+            break;
+        case "-2": // Erreur syntaxe SQL
+        case "-1":
+            echo "Sorry, your request cannot be processed now... Please retry later...";
+            echo $e->userinfo;
+            break;
+    }
+    exit;
+}
+function db_query($sql,$db="TOUR",$r=0){
+	global $_bench;
+	global $db_data;
+	if(!isset($db_data['mode'])) $db_data['mode'] = $db_data['pool'][$db_data['name']]['STATUS'];
+	if($db_data['mode']=='down'){
+		header('Location: /unavailable.php');
+		exit;
+	}else if($db_data['mode']=='degraded'){
+		if(preg_match('#insert|update|delete#i',$sql)) return;
+	}
+	if($sql!=""){
+		if(!isset($db_data['conn'][$db]['CONN'])){
+			if($db_data['mode']=='degraded'){
+				$dsn = $db_data['pool'][$db_data['name']]['DSN_DEGRADED'];
+				$name = $db_data['pool'][$db_data['name']]['NAME']." degraded";
+			}else{
+				$dsn = $db_data['pool'][$db_data['name']]['DSN'];
+				$name = $db_data['pool'][$db_data['name']]['NAME'];
+			}
+			if(count($db_data['conn']) > 0){
+				foreach($db_data['conn'] as $key => $value){
+					if($value['DSN']==$dsn && $key!=$db){
+						$db_data['conn'][$db]['CONN'] = $db_data['conn'][$key]['CONN'];
+						$_bench['use_existing_db_conn '.$name] = getmicrotime();
+						break;
+					}
+				}
+			}
+			
+			$db_data['conn'][$db]['DSN'] = $dsn;
+			if(!isset($db_data['conn'][$db]['CONN'])){
+				$_bench['start_connecting_db '.$name] = getmicrotime();
+				PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'pear_error_handler');
+				$db_data['conn'][$db]['CONN'] = DB::connect($dsn);
+				$temp_dsn = preg_match("#@(.*)\?#",$dsn,$regs);
+				$_bench['connected to '.$regs[1]] = getmicrotime();
+			}
+		}
+		if($r==0) return $db_data['conn'][$db]['CONN']->query($sql);
+		else return $db_data['conn'][$db]['CONN']->getOne($sql);
+	}
+}
+
+function db_close() {
+	global $_bench;
+	global $db_data;
+	if(is_array($db_data['conn'])){
+		foreach($db_data['conn'] as $key => $value){
+			if(isset($value['CONN'])){
+				$db_data['conn'][$key]['CONN']->disconnect();
+				unset($db_data['conn'][$key]['CONN']);
+				$_bench['disconnect_db '.$key] = getmicrotime();
+			}
+		}
+	}
+}
+
+function db_getOne($sql,$db="TOUR"){
+	return db_query($sql,$db,1);
+}
+
+function getListPortal($filter = ""){
+	global $db_data;
+	$_list_type_portail  = array(1 => "Real Estate", 5 => "MLS", 6 => "Non-free", 8 => "Video", 9 => "Social Media", 10 => "Classifieds", 11 => "Luxury", 2 => "Deprecated (Manual)", 3 => "Deprecated (User auto)", 4 => "Deprecated (User secured)", 7 => "Deprecated (Multiple)", 0 => "Deprecated (Undefined)");
+	$_list_bundle = array('0' => "Hidden", '1' => "Export VT", '2' => "Bundle VT", '3' => "Bundle+Export VT", '4' => "Import", '5' => "Export");
+	$data_array = array();
+	$sql = "SELECT ID_PORTAIL, NOM_PORTAIL, SSII_PORTAIL, ID_TYPE_BUNDLE, ID_TYPE_PORTAIL
+            FROM PORTAIL
+            WHERE ID_STATUT_PORTAIL > '-1' AND ID_TYPE_BUNDLE >='0' ".$filter."
+			ORDER BY ID_TYPE_BUNDLE DESC, ID_TYPE_PORTAIL, NOM_PORTAIL ASC";
+	$result = db_query($sql, $db_data['name']);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+		$r['TYPE_PORTAIL'] = $_list_type_portail[$r['ID_TYPE_PORTAIL']];
+		$r['TYPE_BUNDLE'] = $_list_bundle[$r['ID_TYPE_BUNDLE']];
+		$data_array[$r['ID_PORTAIL']] = $r;
+	}
+	return $data_array;
+}
+
+function getListPortalImport(){
+	return getListPortal('AND ID_TYPE_BUNDLE IN (4, 2, 3) ');
+}
+
+function getListPortalExport($only_export = false, $only_wp = false){
+	$filter = " AND ID_TYPE_PORTAIL NOT IN ('0','2','3','4','5','7') AND ID_TYPE_BUNDLE IN ('0', '1', '3', '5') ";
+	if($only_export || $only_wp){
+		$filter = "AND ID_TYPE_BUNDLE IN (".(!$only_export ? "4, " : '')."5".(!$only_wp ? ',1' : '').") ";
+	}
+	return getListPortal($filter);
+}
+
+function getListPortalVideo(){
+	return getListPortal("AND ID_TYPE_BUNDLE='1' AND PORTAIL.ID_TYPE_PORTAIL='8' ");
+}
+
+function getListOptions(){
+	global $db_data;
+	$data = array();
+	$sql = "SELECT REF_CATEGORIE_OPTION, REF_OPTION, VALEUR_OPTION, DESCRIPTION_OPTION
+            FROM IMPORT_OPTION_GLOBAL
+            ORDER BY REF_CATEGORIE_OPTION ASC, REF_OPTION ASC";
+	$result = db_query($sql, $db_data['name']);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+		if(!is_array($data[$r['REF_CATEGORIE_OPTION']])){ $data[$r['REF_CATEGORIE_OPTION']] = array();}
+		$data[$r['REF_CATEGORIE_OPTION']][$r['REF_OPTION']] = $r;
+	}
+	return $data;
+}
+
+function getListTables($partner){
+	global $db_data;
+	db_close();
+	$return = array('dsn' => '', 'options'=> array());
+	if(is_guid($partner)){
+		$getDsn = new GetDsn(array('MEMCACHED' => true));
+		$dsn = $getDsn->byPartner($partner);
+		$oldDB = $db_data['name'];
+		$db_data['name'] = "import";
+		$return['dsn'] = preg_replace('/.+@([^\/]+).+/i', '$1', $dsn);
+		$db_data['pool']['import'] = array('STATUS'=>'normal', 'NAME'=>'import', 'DSN'=> preg_replace('/(REALESTATE|SOFTWARE)\?/i', 'IMPORT?', $dsn));
+
+		$sql = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE Table_Type='BASE TABLE' ORDER BY TABLE_NAME";
+		$result = db_query($sql, $db_data['name']);
+
+		$current_name = "";
+		$count = 0;
+		$names = array('USERS', 'IMAGES', 'TRANSACTIONS', 'TOURS');
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			if(preg_match('/^(.*)_('.implode('|', $names).')$/i', $r['TABLE_NAME'], $find) > 0){
+				if($current_name != $find[1]){
+					$count = 0;
+					$current_name = $find[1];
+				}
+				if(++$count == count($names)){ $return['options'][] = $current_name;}
+			}
+		}
+		db_close();
+		$db_data['name'] = $oldDB;
+	}	
+	return $return;
+}
+
+function desactivateExport($script){
+	$sql = "UPDATE EXPORT SET ID_STATUT_EXPORT='-1', DATE_MODIFICATION_EXPORT='".date('Y-m-d H:i:s')."' WHERE CODE_EXPORT='".fix_text($script)."'";
+	$result = sql_query($sql, 'gateway', $script, $debug);
+}
+
+function desactivateImport($script){
+	$sql = "UPDATE IMPORT SET ID_STATUT_IMPORT='-1', DATE_MODIFICATION_IMPORT='".date('Y-m-d H:i:s')."' WHERE CODE_IMPORT='".fix_text($script)."'";
+	$result = sql_query($sql, 'gateway', $script, $debug);
+}
+
+/** ajax_import **/
+function updateImportInfos($infos){
+	global $db_data;
+	
+	if($infos['import_code_old'] != "" && $infos['import_code_old'] != $infos['import_code']){
+		$tables = array(
+			'IMPORT', 'IMPORT_OPTION', 'IMPORT_DIFFUSION', 'IMPORT_DIFFUSION_OPTION', 
+			'IMPORT_USER', 'IMPORT_USER_OPTION', 'IMPORT_USER_DIFFUSION', 'IMPORT_USER_DIFFUSION_OPTION'
+		);
+		foreach($tables as $table){
+			$sql = "UPDATE ".$table." set code_import='".$infos['import_code']."' WHERE code_import='".$infos['import_code_old']."' ";
+			db_query($sql, $db_data['name']);
+		}
+		
+		$sql = "UPDATE CRON_EXECUTION set code_script='".$infos['import_code']."' WHERE code_script='".$infos['import_code_old']."' AND ID_TYPE_SCRIPT='0'";
+		db_query($sql, $db_data['name']);
+	}
+	
+	$script = getImportInfos($infos['import_code']);
+	$infos['import_activate'] = ($infos['import_activate'] == 'true' ? '1' : '-1');
+	if(count($script) > 0){
+		$sql = "UPDATE IMPORT SET NOM_IMPORT='".fix_text($infos['import_name'], 100)."', ID_PORTAIL='".fix_text($infos['db_partner'])."', TEMPS_MAX_IMPORT='".fix_text($infos['execution_time'])."', PERIODE_IMPORT='".fix_text($infos['execution_period'], 50)."', ARCHIVE_DELAI_IMPORT='".fix_int($infos['execution_archive'])."', NOM_TABLE_IMPORT='".fix_text($infos['db_table'], 50)."', ID_STATUT_IMPORT='".$infos['import_activate']."', DATE_MODIFICATION_IMPORT='".date('Y-m-d H:i:s')."', SERVEUR_IMPORT='".fix_text($infos['import_server'], 20)."', DESCRIPTION_IMPORT='".fix_text($infos['import_description'], 1000)."' WHERE CODE_IMPORT='".fix_text($infos['import_code'])."'";
+	}else{
+		$sql = "INSERT INTO IMPORT(CODE_IMPORT, NOM_IMPORT, ID_PORTAIL, TEMPS_MAX_IMPORT, PERIODE_IMPORT, ARCHIVE_DELAI_IMPORT, NOM_TABLE_IMPORT, ID_STATUT_IMPORT, DATE_MODIFICATION_IMPORT, DATE_CREATION_IMPORT, SERVEUR_IMPORT, DESCRIPTION_IMPORT) VALUES ('".fix_text($infos['import_code'], 50)."', '".fix_text($infos['import_name'], 100)."', '".fix_text($infos['db_partner'])."', '".fix_text($infos['execution_time'])."', '".fix_text($infos['execution_period'], 50)."', '".fix_int($infos['execution_archive'])."', '".fix_text($infos['db_table'], 50)."', '".$infos['import_activate']."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".fix_text($infos['import_server'], 20)."', '".fix_text($infos['import_description'], 1000)."')";
+	}
+	db_query($sql, $db_data['name']);
+
+	//options
+	$oldOptions = getImportOptions($infos['import_code']);
+	if(count($infos['options']) > 0){
+		foreach($infos['options'] as $option){
+			if(count($oldOptions[$option['cat']]) > 0 && count($oldOptions[$option['cat']][$option['ref']]) > 0){
+				unset($oldOptions[$option['cat']][$option['ref']]);
+				$sql = "UPDATE IMPORT_OPTION SET VALEUR_IMPORT_OPTION='".fix_text($option['value'],255)."' WHERE REF_CATEGORIE_IMPORT_OPTION='".fix_text($option['cat'],50)."' AND REF_IMPORT_OPTION='".fix_text($option['ref'],50)."' AND CODE_IMPORT='".fix_text($infos['import_code'],50)."'";
+			}else{
+				$sql = "INSERT INTO IMPORT_OPTION(REF_CATEGORIE_IMPORT_OPTION, REF_IMPORT_OPTION, VALEUR_IMPORT_OPTION, CODE_IMPORT) VALUES('".fix_text($option['cat'],50)."', '".fix_text($option['ref'],50)."', '".fix_text($option['value'],255)."', '".fix_text($infos['import_code'],50)."')";
+			}
+			db_query($sql, $db_data['name']);
+		}
+	}
+	if(count($oldOptions) > 0){
+		foreach($oldOptions as $cat=>$option){
+			if(count($option) >0){
+				foreach($option	as $ref=>$value){
+					$sql = "DELETE FROM IMPORT_OPTION WHERE CODE_IMPORT='".$infos['import_code']."' AND REF_CATEGORIE_IMPORT_OPTION='".$cat."' AND REF_IMPORT_OPTION='".$ref."'";
+					db_query($sql, $db_data['name']);
+				}
+			}
+		}
+	}
+
+	//portals
+	$oldPortals = getScriptDiffusions($infos['import_code']);
+//	$infos['portals'] = json_decode($infos['portals'], true);
+	if(count($infos['portals']) > 0){
+		foreach($infos['portals'] as $portal){
+			if(is_guid($portal['id'])){
+				$portal['activate'] = ($portal['activate'] == 'true' ? '1' : '-1');
+				if($portal['activate'] > 0 && $portal['update'] == 'true'){
+					$portal['activate'] = 2;
+				}
+				if(count($oldPortals[$portal['id']]) > 0){
+					$sql = "UPDATE IMPORT_DIFFUSION SET PREFIXE_PORTAIL='".fix_text($portal['usercode'], 150)."', PASSWORD_PORTAIL='".fix_text($portal['password'], 150)."', NB_IMAGES_LIMIT='".fix_int($portal['limit'])."', DATE_MODIFICATION_IMPORT_DIFFUSION='".date('Y-m-d H:i:s')."', ID_STATUT_IMPORT_DIFFUSION='".$portal['activate']."' WHERE ID_PORTAIL='".fix_text($portal['id'])."' AND CODE_IMPORT='".fix_text($infos['import_code'],50)."'";
+					unset($oldPortals[$portal['id']]['PREFIXE_PORTAIL']);
+				}else{
+					$sql = "INSERT INTO IMPORT_DIFFUSION(ID_PORTAIL, CODE_IMPORT, PREFIXE_PORTAIL, PASSWORD_PORTAIL, NB_IMAGES_LIMIT, DATE_CREATION_IMPORT_DIFFUSION, DATE_MODIFICATION_IMPORT_DIFFUSION, ID_STATUT_IMPORT_DIFFUSION) VALUES('".fix_text($portal['id'])."', '".fix_text($infos['import_code'],50)."', '".fix_text($portal['usercode'], 150)."', '".fix_text($portal['password'], 150)."', '".fix_int($portal['limit'])."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".$portal['activate']."')";
+				}
+				db_query($sql, $db_data['name']);
+				if(count($portal['options']) > 0){
+					foreach($portal['options'] as $v){
+						if(count($oldPortals[$portal['id']]['OPTIONS'][$v['ref']]) > 0){
+							$sql = "UPDATE IMPORT_DIFFUSION_OPTION SET VALEUR_DIFFUSION_OPTION='".fix_text($v['value'], 250)."' WHERE ID_PORTAIL='".$portal['id']."' AND CODE_IMPORT='".fix_text($infos['import_code'], 50)."' AND REF_DIFFUSION_OPTION='".fix_text($v['ref'], 50)."'";
+							unset($oldPortals[$portal['id']]['OPTIONS'][$v['ref']]);
+						}else{
+							$sql = "INSERT INTO IMPORT_DIFFUSION_OPTION(ID_PORTAIL, CODE_IMPORT, REF_DIFFUSION_OPTION, VALEUR_DIFFUSION_OPTION) VALUES('".$portal['id']."', '".fix_text($infos['import_code'], 50)."', '".fix_text($v['ref'], 50)."', '".fix_text($v['value'], 250)."')";
+						}
+						db_query($sql, $db_data['name']);
+					}
+				}
+			}
+		}
+	}
+	
+	if(count($oldPortals) > 0){
+		foreach($oldPortals as $portal){
+			if(isset($portal['PREFIXE_PORTAIL'])){
+				$sql = "DELETE FROM IMPORT_DIFFUSION WHERE ID_PORTAIL='".$portal['ID_PORTAIL']."' AND CODE_IMPORT='".$infos['import_code']."'";
+				db_query($sql, $db_data['name']);
+			}
+			if(count($portal['OPTIONS']) >0){
+				foreach($portal['OPTIONS'] as $k=>$v){
+					$sql = "DELETE FROM IMPORT_DIFFUSION_OPTION WHERE ID_PORTAIL='".$portal['ID_PORTAIL']."' AND CODE_IMPORT='".$infos['import_code']."' AND REF_DIFFUSION_OPTION='".$k."'";
+					db_query($sql, $db_data['name']);
+				}
+			}
+		}
+	}
+}
+
+function getAllPeriod(){
+	global $db_data;
+	$return = array();
+	$sql = "SELECT PERIODE_IMPORT, CODE_IMPORT, ID_PORTAIL, SERVEUR_IMPORT FROM IMPORT ORDER BY SERVEUR_IMPORT ASC, PERIODE_IMPORT ASC, CODE_IMPORT ASC";
+	$result = db_query($sql, $db_data['name']);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+	return $return;
+}
+
+function getLastCorrectExecution($script, $type = 'import'){
+	$return = false;
+	if($script != ""){
+		$sql = "SELECT DATE_FIN_CRON FROM CRON_EXECUTION WHERE CODE_SCRIPT='".fix_text($script)."' AND ID_TYPE_SCRIPT='".($type == "import" ? "0" : "1")."' AND ID_STATUT_CRON_EXECUTION='3' ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+		$result = sql_query($sql, 'gateway', $script, $debug, "export");
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+			$return = $r['DATE_FIN_CRON'];
+		}
+	}
+	return $return;
+}
+
+function getLastExecution($script, $type = 'import'){
+	global $db_data;
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT ID_CRON_EXECUTION, CODE_SCRIPT, DATE_DEBUT_CRON, DATE_FIN_CRON, OPTIONS_CRON, RESUME_CRON, ETAPES_CRON, SERVER_CRON, ID_STATUT_CRON_EXECUTION, DATE_MODIFICATION_CRON_EXECUTION, PID_CRON FROM CRON_EXECUTION WHERE CODE_SCRIPT='".fix_text($script)."' AND ID_TYPE_SCRIPT='".($type == "import" ? "0" : "1")."' ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+		$result = db_query($sql, $db_data['name']);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+			$return[] = $r;
+		}
+	}
+	return $return;
+}
+
+function getExecutionInProgress(){
+	$return = array();
+	$sql = "SELECT CODE_SCRIPT, ID_TYPE_SCRIPT, ID_STATUT_CRON_EXECUTION, DATE_DEBUT_CRON, DATE_FIN_CRON, SERVER_CRON FROM CRON_EXECUTION WHERE ((ID_STATUT_CRON_EXECUTION > -1 AND ID_STATUT_CRON_EXECUTION < 3) OR ID_STATUT_CRON_EXECUTION=4) AND ID_TYPE_SCRIPT > -1 ORDER BY ID_TYPE_SCRIPT ASC, SERVER_CRON ASC, CODE_SCRIPT ASC";
+	$result = sql_query($sql, 'gateway', $script, $debug);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+	for($i = 0; $i < count($return); $i++){
+		$function = "get".($return[$i]['ID_TYPE_SCRIPT'] == 0 ? "Import" : "Export" )."Infos";
+		$return[$i] = merge($return[$i], $function($return[$i]['CODE_SCRIPT'], false, false));
+	}
+	return $return;
+}
+
+function getExecutionFinishSince($date_end){
+	$return = array();
+	$sql = "SELECT CODE_SCRIPT, ID_TYPE_SCRIPT, ID_STATUT_CRON_EXECUTION, DATE_DEBUT_CRON, DATE_FIN_CRON, SERVER_CRON, RESUME_CRON FROM CRON_EXECUTION WHERE ID_STATUT_CRON_EXECUTION in (-1, 3) AND ID_TYPE_SCRIPT > -1 ".($date_end != "" ? " AND DATE_FIN_CRON > '".$date_end."'" : "")." ORDER BY SERVER_CRON ASC, ID_TYPE_SCRIPT ASC, CODE_SCRIPT ASC";
+	$result = sql_query($sql, 'gateway', $script, $debug);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+	return $return;
+}
+
+function getExecutionNotDone($date_end){
+	$return = array();
+	$sql = "SELECT CODE_SCRIPT,ID_TYPE_SCRIPT, DATE_MODIF, (select TOP 1 ID_CRON_EXECUTION FROM CRON_EXECUTION WHERE CODE_SCRIPT=tab.CODE_SCRIPT AND ID_TYPE_SCRIPT=tab.ID_TYPE_SCRIPT AND ID_STATUT_CRON_EXECUTION NOT IN (-1, 3)) ID_IN_PROGRESS FROM (
+		SELECT CODE_SCRIPT,ID_TYPE_SCRIPT, MAX(DATE_MODIFICATION_CRON_EXECUTION) DATE_MODIF FROM CRON_EXECUTION 
+		LEFT JOIN IMPORT ON IMPORT.CODE_IMPORT=CRON_EXECUTION.CODE_SCRIPT AND ID_TYPE_SCRIPT=0
+		LEFT JOIN EXPORT ON EXPORT.CODE_EXPORT=CRON_EXECUTION.CODE_SCRIPT AND ID_TYPE_SCRIPT=1
+		WHERE (ID_STATUT_IMPORT > 0 OR ID_STATUT_EXPORT > 0)
+		GROUP BY CODE_SCRIPT, ID_TYPE_SCRIPT
+	) AS TAB 
+	WHERE DATE_MODIF < '".$date_end."'
+	ORDER BY DATE_MODIF DESC";
+	$result = sql_query($sql, 'gateway', $script, $debug);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		if(!is_guid($r['ID_IN_PROGRESS'])) $return[] = $r;
+	}
+	return $return;
+}
+
+/** cron request **/
+function getScriptUsers($script, $only_active = false, $withOptions = false, $debug = false){
+	global $db_data;
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT CODE_IMPORT, USERCODE, ID_STATUT_USER, DATE_MODIFICATION_USER, ID_FORCE_UPDATE FROM IMPORT_USER WHERE CODE_IMPORT='".fix_text($script)."' ".($only_active ? "AND ID_STATUT_USER >= 0" : "")." ".($usercode != false ? "AND USERCODE='".fix_text($usercode)."' " : "")." ORDER BY ID_STATUT_USER DESC, ID_FORCE_UPDATE DESC, USERCODE";
+		$result = sql_query($sql, 'gateway', $script, $debug);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$r['USERCODE'] = utf8_encode($r['USERCODE']);
+			$return[$r['USERCODE']] = $r;
+		}
+		if(count($return) > 0){
+			foreach($return as $k=>$v){
+				$sql = "SELECT REF_IMPORT_USER_OPTION, VALEUR_IMPORT_USER_OPTION FROM IMPORT_USER_OPTION WHERE REF_CATEGORIE_OPTION='USER_FIELDS' AND CODE_IMPORT='".$script."' AND USERCODE='".$v['USERCODE']."' ".($withOptions ? "" : "AND REF_IMPORT_USER_OPTION IN ('NOM_UTILISATEUR', 'NOM_SOCIETE')");
+				$result = sql_query($sql, 'gateway', $script, $debug);
+				while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+					$return[$k][$r['REF_IMPORT_USER_OPTION']] = $r['VALEUR_IMPORT_USER_OPTION'];
+				}
+			}
+		}
+	}	
+	return $return;
+}
+
+function getImportOptions($script, $debug = false){
+	global $db_data;
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT REF_CATEGORIE_IMPORT_OPTION, REF_IMPORT_OPTION, VALEUR_IMPORT_OPTION, CODE_IMPORT FROM IMPORT_OPTION WHERE CODE_IMPORT='".fix_text($script)."'";
+		$result = sql_query($sql, 'gateway', $script, $debug);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			if(!is_array($return[$r['REF_CATEGORIE_IMPORT_OPTION']])){ $return[$r['REF_CATEGORIE_IMPORT_OPTION']] = array();}
+			$return[$r['REF_CATEGORIE_IMPORT_OPTION']][$r['REF_IMPORT_OPTION']] = $r;
+		}
+	}
+	return $return;
+}
+
+function getScriptDiffusions($script, $only_active = false, $withUsers = false, $debug = false){
+	global $db_data;
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT PORTAIL.ID_PORTAIL, PORTAIL.NOM_PORTAIL, PREFIXE_PORTAIL, PASSWORD_PORTAIL, NB_IMAGES_LIMIT, ID_STATUT_IMPORT_DIFFUSION FROM IMPORT_DIFFUSION INNER JOIN PORTAIL ON PORTAIL.ID_PORTAIL=IMPORT_DIFFUSION.ID_PORTAIL WHERE CODE_IMPORT='".fix_text($script)."' ".($only_active ? "AND ID_STATUT_IMPORT_DIFFUSION > 0" : "")." ORDER BY PORTAIL.NOM_PORTAIL ASC";
+		$result = sql_query($sql, 'gateway', $script, $debug);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[$r['ID_PORTAIL']] = $r;}
+		if(count($return) > 0){
+			foreach($return as $id=>$v){
+				$sql = "SELECT REF_DIFFUSION_OPTION, VALEUR_DIFFUSION_OPTION FROM IMPORT_DIFFUSION_OPTION WHERE CODE_IMPORT='".fix_text($script)."' AND ID_PORTAIL='".$id."'";
+				$result = sql_query($sql, 'gateway', $script, $debug);
+				$return[$id]['OPTIONS'] = array();
+				while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[$id]['OPTIONS'][$r['REF_DIFFUSION_OPTION']] = $r['VALEUR_DIFFUSION_OPTION'];}
+			}
+		}
+		
+		if($withUsers){
+			$sql = "SELECT PORTAIL.ID_PORTAIL, PORTAIL.NOM_PORTAIL, IMPORT_USER.USERCODE, PREFIXE_PORTAIL, PASSWORD_PORTAIL, NB_IMAGES_LIMIT, ID_STATUT_IMPORT_USER_DIFFUSION ID_STATUT_IMPORT_DIFFUSION 
+			FROM IMPORT_USER_DIFFUSION 
+			INNER JOIN IMPORT_USER ON IMPORT_USER.USERCODE=IMPORT_USER_DIFFUSION.USERCODE AND IMPORT_USER.CODE_IMPORT=IMPORT_USER_DIFFUSION.CODE_IMPORT 
+			INNER JOIN PORTAIL ON PORTAIL.ID_PORTAIL=IMPORT_USER_DIFFUSION.ID_PORTAIL
+			WHERE ID_STATUT_USER >= 0 AND IMPORT_USER_DIFFUSION.CODE_IMPORT='".fix_text($script)."' ".($only_active ? "AND ID_STATUT_IMPORT_USER_DIFFUSION > 0" : "");
+			$result = sql_query($sql, 'gateway', $script, $debug);
+			$users = array();
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $users[] = $r;}
+			if(count($users) > 0){
+				foreach($users as $user){
+					$sql = "SELECT REF_IMPORT_OPTION, VALEUR_IMPORT_OPTION FROM IMPORT_USER_DIFFUSION_OPTION WHERE USERCODE='".fix_text($user['USERCODE'])."' AND CODE_IMPORT='".fix_text($script)."' AND ID_PORTAIL='".$user['ID_PORTAIL']."'";
+					$result = sql_query($sql, 'gateway', $script, $debug);
+					$user['OPTIONS'] = array();
+					while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+						$user['OPTIONS'][$r['REF_IMPORT_OPTION']] = $r['VALEUR_IMPORT_OPTION'];
+					}
+					if(!is_array($return[$user['ID_PORTAIL']])){ 
+						$return[$user['ID_PORTAIL']] = array('ID_PORTAIL' => $user['ID_PORTAIL'], 'NOM_PORTAIL' => $user['NOM_PORTAIL'], 'USERS'=>array());
+					}else if(!is_array($return[$user['ID_PORTAIL']]['USERS'])){ $return[$user['ID_PORTAIL']]['USERS'] = array();}
+					$return[$user['ID_PORTAIL']]['USERS'][$user['USERCODE']] = $user;
+				}
+			}
+		}
+	}
+	return $return;
+}
+
+
+function getPortailInfos($id_portail ,$script, $debug = false){
+	global $db_data;
+	$return = array();
+	if(is_guid($id_portail)){
+		if(!$return){
+			$sql = "SELECT ID_PORTAIL, NOM_PORTAIL, CODE_PORTAIL FROM PORTAIL WHERE ID_PORTAIL='".$id_portail."'";
+			$result = sql_query($sql, 'gateway', $script, $debug);
+			if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+				$return = $r;
+			}
+		}
+	}
+	return $return;
+}
+
+function getImportInfos($script, $debug = false, $getExec = true){
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT CODE_IMPORT, PORTAIL.NOM_PORTAIL, NOM_IMPORT,  PORTAIL.ID_PORTAIL, PASSWORD_WS, TEMPS_MAX_IMPORT, PERIODE_IMPORT, ARCHIVE_DELAI_IMPORT, NOM_TABLE_IMPORT, ID_STATUT_IMPORT, DATE_MODIFICATION_IMPORT, DATE_CREATION_IMPORT, SERVEUR_IMPORT, DESCRIPTION_IMPORT FROM IMPORT 
+		INNER JOIN PORTAIL ON PORTAIL.ID_PORTAIL=IMPORT.ID_PORTAIL WHERE CODE_IMPORT='".fix_text($script)."'";
+		$result = sql_query($sql, 'gateway', $script, $debug);
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$return = $r;
+			if($getExec){
+				$sql = "SELECT TOP 1 DATE_DEBUT_CRON, DATE_FIN_CRON, ID_STATUT_CRON_EXECUTION, ID_CRON_EXECUTION, SERVER_CRON, RESUME_CRON, PID_CRON FROM CRON_EXECUTION WHERE CODE_SCRIPT='".fix_text($script)."' AND ID_TYPE_SCRIPT='0' ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+				$result = sql_query($sql, 'gateway', $script, $debug);
+				if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+					$return = merge($return, $r);
+				}
+			}
+		}
+	}
+	return $return;
+}
+
+function getImportOnServer($srv = "", $all = false, $debug = false){
+	$return = array();
+	if($srv != ""){
+		$sql = "SELECT CODE_IMPORT FROM IMPORT WHERE SERVEUR_IMPORT='".fix_text($srv)."' ".(!$all ? " AND ID_STATUT_IMPORT > 0" : "")." order by ".(!$all ? "PERIODE_EXPORT desc, " : "")." code_import asc";
+		$result = sql_query($sql, 'gateway', $script, $debug);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$return[] = $r['CODE_IMPORT'];
+		}
+	}
+	return $return;
+}
+
+/**
+*	sql request for cron
+**/
+function sql_connect($db, $script_name, $debug = false, $type = "import"){
+	global $db_data;
+	$debug = false;
+	$dsn = $db_data['pool'][$db]['DSN'];
+	$name = $db_data['pool'][$db]['NAME'];
+	$log_function = $type."_log";
+	$script_name = preg_replace('/^export_/i', '', $script_name);
+	if($dsn != ""){
+		if(!isset($db_data['conn'][$db]['CONN'])){
+			if($debug){ $log_function('[DEBUG][SQL_CONNECT] '.$db, $script_name);}
+			//PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'pear_error_handler');
+			if($debug){ $log_function('[DEBUG][SQL_CONNECT] CONNECT TO '.$dsn , $script_name);}
+			$db_data['conn'][$db]['CONN'] = DB::connect($dsn);
+		}
+		if(!PEAR::isError($db_data['conn'][$db]['CONN'])){ 
+			$db_data['conn'][$db]['DSN'] = $dsn;
+			return $db_data['conn'][$db]['CONN'];
+		}else{
+			$log_function('[SQL_CONNECT][ERROR] '.$db.':'.$db_data['conn'][$db]['CONN']->getCode().". ".$db_data['conn'][$db]['CONN']->getMessage().' ('.$dsn.')', $script_name);
+		}
+	}
+	unset($db_data['conn'][$db]['CONN']);
+	return false;
+}
+
+function sql_disconnect($db, $script_name, $debug = false, $type = "import"){
+	global $db_data;
+	$log_function = $type."_log";
+	$script_name = preg_replace('/^export_/i', '', $script_name);
+	$debug = false;
+	if($debug){ $log_function('[DEBUG][SQL_DISCONNECT] '.$db, $script_name);}
+	if(is_array($db_data['conn'])){
+		if(is_array($db_data['conn'][$db])){
+			if(isset($db_data['conn'][$db]['CONN'])){
+				$db_data['conn'][$db]['CONN']->disconnect();
+				unset($db_data['conn'][$db]['CONN']);
+			}
+		}
+	}
+}
+
+function sql_getDatabase($db){
+	global $db_data;
+	return preg_replace('/.+@\d+.\d+.\d+.([^\/]+).+/i', '$1', $db_data['pool'][$db]['DSN']);
+}
+
+/**
+ * sql_query
+ * @return true (fine)
+ * @return false (there is an issue)
+ * @return 9 -> PK violation
+ **/
+function sql_query($sql, $db, $script_name, $debug = false, $type = "import", $r = 0, $nbTry = 0, $getNbAffectedRow = false){
+	global $db_data;
+	if($sql != ""){
+		$debug = false;
+		$script_name = preg_replace('/^export_/i', '', $script_name);
+		$log_function = $type."_log";
+		$log_error = "";
+		$db_connect = sql_connect($db, $script_name, $debug, $type);
+		if($db_connect !== false){
+			if($r == 0){
+				if($debug){ $log_function('[DEBUG][SQL_QUERY] '.sql_getDatabase($db).':'.$sql, $script_name);}
+				$result = $db_connect->query($sql);
+			}else{
+				if($debug){ $log_function('[DEBUG][SQL_GETONE] '.sql_getDatabase($db).':'.$sql, $script_name);}
+				$result = $db_connect->getOne($sql);
+			}
+			if(!PEAR::isError($result)){ 
+				$db_data['sql'] = $sql;
+				if($getNbAffectedRow){
+					return (int) $db_connect->affectedRows();
+				}else{
+					return $result;
+				}
+			}else{
+				$log_error = '[SQL_QUERY][ERROR] '.sql_getDatabase($db).':'.$result->getCode().". ".$result->getMessage().' ('.$result->getUserInfo().') ';
+				$log_function($log_error, $script_name);
+				if(preg_match('/Violation of PRIMARY KEY constraint/i', $result->getUserInfo()) > 0){
+					return 9;
+				}
+			}
+		}else{
+			$log_error = '[SQL_QUERY][ERROR] '.$db.': Connection failed';
+			$log_function($log_error, $script_name);
+		}
+		if($nbTry < 10){
+//		if($nbTry < 0){
+			$nbTry++;
+			sql_disconnect($db, $script_name, $debug, $type);
+			$log_function('[SQL_QUERY][ERROR] '.sql_getDatabase($db).' wait '.($nbTry*60).'s before next try ('.$nbTry.')', $script_name);
+			sleep($nbTry*60);
+			return sql_query($sql, $db, $script_name, $debug, $type, $r, $nbTry, $getNbAffectedRow);
+		}else{
+			sql_disconnect($db, $script_name, $debug, $type);
+			$body = '[SQL_QUERY][ERROR] '.sql_getDatabase($db).' SCRIPT STOPPED<br />';
+			$body .= 'REQUEST:'.$sql.'<br />';
+			$body .= $log_error."<br />";
+			$body .= 'Last successfull request:'.$db_data['sql'].'<br />';
+			$log_function(str_replace('<br />', "\n", $body), $script_name);
+			$body = '<a href="'.str_replace(array('#TYPE#', '#SCRIPT#'), array($type, $script_name), URL_MANAGE_SCRIPT).'">'.$script_name.'</a><br /><br />'.$body;
+			if(!$debug){ sendAlertEmail($script_name, $body, $type);}
+			global $id_cron;
+			if(is_guid($id_cron)){
+				update_cron_end_width_error($id_cron, $script_name, "SCRIPT STOPPED BY SQL ERROR", $debug);
+			}
+			exit;
+		}
+	}
+	return false;
+}
+
+function sql_update($sql, $db, $script_name, $debug = false, $type = "import", $r = 0, $nbTry = 0){
+	return sql_query($sql, $db, $script_name, $debug, $type = "import", $r, $nbTry, true);
+}
+
+function sql_getOne($sql, $db, $script_name, $debug = false, $type = "import"){
+	return sql_query($sql, $db, $script_name, $debug, $type, 1);
+}
+
+// export 
+
+function getExportOnServer($srv = "", $all = false, $debug = false){
+	$return = array();
+	if($srv != ""){
+		$sql = "SELECT CODE_EXPORT FROM EXPORT WHERE SERVEUR_EXPORT='".fix_text($srv)."' ".(!$all ? " AND ID_STATUT_EXPORT > 0" : "")." order by ".(!$all ? "PERIODE_EXPORT desc, " : "")."code_export asc";
+		$result = sql_query($sql, 'gateway', $script, $debug, "export");
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$return[] = $r['CODE_EXPORT'];
+		}
+	}
+	return $return;
+}
+
+
+function getExportInfos($script, $debug = false, $getExec = true){
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT CODE_EXPORT, NOM_EXPORT, PERIODE_EXPORT, ARCHIVE_DELAI_EXPORT, ID_STATUT_EXPORT, DATE_MODIFICATION_EXPORT, DATE_CREATION_EXPORT, SERVEUR_EXPORT, TEMPS_MAX_EXPORT, DESCRIPTION_EXPORT FROM EXPORT WHERE CODE_EXPORT='".fix_text($script)."'";
+		$result = sql_query($sql, 'gateway', $script, $debug, "export");
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$return = $r;
+			if($getExec){
+				$sql = "SELECT TOP 1 DATE_DEBUT_CRON, DATE_FIN_CRON, ID_STATUT_CRON_EXECUTION, ID_CRON_EXECUTION, SERVER_CRON, RESUME_CRON, PID_CRON FROM CRON_EXECUTION WHERE CODE_SCRIPT='".fix_text($script)."' AND ID_TYPE_SCRIPT='1' ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+				$result = sql_query($sql, 'gateway', $script, $debug, "export");
+				if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+					$return = merge($return, $r);
+				}
+			}
+		}
+	}
+	return $return;
+}
+
+function getExportPortails($script, $full = true, $debug = false){
+	global $db_data;
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT CODE_EXPORT, PORTAIL.ID_PORTAIL, PORTAIL.NOM_PORTAIL, ID_STATUT_EXPORT_PORTAIL, DATE_MODIFICATION_EXPORT_PORTAIL, DATE_CREATION_EXPORT_PORTAIL FROM EXPORT_PORTAIL INNER JOIN PORTAIL ON PORTAIL.ID_PORTAIL=EXPORT_PORTAIL.ID_PORTAIL WHERE CODE_EXPORT='".fix_text($script)."'".(!$full ? " AND ID_STATUT_EXPORT_PORTAIL > 0" : "")." ORDER BY PORTAIL.NOM_PORTAIL ASC";
+		$result = sql_query($sql, 'gateway', $script, $debug, "export");
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$return[$r['ID_PORTAIL']] = $r;
+		}
+	}
+	return $return;
+}
+
+function getExportOptions($script, $debug = false){
+	global $db_data;
+	$return = array();
+	if($script != ""){
+		$sql = "SELECT REF_CATEGORIE_EXPORT_OPTION, REF_EXPORT_OPTION, VALEUR_EXPORT_OPTION, CODE_EXPORT FROM EXPORT_OPTION WHERE CODE_EXPORT='".fix_text($script)."'";
+		$result = sql_query($sql, 'gateway', $script, $debug, "export");
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			if(!is_array($return[$r['REF_CATEGORIE_EXPORT_OPTION']])){ $return[$r['REF_CATEGORIE_EXPORT_OPTION']] = array();}
+			$return[$r['REF_CATEGORIE_EXPORT_OPTION']][$r['REF_EXPORT_OPTION']] = $r;
+		}
+	}
+	return $return;
+}
+
+function updateExportInfos($infos){
+	global $db_data;
+	
+	if($infos['export_code_old'] != "" && $infos['export_code_old'] != $infos['export_code']){
+		$tables = array(
+			'EXPORT', 'EXPORT_OPTION', 'EXPORT_PORTAIL'
+		);
+		foreach($tables as $table){
+			$sql = "UPDATE ".$table." set code_export='".$infos['export_code']."' WHERE code_export='".$infos['export_code_old']."' ";
+			db_query($sql, $db_data['name']);
+		}
+		
+		$sql = "UPDATE CRON_EXECUTION set code_script='".$infos['export_code']."' WHERE code_script='".$infos['export_code_old']."' AND ID_TYPE_SCRIPT='1'";
+		db_query($sql, $db_data['name']);
+	}
+
+	$script = getExportInfos($infos['export_code']);
+	$infos['export_activate'] = ($infos['export_activate'] == 'true' ? '1' : '-1');
+	if(count($script) > 0){
+		$sql = "UPDATE EXPORT SET NOM_EXPORT='".fix_text($infos['export_name'], 100)."', TEMPS_MAX_EXPORT='".fix_text($infos['execution_time'])."', PERIODE_EXPORT='".fix_text($infos['execution_period'], 50)."', ARCHIVE_DELAI_EXPORT='".fix_int($infos['execution_archive'])."', ID_STATUT_EXPORT='".$infos['export_activate']."', DATE_MODIFICATION_EXPORT='".date('Y-m-d H:i:s')."', SERVEUR_EXPORT='".fix_text($infos['export_server'], 20)."', DESCRIPTION_EXPORT='".fix_text($infos['export_description'], 1000)."' WHERE CODE_EXPORT='".fix_text($infos['export_code'])."'";
+	}else{
+		$sql = "INSERT INTO EXPORT(CODE_EXPORT, NOM_EXPORT, TEMPS_MAX_EXPORT, PERIODE_EXPORT, ARCHIVE_DELAI_EXPORT, ID_STATUT_EXPORT, DATE_MODIFICATION_EXPORT, DATE_CREATION_EXPORT, SERVEUR_EXPORT, DESCRIPTION_EXPORT) VALUES ('".fix_text($infos['export_code'], 50)."', '".fix_text($infos['export_name'], 100)."', '".fix_text($infos['execution_time'])."', '".fix_text($infos['execution_period'], 50)."', '".fix_int($infos['execution_archive'])."', '".$infos['export_activate']."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".fix_text($infos['export_server'], 20)."', '".fix_text($infos['export_description'], 1000)."')";
+	}
+	db_query($sql, $db_data['name']);
+
+	//options
+	$oldOptions = getExportOptions($infos['export_code']);
+	if(count($infos['options']) > 0){
+		foreach($infos['options'] as $option){
+			if(count($oldOptions[$option['cat']]) > 0 && count($oldOptions[$option['cat']][$option['ref']]) > 0){
+				unset($oldOptions[$option['cat']][$option['ref']]);
+				$sql = "UPDATE EXPORT_OPTION SET VALEUR_EXPORT_OPTION='".fix_text($option['value'],255)."' WHERE REF_CATEGORIE_EXPORT_OPTION='".fix_text($option['cat'],50)."' AND REF_EXPORT_OPTION='".fix_text($option['ref'],50)."' AND CODE_EXPORT='".fix_text($infos['export_code'],50)."'";
+			}else{
+				$sql = "INSERT INTO EXPORT_OPTION(REF_CATEGORIE_EXPORT_OPTION, REF_EXPORT_OPTION, VALEUR_EXPORT_OPTION, CODE_EXPORT) VALUES('".fix_text($option['cat'],50)."', '".fix_text($option['ref'],50)."', '".fix_text($option['value'],255)."', '".fix_text($infos['export_code'],50)."')";
+			}
+			db_query($sql, $db_data['name']);
+		}
+	}
+	if(count($oldOptions) > 0){
+		foreach($oldOptions as $cat=>$option){
+			if(count($option) >0){
+				foreach($option	as $ref=>$value){
+					$sql = "DELETE FROM EXPORT_OPTION WHERE CODE_EXPORT='".$infos['export_code']."' AND REF_CATEGORIE_EXPORT_OPTION='".$cat."' AND REF_EXPORT_OPTION='".$ref."'";
+					db_query($sql, $db_data['name']);
+				}
+			}
+		}
+	}
+
+	//portals
+	$oldPortals = getExportPortails($infos['export_code']);
+	if(count($infos['portals']) > 0){
+		foreach($infos['portals'] as $portal){
+			if(is_guid($portal['id'])){
+				$portal['activate'] = ($portal['activate'] == 'true' ? '1' : '-1');
+				if(count($oldPortals[$portal['id']]) > 0){
+					$sql = "UPDATE EXPORT_PORTAIL SET DATE_MODIFICATION_EXPORT_PORTAIL='".date('Y-m-d H:i:s')."', ID_STATUT_EXPORT_PORTAIL='".$portal['activate']."' WHERE ID_PORTAIL='".fix_text($portal['id'])."' AND CODE_EXPORT='".fix_text($infos['export_code'],50)."'";
+					unset($oldPortals[$portal['id']]);
+				}else{
+					$sql = "INSERT INTO EXPORT_PORTAIL(ID_PORTAIL, CODE_EXPORT, DATE_CREATION_EXPORT_PORTAIL, DATE_MODIFICATION_EXPORT_PORTAIL, ID_STATUT_EXPORT_PORTAIL) VALUES('".fix_text($portal['id'])."', '".fix_text($infos['export_code'],50)."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".$portal['activate']."')";
+				}
+				db_query($sql, $db_data['name']);
+			}
+		}
+	}
+	
+	if(count($oldPortals) > 0){
+		foreach($oldPortals as $portal){
+			$sql = "DELETE FROM EXPORT_PORTAIL WHERE ID_PORTAIL='".$portal['ID_PORTAIL']."' AND CODE_EXPORT='".$infos['export_code']."'";
+			db_query($sql, $db_data['name']);
+		}
+	}
+}
+
+// Users
+function getUserInfos($script, $usercode, $debug = false){
+	global $db_data;
+	$return = array();
+	if($script != "" && $usercode != ""){
+		$sql = "SELECT CODE_IMPORT, USERCODE, ID_STATUT_USER, DATE_MODIFICATION_USER, DATE_CREATION_USER, ID_FORCE_UPDATE FROM IMPORT_USER WHERE CODE_IMPORT='".fix_text($script)."' AND USERCODE='".fix_text($usercode)."'";
+		$result = db_query($sql, $db_data['name']);
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$return = $r;
+			$return['USERCODE'] = utf8_encode($return['USERCODE']);
+			
+			$return['OPTIONS'] = array();
+			$sql = "SELECT REF_IMPORT_USER_OPTION, VALEUR_IMPORT_USER_OPTION FROM IMPORT_USER_OPTION WHERE REF_CATEGORIE_OPTION='USER_FIELDS' AND CODE_IMPORT='".$return['CODE_IMPORT']."' AND USERCODE='".$return['USERCODE']."'";
+			$return['OPTIONS'] = array();
+			$result = db_query($sql, $db_data['name']);
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+				$return['OPTIONS'][$r['REF_IMPORT_USER_OPTION']] = $r;
+			}
+			
+			$return['DIFFUSIONS'] = array();
+			$sql = "SELECT PORTAIL.ID_PORTAIL, NOM_PORTAIL, USERCODE, CODE_IMPORT, PREFIXE_PORTAIL, PASSWORD_PORTAIL, NB_IMAGES_LIMIT, DATE_MODIFICATION_IMPORT_USER_DIFFUSION, ID_STATUT_IMPORT_USER_DIFFUSION FROM IMPORT_USER_DIFFUSION INNER JOIN PORTAIL ON PORTAIL.ID_PORTAIL=IMPORT_USER_DIFFUSION.ID_PORTAIL WHERE CODE_IMPORT='".$return['CODE_IMPORT']."' AND USERCODE='".$return['USERCODE']."' ORDER BY NOM_PORTAIL";
+			
+			$result = db_query($sql, $db_data['name']);
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return['DIFFUSIONS'][$r['ID_PORTAIL']] = $r;}
+
+			foreach($return['DIFFUSIONS'] as $k=>$v){
+				$sql = "SELECT ID_PORTAIL, CODE_IMPORT, USERCODE, REF_IMPORT_OPTION, VALEUR_IMPORT_OPTION FROM IMPORT_USER_DIFFUSION_OPTION WHERE ID_PORTAIL='".$k."' AND CODE_IMPORT='".$return['CODE_IMPORT']."' AND USERCODE='".$return['USERCODE']."'";
+				$result = db_query($sql, $db_data['name']);
+				$return['DIFFUSIONS'][$k]['OPTIONS'] = array();
+				while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return['DIFFUSIONS'][$k]['OPTIONS'][$r['REF_IMPORT_OPTION']] = $r['VALEUR_IMPORT_OPTION'];}
+			}
+		}
+	}	
+	return $return;
+}
+
+function changeUsercode($script, $old_usercode, $usercode){
+	global $db_data;
+	$return = false;
+	if($script != "" && $usercode != "" && $old_usercode != ""){
+		$sql = "SELECT USERCODE FROM IMPORT_USER WHERE CODE_IMPORT='".fix_text($script)."' AND USERCODE='#USERCODE#'";
+		$old_usercode = db_getOne(str_replace('#USERCODE#', fix_text($old_usercode), $sql), $db_data['name']);
+		$new_usercode = db_getOne(str_replace('#USERCODE#', fix_text($usercode), $sql), $db_data['name']);
+		if( $old_usercode != "" && $new_usercode == ""){
+			$tables = array('IMPORT_USER', 'IMPORT_USER_DIFFUSION', 'IMPORT_USER_OPTION', 'IMPORT_USER_DIFFUSION_OPTION');
+			foreach($tables as $table){
+				$sql = "UPDATE ".$table." SET USERCODE='".$usercode."' WHERE CODE_IMPORT='".fix_text($script)."' AND USERCODE='".fix_text($old_usercode)."'";
+				db_query($sql, $db_data['name']);
+			}
+			$return = true;
+		}
+	}
+	return $return;
+}
+
+function updateUserInfos($infos){
+	global $db_data;
+	$user = getUserInfos($infos['import_code'], $infos['user_code']);
+	$infos['user_force'] = ($infos['user_force'] == "true" ? "1" : "0");
+	if(count($user) > 0){
+		$sql = "UPDATE IMPORT_USER SET ID_STATUT_USER='".$infos['user_status']."', ID_FORCE_UPDATE='".$infos['user_force']."', DATE_MODIFICATION_USER='".date('Y-m-d H:i:s')."' WHERE CODE_IMPORT='".fix_text($infos['import_code'])."' AND USERCODE='".fix_text($infos['user_code'], 50)."'";
+	}else{
+		$sql = "INSERT INTO IMPORT_USER(USERCODE, CODE_IMPORT, ID_STATUT_USER, DATE_CREATION_USER, DATE_MODIFICATION_USER, ID_FORCE_UPDATE)
+     VALUES('".fix_text($infos['user_code'], 50)."', '".fix_text($infos['import_code'], 50)."', '".$infos['user_status']."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".$infos['user_force']."')";
+	}
+	db_query($sql, $db_data['name']);
+
+	//options
+	$oldOptions = $user['OPTIONS'];
+	if(count($infos['options']) > 0){
+		foreach($infos['options'] as $option){
+			if(count($oldOptions[$option['ref']]) > 0){
+				unset($oldOptions[$option['ref']]);
+				$sql = "UPDATE IMPORT_USER_OPTION SET VALEUR_IMPORT_USER_OPTION='".fix_text($option['value'],255)."' WHERE REF_CATEGORIE_OPTION='".fix_text($option['cat'],20)."' AND REF_IMPORT_USER_OPTION='".fix_text($option['ref'],30)."' AND CODE_IMPORT='".fix_text($infos['import_code'],50)."' AND USERCODE='".fix_text($infos['user_code'], 50)."'";
+			}else{
+				$sql = "INSERT INTO IMPORT_USER_OPTION (USERCODE, CODE_IMPORT, REF_IMPORT_USER_OPTION, REF_CATEGORIE_OPTION, VALEUR_IMPORT_USER_OPTION) VALUES ('".fix_text($infos['user_code'], 50)."', '".fix_text($infos['import_code'], 50)."', '".fix_text($option['ref'], 30)."', '".fix_text($option['cat'],20)."', '".fix_text($option['value'],255)."')";
+			}
+			db_query($sql, $db_data['name']);
+		}
+	}
+	if(count($oldOptions) > 0){
+		foreach($oldOptions as $ref=>$value){
+			$sql = "DELETE FROM IMPORT_USER_OPTION WHERE CODE_IMPORT='".$infos['import_code']."' AND USERCODE='".fix_text($infos['user_code'], 50)."' AND REF_CATEGORIE_OPTION='USER_FIELDS' AND REF_IMPORT_USER_OPTION='".$ref."'";
+			db_query($sql, $db_data['name']);
+		}
+	}
+
+	//portals
+	$oldPortals = $user['DIFFUSIONS'];
+	$infos['portals'] = $infos['portals'];
+	if(count($infos['portals']) > 0){
+		foreach($infos['portals'] as $portal){
+			if(is_guid($portal['id'])){
+				$portal['activate'] = ($portal['activate'] == 'true' ? '1' : '-1');
+				if($portal['activate'] > 0 && $portal['update'] == 'true'){
+					$portal['activate'] = 2;
+				}
+				if(count($oldPortals[$portal['id']]) > 0){
+					$sql = "UPDATE IMPORT_USER_DIFFUSION SET PREFIXE_PORTAIL='".fix_text($portal['usercode'], 150)."', PASSWORD_PORTAIL='".fix_text($portal['password'], 150)."', NB_IMAGES_LIMIT='".fix_int($portal['limit'])."', DATE_MODIFICATION_IMPORT_USER_DIFFUSION='".date('Y-m-d H:i:s')."', ID_STATUT_IMPORT_USER_DIFFUSION='".$portal['activate']."' WHERE ID_PORTAIL='".fix_text($portal['id'])."' AND CODE_IMPORT='".fix_text($infos['import_code'],50)."' AND USERCODE='".fix_text($infos['user_code'], 50)."'";
+					unset($oldPortals[$portal['id']]['PREFIXE_PORTAIL']);
+				}else{
+					$sql = "INSERT INTO IMPORT_USER_DIFFUSION(ID_PORTAIL, USERCODE, CODE_IMPORT, PREFIXE_PORTAIL, PASSWORD_PORTAIL, NB_IMAGES_LIMIT, DATE_MODIFICATION_IMPORT_USER_DIFFUSION, ID_STATUT_IMPORT_USER_DIFFUSION, DATE_CREATION_IMPORT_USER_DIFFUSION) VALUES ('".fix_text($portal['id'])."', '".fix_text($infos['user_code'], 50)."', '".fix_text($infos['import_code'], 50)."', '".fix_text($portal['usercode'], 150)."', '".fix_text($portal['password'], 150)."', '".fix_int($portal['limit'])."', '".date('Y-m-d H:i:s')."', '".$portal['activate']."', '".date('Y-m-d H:i:s')."')";
+				}
+				db_query($sql, $db_data['name']);
+				if(count($portal['options']) > 0){
+					foreach($portal['options'] as $v){
+						if(count($oldPortals[$portal['id']]['OPTIONS'][$v['ref']]) > 0){
+							$sql = "UPDATE IMPORT_USER_DIFFUSION_OPTION SET VALEUR_IMPORT_OPTION='".fix_text($v['value'], 250)."' WHERE ID_PORTAIL='".$portal['id']."' AND CODE_IMPORT='".fix_text($infos['import_code'], 50)."' AND USERCODE='".fix_text($infos['user_code'], 50)."' AND  REF_IMPORT_OPTION='".fix_text($v['ref'], 50)."'";
+							unset($oldPortals[$portal['id']]['OPTIONS'][$v['ref']]);
+						}else{
+							$sql = "INSERT INTO IMPORT_USER_DIFFUSION_OPTION(ID_PORTAIL, CODE_IMPORT, USERCODE, REF_IMPORT_OPTION, VALEUR_IMPORT_OPTION) VALUES('".fix_text($portal['id'])."', '".fix_text($infos['import_code'], 50)."', '".fix_text($infos['user_code'], 50)."', '".fix_text($v['ref'], 50)."', '".fix_text($v['value'], 250)."')";
+						}
+						db_query($sql, $db_data['name']);
+					}
+				}
+			}
+		}
+	}
+	
+	if(count($oldPortals) > 0){
+		foreach($oldPortals as $portal){
+			if(isset($portal['PREFIXE_PORTAIL'])){
+				$sql = "DELETE FROM IMPORT_USER_DIFFUSION WHERE ID_PORTAIL='".$portal['ID_PORTAIL']."' AND CODE_IMPORT='".$infos['import_code']."' AND USERCODE='".fix_text($infos['user_code'], 50)."'";
+				db_query($sql, $db_data['name']);
+			}
+			if(count($portal['OPTIONS']) >0){
+				foreach($portal['OPTIONS'] as $k=>$v){
+					$sql = "DELETE FROM IMPORT_USER_DIFFUSION_OPTION WHERE ID_PORTAIL='".$portal['ID_PORTAIL']."' AND CODE_IMPORT='".$infos['import_code']."' AND USERCODE='".fix_text($infos['user_code'], 50)."' AND REF_IMPORT_OPTION='".$k."'";
+					db_query($sql, $db_data['name']);
+				}
+			}
+		}
+	}
+}
+
+
+function getOptionInfo($cat, $ref){
+	global $db_data;
+	$return = array();
+	$sql = "SELECT REF_CATEGORIE_OPTION, REF_OPTION, VALEUR_OPTION, DESCRIPTION_OPTION FROM IMPORT_OPTION_GLOBAL WHERE REF_CATEGORIE_OPTION='".fix_text($cat)."' AND REF_OPTION='".fix_text($ref)."'";
+	$result = db_query($sql, $db_data['name']);
+	if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		$return = $r;
+	}
+	return $return;
+}
+
+function updateOptionInfos($infos){
+	global $db_data;
+
+	$needRename = (($infos['old_category'] != "" && $infos['option_category'] != $infos['old_category']) || ($infos['old_ref'] != "" && $infos['option_ref'] != $infos['old_ref']));
+	if($needRename && count(getOptionInfo($infos['old_category'], $infos['old_ref'])) > 0){
+		$sql = "UPDATE IMPORT_OPTION_GLOBAL SET REF_CATEGORIE_OPTION='".fix_text($infos['option_category'], 20)."', REF_OPTION='".fix_text($infos['option_ref'], 50)."' WHERE REF_CATEGORIE_OPTION='".fix_text($infos['old_category'], 20)."' AND REF_OPTION='".fix_text($infos['old_ref'], 50)."'";
+		db_query($sql, $db_data['name']);
+	}
+	if(count(getOptionInfo($infos['option_category'], $infos['option_ref'])) > 0){
+		$sql = "UPDATE IMPORT_OPTION_GLOBAL SET DESCRIPTION_OPTION='".fix_text($infos['option_desc'], 255)."', VALEUR_OPTION='".fix_text($infos['option_value'], 255)."' WHERE REF_CATEGORIE_OPTION='".fix_text($infos['option_category'], 20)."' AND REF_OPTION='".fix_text($infos['option_ref'], 50)."'";
+	}else{
+		$sql = "INSERT INTO IMPORT_OPTION_GLOBAL(Ref_categorie_option, Ref_option, Valeur_option, Description_option) VALUES('".fix_text($infos['option_category'], 20)."', '".fix_text($infos['option_ref'], 50)."', '".fix_text($infos['option_value'], 255)."', '".fix_text($infos['option_desc'], 255)."')";
+	}
+	db_query($sql, $db_data['name']);
+}
+
+
+?>

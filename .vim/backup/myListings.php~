@@ -1,0 +1,69 @@
+<?php
+
+require_once 'DB.php';
+require_once '../include/global.php';
+require_once '../include/fonctions.php';
+require_once '../include/fonction.db.php';
+require_once '../include/fonction.gps.php';
+require_once 'previsite/GetDsn.php';
+
+define('PARTNERID', 		'8AE27375-574F-8584-C5A0-7E21A74ACF8B');
+define('PASSWORD',	 		'xgni553');
+define('URL_IMG_AGENCY',	'http://media.previsite.com/agency/max_160x160/#ID#.#EXT#');
+define('URL_IMG_USER',		'http://media.previsite.com/user/max_160x160/#ID#.#EXT#');
+define('URL_REST_GETUSER',	'http://api.previsite.com/rest/p/user/#USERCODE#?partnerID=#PARTNERID#&password=#PASSWORD#');
+define('ANDROID_WS_VERSION','1.0');
+//problem prod video
+//define('ANDROID_LAST_PROD', 		'2011-05-31 10:00:00 +0100');
+
+$db_data['name'] = 'main';
+//$obj_conn['dsn'] = DSN_REALESTATE;
+
+$response = "false";
+
+$login 		= $_REQUEST['login'];
+$pages		= explode(';', $_REQUEST['likes']);
+
+$test = array('login', 'pages');
+foreach($test as $v){ if($$v == "(null)"){ $$v = "";}}
+
+$code_error = 0;
+$tab_error = array(
+	'0' => 'OK',
+	'1' => 'MISSING LOGIN OR PASSWORD',
+	'2' => 'DATA NOT FOUND',
+	'3' => 'USER NOT FOUND'
+);
+
+if($login != "" && count($pages) > 0){
+	$user = array();
+	$dsn = "odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_SOFTWARE?unicode=yes";
+	if($dsn != ""){
+		$tmp = array();
+		foreach($pages as $v){
+			if($v != "") $tmp[] = $v;
+		}
+		$pages = $tmp;
+		$db_data['pool'][$db_data['name']]['DSN'] = $dsn;
+		$users = array();
+		$sql = "SELECT PREFIXE_PORTAIL FROM CLIENT_PORTAIL WHERE ID_PORTAIL='191F4B45-53AD-2D10-DBE2-E7479443BBE7' AND PREFIXE_PORTAIL IN ('".implode("', '", $pages)."')";
+		$sql = "SELECT FACEBOOK_PAGE_ID, ID_UTILISATEUR, NOM_SOCIETE, SITEWEB_SOCIETE, (SELECT VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE REF_OPTION='IDLOGOSOCIETE' AND ID_UTILISATEUR=UTILISATEUR.ID_UTILISATEUR) LOGO FROM UTILISATEUR INNER JOIN SOCIETE ON SOCIETE.ID_SOCIETE=UTILISATEUR.ID_SOCIETE WHERE ID_STATUT_UTILISATEUR > 0 AND FACEBOOK_PAGE_ID  IN ('".implode("', '", $pages)."')";
+		$result = db_query($sql, 'main');
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+			$r['LOGO'] = "http://mediarr.previsite.com/agency/".$r['LOGO'].".jpg";
+ 			$users[$r['FACEBOOK_PAGE_ID']] = $r;
+		}
+		if(count($users) > 0){
+			$response = array("users" => $users);
+			$code_error = 0;
+		}else{ $code_error = 3;}
+	}else{ $code_error = 2;}
+}else{ $code_error = 1;}
+
+if($code_error  > 0){
+	$response = array('error'=> $code_error.". ".$tab_error[$code_error]);
+}
+
+echo json_encode($response);
+exit;
+?>

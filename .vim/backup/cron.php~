@@ -1,0 +1,611 @@
+<?php 
+require_once('DB.php');
+require_once 'HTTP/Request.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('previsite/GetDsn.php');
+require_once('/var/www/gateway2.previsite.net/include/global.php');
+require_once(PATH_INCLUDE.'function.php');
+require_once(PATH_INCLUDE.'function.db.php');
+require_once(PATH_INCLUDE.'function.cron.php');
+require_once PATH_INCLUDE.'function.rets.php';
+require_once PATH_INCLUDE.'class.rets.php';
+require_once(PATH_INCLUDE.'function.images.php');
+require_once(PATH_INCLUDE.'function.import.data.php');
+require_once(PATH_INCLUDE.'function.import.software.php');
+require_once(PATH_INCLUDE.'function.ws.php');
+require_once(PATH_INCLUDE.'function.tts.php');
+
+$script = $_REQUEST['script'];
+$force	= ($_REQUEST['force'] == "true");
+$force_delete = ($_REQUEST['delete'] == "true");
+$debug	= $_REQUEST['test'];
+$srv	= $_REQUEST['srv'];
+$output	= ($_REQUEST['output'] != "false");
+$nomail	= ($_REQUEST['nomail'] == "true" || $debug != "" || $_SERVER['argc'][2] == "nomail");
+$sample = ($_REQUEST['sample'] == "true");
+if($_SERVER['argc'] > 0 && $_SERVER['argv'][1] != ""){
+	$script = $_SERVER['argv'][1];
+	$force = true;
+}
+//exit;
+
+$server_name = get_server_name();
+if($sample){
+	if($debug != "" && file_exists(PATH_IMPORT.$debug.".php")){
+		echo "<pre>";
+		$import = getConfigImport($debug);
+		print_r(get_import_data_model($import, true));
+		echo "</pre>";
+	}else{ echo "script not found...";}
+	exit;
+}else if($debug != ""){
+	if(file_exists(PATH_IMPORT.$debug.".php")){
+		include(PATH_IMPORT.$debug.".php");	
+		$workPath = PATH_TMP."debug/";
+		if(!is_dir($workPath)){ mkdir($workPath);}	
+		$workPath = PATH_TMP."debug/".$debug."/";		
+		if(!is_dir($workPath)){ mkdir($workPath);}	
+		$import = getConfigImport($debug);
+//		print_r($import);
+		if(count($import) > 0){
+			//$id_cron = debug_start_import($debug);
+//			if(is_guid($id_cron)){
+				import_log('[CHECK][DEBUG] PID:'.getmypid() , $import['CODE_IMPORT']);
+				$next = ($import['OPTIONS']['PART_IMPORT'] == 1);
+				$errors = array();
+				$data = array();
+				if($import['OPTIONS']['GET_IMPORTED_TOURS'] == 1){
+					$getDsn = new GetDsn(array('MEMCACHED' => true));
+					$dsn = $getDsn->byPartner($import['ID_PORTAIL']);
+					$db_data['pool']['import'] = array('STATUS'=>'normal', 'NAME'=>'import', 'DSN'=> preg_replace('/(REALESTATE|SOFTWARE)\?/i', 'IMPORT?', $dsn)); 
+					$importedTours = get_imported_tours($import['NOM_IMPORT'], $import['NOM_TABLE_IMPORT'], ( $import['OPTIONS']['IMPORT_NOT_FULL'] == 1 || $import['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1), $import['OPTIONS']['DEBUG'] == 1);
+				}
+				if($import['OPTIONS']['GET_DATE_LAST_IMPORT'] == 1){
+					$dateLastCorrectImport = getLastCorrectExecution($import['CODE_IMPORT']);
+				}
+				do{
+					$first = ($next === true);
+					$lastParams = array();
+					if($import['OPTIONS']['PART_IMPORT'] == 1) $lastParams[] = $next;
+					if($import['OPTIONS']['GET_IMPORTED_TOURS'] == 1) $lastParams[] = $importedTours;
+					if($import['OPTIONS']['GET_DATE_LAST_IMPORT'] == 1) $lastParams[] = $dateLastCorrectImport;
+					for($i = count($lastParams); $i < 3; $i++) $lastParams[] = false;
+					$tmp = $debug($debug, $import['USERS'], $workPath, $workPath, false, date("YmdHis-"), $lastParams[0], $lastParams[1], $lastParams[2]);
+					$errors[] = check_import_data($tmp, $import, $output);
+					$next = $tmp['NEXT_PART'];
+					$data[] = $tmp;
+				}while($import['OPTIONS']['PART_IMPORT'] == 1 && $next['CONTINUE'] && $first);
+//				debug_end_import($id_cron, $debug);
+/*			}else{
+				$errors = array(
+					array(
+						array('type'=> 'fatal', 'field' => 'Cannot launch', 'error' => 'script already in progress')
+					),
+				);
+				$data = array();
+			}
+*/		
+			if($output){
+				header('Content-type: text/html; charset=UTF-8');
+	?>			
+				<a href="http://gateway2.previsite.net/cron?sample=true&test=<?=$debug;?>" target="_blank">list fields available</a><br /><br />
+	<?php
+				foreach($errors as $step=>$err){
+					if(count($err) > 0){
+						if($import['OPTIONS']['PART_IMPORT'] == 1){ echo '<div style="font-weight:bold;color:gray;font-size:14px;"> STEP '.($step+1).'</div>';}
+						foreach($err as $k=>$error){
+							echo '<div style="font-weight:bold;color:'.($error['type'] == 'fatal' ? 'red' : 'orange').';font-size:13px;">'.($k+1).'. '.$error['field'].': '.$error['error'].'</div>';
+						}
+					}
+				}
+			
+				foreach($data as $step=>$tmp){ 
+					if($import['OPTIONS']['PART_IMPORT'] == 1){ echo '<br/><div style="font-weight:bold;color:gray;font-size:14px;"> STEP '.($step+1).'</div>';}	
+					echo "<pre>";
+					print_r($tmp);
+					echo "</pre>";
+				}
+			}else{
+				$output = "true";
+				foreach($errors as $error){
+					if(!$error) $output = "false";
+				}
+				echo $output;
+			}
+			exec('rm -r '.$workPath);
+		}else{ echo "script not found in <b>".$srv."</b>";}
+	}else{ echo "script not found...";}
+	exit;
+}
+
+$scripts = array();
+if($script != ""){
+	$tmp = getConfigImport($script);
+	if(count($tmp) > 0){ $scripts = array($script);}
+	else{ die("Invalide Script");}
+}else{ $scripts = getImportOnServer($server_name);}
+
+if(count($scripts) == 0){ die('No script found on this server');}
+write_cron_log("--------START--------");
+foreach($scripts as $script){
+	$import = getConfigImport($script);
+	if($import['ID_STATUT_IMPORT'] > 0 || $force){
+		if(file_exists(PATH_IMPORT.$import['CODE_IMPORT'].".php")){
+			write_cron_log("check ".$import['CODE_IMPORT']."...");
+			$output = array();
+			$phpTest = exec("php -l ".PATH_IMPORT.$import['CODE_IMPORT'].".php", $output);
+			if(preg_match('/^No syntax errors detected in/i', $phpTest) == 0){
+				$body = array(
+				   	" - Server:".$import['SERVEUR_IMPORT'],
+				    " - Script: <a href=\"http://gateway2.previsite.net/manage_import?script=".$import['CODE_IMPORT']."\" >".$import['CODE_IMPORT']."</a>",
+				   	" - Error:".implode("<br />", $output),
+				);
+				write_cron_log("Script ".$import['CODE_IMPORT']." parse error...");
+				if(count($output) > 0) desactivateImport($import['CODE_IMPORT']);
+				write_cron_log("Script ".$import['CODE_IMPORT']." desactivated...");
+				sendMail("gateway@previsite.com", "Gateway", "Import alert - ".$import['CODE_IMPORT'], implode("<br />", $body));
+				continue;
+			}
+			if(is_cron_import( $import['CODE_IMPORT'], $import['OPTIONS']['DEBUG'] == 1) || $force){
+				$error_log = str_replace('#SCRIPT#', $import['CODE_IMPORT'], ERROR_LOG_FILE);
+				ini_set('error_log', $error_log);
+				if(file_exists($error_log)){
+					pclose(popen("tail -n 5000 ".$error_log." > ".$error_log.".tmp && mv ".$error_log.".tmp ".$error_log,'r'));
+				}
+				write_cron_log("Start ".$import['CODE_IMPORT']."...");
+				if(is_guid($import['ID_PORTAIL'])){
+					include(PATH_IMPORT.$import['CODE_IMPORT'].".php");
+					if(function_exists($import['CODE_IMPORT'])){
+						$id_cron = update_cron_parse_start($import['CODE_IMPORT'], $import['OPTIONS'], $import['STEPS'], $import['OPTIONS']['DEBUG'] == 1);
+						if(is_guid($id_cron)){
+							$date_reference = date('Y-m-d H:i:s');
+							$logs = array(
+								'BEFORE'=> array('USERS' => 0,'TOURS' => 0,'IMAGES' => 0,'PLANS' => 0),
+								'AFTER_UPDATE' => array('USERS' => 0,'TOURS' => 0,'IMAGES' => 0,'PLANS' => 0),
+								'AFTER_DELETE' => array('USERS' => 0,'TOURS' => 0,'IMAGES' => 0,'PLANS' => 0),
+							);
+							$logs_global = $logs;
+	//						$notification_email = array();
+	//						$usercode_to_email = array();
+							$list_nom_script_complement = array(
+								'USERS' => array(), 
+								'TOURS' => array()
+							);
+							$error_data = array();
+							$getDsn = new GetDsn(array('MEMCACHED' => true));
+							$dsn = $getDsn->byPartner($import['ID_PORTAIL']);
+							$db_data['pool']['import'] = array('STATUS'=>'normal','NAME'=>'import','DSN'=> preg_replace('/(REALESTATE|SOFTWARE)\?/i', 'IMPORT?', $dsn)); 
+							write_cron_log($db_data['pool']['import']['DSN']);
+					
+							$date_start = getmicrotime();
+							$date_cron_start = mktime();
+					
+							$archive_path = PATH_FTP_ARCHIVES.$import['CODE_IMPORT']."/";
+							if(!file_exists($archive_path)){ mkdir($archive_path);}
+							if(!file_exists(PATH_TMP.$import['CODE_IMPORT']."/")){ mkdir(PATH_TMP.$import['CODE_IMPORT']."/");}
+							$workPath = PATH_TMP.$import['CODE_IMPORT']."/".date('YmdHis')."/";
+							if(!file_exists($workPath)){ mkdir($workPath);}
+
+							import_log('-------------------------' , $import['CODE_IMPORT']);
+							import_log('----------START----------' , $import['CODE_IMPORT']);
+							$db_data['name'] = 'import';
+							$next = $import['OPTIONS']['PART_IMPORT'] == 1;
+							if($import['OPTIONS']['GET_IMPORTED_TOURS'] == 1){
+								import_log('[GET IMPORTED TOURS][START]' , $import['CODE_IMPORT']);
+								$importedTours = get_imported_tours($import['CODE_IMPORT'], $import['NOM_TABLE_IMPORT'], ( $import['OPTIONS']['IMPORT_NOT_FULL'] == 1 || $import['OPTIONS']['IMPORT_NOT_FULL_TOURS'] == 1), $import['OPTIONS']['DEBUG'] == 1);
+								import_log('[GET IMPORTED TOURS][END] '.count($importedTours).' tours in import db', $import['CODE_IMPORT']);
+							}
+
+							if($import['OPTIONS']['GET_DATE_LAST_IMPORT'] == 1){
+								$dateLastCorrectImport = getLastCorrectExecution($import['CODE_IMPORT']);
+							}
+							$db_data['name'] = 'gateway';
+							$steps = $import['STEPS'];
+							$diffusions_allowed = array();
+							$first = true;
+							$archive_delete = $force_delete;
+							$no_data = false;
+							$parseError = false;
+							$is_full = false;
+							$users_updated = array();
+							$key_publications = array( 'DIFFUSIONS', 'UNPUBLICATION');
+							do{
+								$lastParams = array();
+								if($import['OPTIONS']['PART_IMPORT'] == 1) $lastParams[] = $next;
+								if($import['OPTIONS']['GET_IMPORTED_TOURS'] == 1) $lastParams[] = $importedTours;
+								if($import['OPTIONS']['GET_DATE_LAST_IMPORT'] == 1) $lastParams[] = $dateLastCorrectImport;
+								for($i = count($lastParams); $i < 3; $i++) $lastParams[] = false;
+
+								import_log('[PARSE][START]' , $import['CODE_IMPORT']);
+	//							$data = $import['CODE_IMPORT']($import['CODE_IMPORT'], $workPath, $archive_path, $import['STEPS']['ARCHIVE_SOURCE_FILE'] == 1, date("YmdHis-"), $next);
+								$data = $import['CODE_IMPORT']($import['CODE_IMPORT'], $import['USERS'], $workPath, $archive_path, $import['STEPS']['ARCHIVE_SOURCE_FILE'] == 1, date("YmdHis-"), $lastParams[0], $lastParams[1], $lastParams[2]);
+								$logs['BEFORE']['USERS'] = count($data['USERS']);
+								$logs['BEFORE']['TOURS'] = count($data['TOURS']);
+								$logs['BEFORE']['TRANSACTIONS'] = count($data['TRANSACTIONS']);
+								$logs['BEFORE']['IMAGES'] = count($data['IMAGES']);
+								$logs['BEFORE']['PLANS'] = count($data['PLANS']);
+								import_log("Infos found: ".$logs['BEFORE']['USERS'].' users, '.$logs['BEFORE']['TOURS'].' tours, '.$logs['BEFORE']['TRANSACTIONS'].' transactions, '.$logs['BEFORE']['IMAGES'].' images, '.$logs['BEFORE']['PLANS'].' plans', $import['CODE_IMPORT']);
+								import_log('[PARSE][END]', $import['CODE_IMPORT']);
+								if($first){ update_cron_parse_end($id_cron, $import['CODE_IMPORT'], $import['OPTIONS']['DEBUG'] == 1);}
+								if(check_import_data($data, $import, false)){
+									$archive_delete = true;
+	/*								if($import['STEPS']['NOTIFICATION_EMAIL'] && count($data['USERS']) > 0){
+										foreach($data['USERS'] as $user){
+											if($user['EMAIL_UTILISATEUR'] != ""){ $usercode_to_email[$user['USERCODE']] = $user['EMAIL_UTILISATEUR'];}
+										}
+									}
+	 */								$continue = false;
+									foreach($logs['BEFORE'] as $v){ 
+										if($v>0){ 
+											$continue = true;break;
+										} 
+									}
+									if($continue){
+										$list_fields = array('USERS', 'TOURS', 'TRANSACTIONS', 'IMAGES', 'PLANS');
+										foreach($list_fields as $field){
+											if($import['STEPS']['IMPORT_'.$field] === true && is_array($data[$field]) 
+											&& count($data[$field]) == 0){ 
+												if(preg_match("/^(TOURS|IMAGES|PLANS)$/", $field) > 0 && $import['OPTIONS']['DIFFERENTIAL_IMPORT_TOUR'] == 1){ continue;}											
+												$continue = false;
+												break;
+											}
+										}
+									}
+									if(($first && $continue) || (!$first && $import['OPTIONS']['PART_IMPORT'] == 1)){
+										$next = $data['NEXT_PART'];
+										$need_delete = (!$first && $import['OPTIONS']['PART_IMPORT'] == 1 && $next['CONTINUE'] !== true);
+										if($need_delete && $import['OPTIONS']['DEBUG'] == 1) import_log("[DEBUG] Force delete activated", $import['CODE_IMPORT']);
+										foreach($steps as $k=>$v){
+											if(preg_match('/^DELETE_/i', $k) > 0){
+												$import['STEPS'][$k] = ($next['CONTINUE'] === true ? 0 : $steps[$k]);
+											}
+										}
+										if(!$continue) $continue = true;
+									}
+								
+									if($continue){
+										if($import['OPTIONS']['PART_IMPORT'] == 1) import_log("IMPORT STEP: ".$data['NEXT_PART']['CURRENT_STEP'] , $import['CODE_IMPORT']);
+										if($import['OPTIONS']['IMPORT_NOT_ALWAYS_FULL'] == 1){
+											$is_full = ($data['OPTIONS']['NO_DELETE'] === false);
+											import_log("IMPORT ".(!$is_full ? "NOT " : "")."FULL" , $import['CODE_IMPORT']);
+											foreach($import['STEPS'] as $k=>$v){
+												if(preg_match('/^DELETE_/i', $k) > 0){
+													$import['STEPS'][$k] = (!$is_full ? false : $import['STEPS'][$k]);
+												}
+											}
+										}
+										if($first) update_cron_start($id_cron, $import['CODE_IMPORT'], $date_reference, $import['OPTIONS']['DEBUG'] == 1);
+										$first = false;
+										if($import['STEPS']['IMPORT_DATA'] == 1){
+											import_log('[DATA IMPORT][START]' , $import['CODE_IMPORT']);
+											$data = import_data($data, $import, $import['NOM_TABLE_IMPORT'], $date_reference, $diffusions_allowed, $need_delete);
+											//complements
+											foreach($list_nom_script_complement as $k=>$v){
+												if(count($data['COMPLEMENTS']['LIST_NOM_SCRIPT_COMPLEMENT_'.$k]) > 0){
+													$list_nom_script_complement[$k] = merge($list_nom_script_complement[$k], $data['COMPLEMENTS']['LIST_NOM_SCRIPT_COMPLEMENT_'.$k]);
+												}
+											}
+											//logs
+											$logs['UPDATE']['USERS'] = count($data['UPDATE']['USERS']);
+											$logs['UPDATE']['TOURS'] = count($data['UPDATE']['TOURS']);
+											$logs['UPDATE']['TRANSACTIONS'] = count($data['UPDATE']['TRANSACTIONS']);
+											$logs['UPDATE']['IMAGES']= $data['UPDATE']['IMAGES'];
+											$logs['UPDATE']['PLANS'] = $data['UPDATE']['PLANS'];
+											import_log("To update: ".$logs['UPDATE']['USERS'].' users, '.$logs['UPDATE']['TOURS'].' tours, '.$logs['UPDATE']['TRANSACTIONS'].' transactions, '.$logs['UPDATE']['IMAGES'].' images, '.$logs['UPDATE']['PLANS'].' plans', $import['CODE_IMPORT']);
+			
+											$logs['DELETE']['USERS'] = count($data['DELETE']['USERS']);
+											$logs['DELETE']['TOURS'] = count($data['DELETE']['TOURS']);
+											$logs['DELETE']['TRANSACTIONS'] = count($data['DELETE']['TRANSACTIONS']);
+											$logs['DELETE']['IMAGES']= count($data['DELETE']['IMAGES']);
+											$logs['DELETE']['PLANS'] = count($data['DELETE']['PLANS']);
+											import_log("To delete: ".$logs['DELETE']['USERS'].' users, '.$logs['DELETE']['TOURS'].' tours, '.$logs['DELETE']['TRANSACTIONS'].' transactions, '.$logs['DELETE']['IMAGES'].' images, '.$logs['DELETE']['PLANS'].' plans', $import['CODE_IMPORT']);
+
+											foreach($logs as $action=>$log){
+												foreach($log as $k=>$v){ $logs_global[$action][$k] += $v;}
+											}
+
+											//get users update
+											$get_users = array('USERS', 'TOURS');
+											foreach ($get_users as $key) {
+												if(count($data['UPDATE'][$key]) > 0){
+													if($import['OPTIONS']['IMPORT_NOT_ALWAYS_FULL'] != 1 || ($import['OPTIONS']['IMPORT_NOT_ALWAYS_FULL'] == 1 && $is_full)){
+														foreach($data['UPDATE'][$key] as $v){ 
+															if(!in_array($v['USERCODE'], $users_updated)){
+																$users_updated[] = $v['USERCODE'];
+															}
+														}
+													}
+												}
+											}
+											if(count($data['WILL_DELETED']) > 0){
+												$body = array("", "\t <a href=\"".str_replace(array('#TYPE#', '#SCRIPT#'), array( "import", $import['CODE_IMPORT']), URL_MANAGE_SCRIPT)."\">".$import['NOM_IMPORT']."</a>", "");
+												for($i=0; $i < count($data['WILL_DELETED']); $i++){
+													$tmp = "\t\t - User: ".$data['WILL_DELETED'][$i]['NOM_SOCIETE'];
+													$tmp .= " / <a href=\"".str_replace(array('#SCRIPT#', '#USERCODE#'), array( $import['CODE_IMPORT'], $data['WILL_DELETED'][$i]['USERCODE']), URL_MANAGE_SCRIPT_USER)."\">".$data['WILL_DELETED'][$i]['USERCODE']."</a>";
+													$tmp .= " will be delete in <b>".$data['WILL_DELETED'][$i]['DELAY']."</b> day".($data['WILL_DELETED'][$i]['DELAY'] > 0 ? "s": "");
+
+													$params = array('partnerID' => $import['ID_PORTAIL'], 'password' => $import['PASSWORD_WS']);
+													$url_base = str_replace( '#USERCODE#', $data['WILL_DELETED'][$i]['USERCODE'], WS_GET_USER);
+													$response = make_ws_request($url_base, $params, "GET");
+													$xml = @simplexml_load_string($response);
+													if(count($xml) > 0 && is_guid($xml->userID."")){
+														$tmp .= " (".$xml->userID.")";
+													}
+													$body[] = $tmp;
+												}
+												$body[] = "";
+												sendAlertEmail($import['CODE_IMPORT'], implode($body, "<br />"), "import", "gateway@previsite.com", "old users");
+											}
+											import_log('[DATA IMPORT COMMIT][END]' , $import['CODE_IMPORT']);
+											import_log('[DATA IMPORT][END]' , $import['CODE_IMPORT']);
+											if($import['STEPS']['IMPORT_SOFTWARE'] == 1 || $import['STEPS']['FORCE_UPDATE_DATA'] == 1){
+												//modif: 2012-07-03: JB Suite à la demande de vartan de mettre à jour la base import sans importer les données dans software. Si soucis remettre comme avant en gardant uniquement les lignes entres '[DATA SOFTWARE][START]' et '[DATA SOFTWARE][END]'
+												$update_actions = array('UPDATE' => array('DONE', 'FAILED'), 'DELETE' => array(''));
+												$update_fields = array('TRANSACTIONS', 'IMAGES', 'PLANS', 'TOURS', 'USERS');
+												if($import['STEPS']['IMPORT_SOFTWARE'] == 1){
+													import_log('[DATA SOFTWARE][START]' , $import['CODE_IMPORT']);
+													$data_logs = import_software($data, $import, $workPath);
+													import_log('[DATA SOFTWARE][END]' , $import['CODE_IMPORT']);
+												}else{
+													$data_logs = array('UPDATE' => array());
+													foreach($data['UPDATE'] as $field => $field_list){
+														if($import['STEPS']['IMPORT_'.strtoupper($field)] == 1){
+															if(preg_match('/^(USERS|TRANSACTIONS)$/i', $field) > 0){
+																if($import['STEPS']['IMPORT_'.$field] == 1){
+																	$data_logs['UPDATE'][$field]['DONE'] = $field_list;
+																}
+															}else if(preg_match('/^(TOURS)$/i', $field) > 0){
+																$field_images = array('IMAGES', 'PLANS');
+																if(!is_array($data_logs['UPDATE']['TOURS'])){ $data_logs['UPDATE']['TOURS'] = array();}
+																$field_list = array_values($field_list);
+																for($k =0; $k < count($field_list); $k++){
+																	foreach($field_images as $field_image){
+																		if(count($field_list[$k][$field_image]) > 0 && $import['STEPS']['IMPORT_IMAGES'] == 1){
+																			if(!is_array($data_logs['UPDATE'][$field_image])){ $data_logs['UPDATE'][$field_image]['DONE'] = array();}
+																			$data_logs['UPDATE'][$field_image]['DONE'] = merge($data_logs['UPDATE'][$field_image]['DONE'], $field_list[$k][$field_image]);
+																			unset($field_list[$k][$field_image]);
+																		}
+																	}
+																	if($import['STEPS']['IMPORT_TOURS'] == 1){ $data_logs['UPDATE']['TOURS']['DONE'][] = $field_list[$k];}
+																}
+															}
+														}
+													}
+												}
+
+												$db_data['name'] = 'import';
+												import_log('[DATA IMPORT COMMIT][START]' , $import['CODE_IMPORT']);
+												foreach($update_actions as $action => $statuts){
+													foreach($statuts as $statut){
+														foreach($update_fields as $field){
+															$tab = ($statut != "" ? $data_logs[$action][$field][$statut] : $data_logs[$action][$field]);
+															if(count($tab) > 0){
+																$function = strtolower($action).($statut!= "" ? "_".strtolower($statut) : "")."_data_".strtolower($field);
+																if(function_exists($function)){
+																	$function($tab, $import['CODE_IMPORT'], $import['NOM_TABLE_IMPORT'], $import['OPTIONS']['DEBUG'] == 1);
+																	import_log($action." ".$field." ".$statut." : ".count($tab) , $import['CODE_IMPORT']);
+																}else{ 
+																	write_cron_log("WARNING: function:".$function." not found");
+																	import_log("WARNING: function:".$function." not found" , $import['CODE_IMPORT']);
+																}
+															}		
+														}
+													}
+												}
+												foreach($key_publications as $key_publication){
+													if(count($data_logs[$key_publication]) > 0){
+														if(!is_array($logs_global[$key_publication])){ $logs_global[$key_publication] = array();}
+														foreach($data_logs[$key_publication] as $k=>$v){
+															if(!is_array($logs_global[$key_publication][$k]) ){ $logs_global[$key_publication][$k] = array('DONE' => 0, 'TOTAL' => 0);}
+															$logs_global[$key_publication][$k]['DONE'] += $v['DONE'];
+															$logs_global[$key_publication][$k]['TOTAL'] += $v['TOTAL'];
+														}
+													}
+												}
+											}
+										}
+										if($data['NEXT_PART']['CURRENT_STEP']){ import_log('END STEP: '.$data['NEXT_PART']['CURRENT_STEP'], $import['CODE_IMPORT']);}
+									}else{ 
+										write_cron_log("End ".$import['CODE_IMPORT']." with no data...");
+										import_log("End ".$import['CODE_IMPORT']." with no data..." , $import['CODE_IMPORT']);
+										$no_data = true;
+										break;
+									}
+								}else{
+									$errors = check_import_data($data, $import, true);
+									foreach($errors as $error_k=>$error){
+										import_log('[PARSE_DATA][ERROR_'.strtoupper($error['type']).'] '.($error_k+1).'. '.$error['field'].': '.$error['error'], $import['CODE_IMPORT']);
+									}
+								  
+									$parseError = true;
+									$no_data = true;
+									write_cron_log("Send alert email ".$import['CODE_IMPORT']);
+									$body = "";
+									if($import['OPTIONS']['PART_IMPORT'] == 1){$body  .= "CURRENT_STEP: ".$data['NEXT_PART']['CURRENT_STEP']."<br />";}
+									$body  .= "End ".$import['CODE_IMPORT']." error in data array...";
+									$emails_report = array();
+									if($import['OPTIONS']['SEND_REPORT_TO'] != ""){
+										$emails_report = explode( ';', $import['OPTIONS']['SEND_REPORT_TO']);
+									}
+									if(!$nomail && false){ 
+										sendAlertEmail($import['CODE_IMPORT'], $body, "import", $emails_report);
+									}
+									import_log("End ".$import['CODE_IMPORT']." error in data array... ".($import['OPTIONS']['PART_IMPORT'] == 1 ? "CURRENT_STEP: ".$data['NEXT_PART']['CURRENT_STEP'] : ""), $import['CODE_IMPORT']);
+									write_cron_log("End ".$import['CODE_IMPORT']." error in data array...");
+									break;
+								}
+								import_log('-----------END-----------' , $import['CODE_IMPORT']);
+							}while($import['OPTIONS']['PART_IMPORT'] == 1 && $next['CONTINUE'] === true);
+							if( !$no_data && $import['OPTIONS']['EXEC_COMMAND_AFTER_IMPORT'] != ""){
+								$replace = array(
+									'search' => array('#DATE_REFERENCE#', '#FULL#', '#WORKPATH#'),
+									'replace'=> array(str_replace(' ', '\\ ', $date_reference), ($is_full ? "true" : "false") , $workPath),
+								);
+								$cmd = str_replace($replace['search'], $replace['replace'], $import['OPTIONS']['EXEC_COMMAND_AFTER_IMPORT']).' > '.str_replace('#SCRIPT#', $import['CODE_IMPORT'].".cmd", ERROR_LOG_FILE);
+								import_log('[EXEC CMD] '.$cmd, $import['CODE_IMPORT']);
+								exec($cmd);
+							}
+							exec('rm -r '.$workPath);
+							if($import['ARCHIVE_DELAI_IMPORT'] == ""){ $import['ARCHIVE_DELAI_IMPORT'] = 10;}
+							if($archive_delete){
+								$delete_archives = array(
+									array("mask" => '-(\d{4}-\d{2}-\d{2})', "glob" => PATH_LOG."/".$import['CODE_IMPORT']."*", "date" => "Y-m-d"),
+									array("mask" => '^(\d{4}\d{2}\d{2}\d{2}\d{2}\d{2})', "glob" => $archive_path."/*", "date" => 'YmdHis')
+								);
+								foreach($delete_archives as $delete){
+									$archives_files = glob($delete['glob']);
+									if(count($archives_files) > 0){
+										rsort($archives_files);
+										$archive_count = 0;
+										$archive_last_date = "";
+										$archive_del = false;
+										foreach($archives_files as $file){									
+											if(preg_match('/'.$delete['mask'].'/i', basename($file), $result) > 0){
+												if(!$archive_del && ($archive_last_date == "" || $archive_last_date != $result[1])){
+													$archive_last_date = $result[1];
+													$archive_del = ($archive_count++ > 0);
+												} 
+												if($archive_del && $result[1] < date($delete['date'], mktime(date("H"), date("i"), date("s"), date("n"), date("j")-$import['ARCHIVE_DELAI_IMPORT'], date("Y")))){
+													write_cron_log('[LOG] delete old archive: '.$file);
+													exec('rm -r "'.$file.'"');
+												}
+											}
+										}
+									}			
+								}
+							}
+						}
+						sql_disconnect($db_data['name'], $import['CODE_IMPORT'], false);
+						$date_end = getmicrotime();
+						//gestion des alertes
+						$duration = ($date_end-$date_start);
+						$alert = "";
+						$make_alert = false;
+						if($import['TEMPS_MAX_IMPORT'] < ($duration/60/60)){
+							$alert .= "- Script last execution duration: <b>".convert_duration_for_print($duration)."</b> (duration limit:".$import['TEMPS_MAX_IMPORT'].")<br />";
+							$make_alert = true;
+						}
+						$resume = "";
+						import_log('----------RESUME---------' , $import['CODE_IMPORT']);
+						if($import['OPTIONS']['NOTIFICATION_EMAIL']){
+							$tmp = array();
+							$notification_email = get_new_tour_with_images($import['CODE_IMPORT'], $import['NOM_TABLE_IMPORT'], $date_reference, $list_nom_script_complement['TOURS'], $import['OPTIONS']['DEBUG'] == 1);
+							import_log('[NOTIFICATION][TODO] '.count($notification_email).' count', $import['CODE_IMPORT']);
+							foreach($notification_email as $v){
+								$tmp[] = array(
+									'EMAIL' => $v['EMAIL_UTILISATEUR'],
+									'PARAMS' => array('REF_PORTAIL' => (string)$v['REF_PORTAIL'], 'USERCODE'=>(string)$v['USERCODE'])
+								);
+							}
+							if(count($tmp) > 0){
+								$params = array(
+									'template' => $import['OPTIONS']['TEMPLATE_EMAIL'],
+									'src' => $import['CODE_IMPORT'],
+									'partner' => $import['ID_PORTAIL'],
+									'params' => json_encode($tmp)
+								);
+								
+								$response = make_ws_request(URL_NOTIFICATION_EMAIL, $params, "POST");
+								if($response != "true"){
+									import_log('[NOTIFICATION][ERROR] user:'.$k.' ('.make_ws_request(URL_NOTIFICATION_EMAIL, $params,"GET", true).':'.$response.')', $import['CODE_IMPORT']);
+								}else if($import['OPTIONS']['DEBUG'] == 1){
+									import_log('[NOTIFICATION][DEBUG] user:'.$k.' ('.make_ws_request(URL_NOTIFICATION_EMAIL, $params,"GET", true).':'.$response.')', $import['CODE_IMPORT']);
+								}
+							}else if($import['OPTIONS']['DEBUG'] == 1){
+								import_log('[NOTIFICATION_EMAIL][DEBUG] No email found', $import['CODE_IMPORT']);
+							}
+						}
+						//alert trop de modifications
+						if($import['STEPS']['IMPORT_DATA'] == 1){
+							$actions = array('UPDATE', 'DELETE');
+							foreach($actions as $action){
+								$keys = array_keys($logs_global['BEFORE']);
+								$txt = "";
+								foreach($keys as $v){
+		//							write_cron_log('BEFORE->'.$v.'->'.($logs['BEFORE'][$v]*20/100)." < ".$action."->".$v."->".$logs[$action][$v]);
+									if(/*$logs_global['BEFORE'][$v] > 0 && */ ($logs_global['BEFORE'][$v]*20/100) < $logs_global[$action][$v]){
+										$make_alert = true;
+										$alert .= "- ".ucfirst(strtolower($v))." ".strtolower($action).": <b>".$logs_global[$action][$v]."/".$logs_global['BEFORE'][$v]."</b><br />";
+									}else{
+										$alert .= "- ".ucfirst(strtolower($v))." ".strtolower($action).": ".$logs_global[$action][$v]."/".$logs_global['BEFORE'][$v]."<br />";
+									}
+									$txt.= strtolower($v).':'.$logs_global[$action][$v].'/'.$logs_global['BEFORE'][$v].', ';
+									if($action == "UPDATE"){
+										$resume .= strtoupper($v).':'.$logs_global[$action][$v].'/'.$logs_global['BEFORE'][$v].';';
+									}
+								}
+								import_log(strtolower($action).': '.preg_replace('/, $/i','', $txt), $import['CODE_IMPORT']);
+							}
+							foreach($key_publications as $key_publication){
+								if(count($logs_global[$key_publication]) > 0){
+									$alert .= "<br />--".$key_publication."--<br/>";
+									$txt = "";
+									foreach($logs_global[$key_publication] as $k=>$v){
+										if(($v['TOTAL']*80/100) > $v['DONE']){
+											$make_alert = true;
+											$alert .= "    - ".ucfirst(strtolower($k))." : <b>".$v['DONE']."/".$v['TOTAL']."</b><br />";
+											$resume .= ($key_publication == "UNPUBLICATION" ? "_" : "").ucfirst(strtolower($k)).':'.$v['DONE'].'/'.$v['TOTAL'].';';
+										}else{
+											$alert .= "    - ".ucfirst(strtolower($k))." : ".$v['DONE']."/".$v['TOTAL']."<br />";
+										}
+										$txt.= ucfirst(strtolower($k)).' : '.$v['DONE'].'/'.$v['TOTAL'].', ';
+									}
+									import_log(strtolower($key_publication).': '.preg_replace('/, $/i','', $txt), $import['CODE_IMPORT']);
+								}
+							}
+						}
+						if(!$no_data) update_cron_end($id_cron, $import['CODE_IMPORT'], $resume, $users_updated,$import['OPTIONS']['DEBUG'] == 1);
+						else if($parseError) update_cron_end_width_parseError($id_cron, $import['CODE_IMPORT'], $import['OPTIONS']['DEBUG'] == 1);
+						else update_cron_end_width_nodata($id_cron, $import['CODE_IMPORT'], $import['OPTIONS']['DEBUG'] == 1);
+						if($import['ID_STATUT_IMPORT'] > 0 && $make_alert){
+							write_cron_log("Send alert email ".$import['CODE_IMPORT']);
+							$phpmail = new PHPMailer();
+							$phpmail->IsSMTP();
+							$phpmail->IsHTML(true);
+							$phpmail->Host      = SMTP_MAIL;
+							$phpmail->From      = "gateway@previsite.com";
+							$phpmail->FromName  = 'Import '.$import['CODE_IMPORT'];
+							$phpmail->WordWrap  = 70;
+							$phpmail->Subject   = 'Import alert - '.$import['CODE_IMPORT'];
+
+							$body  .= "-------------DETAILS-----------<br />";
+							$body  .= $alert;
+							$phpmail->Body = $body;
+							$phpmail->AddAddress("gateway@previsite.com","Gateway");
+							if($import['OPTIONS']['SEND_REPORT_TO'] != ""){
+								$import['OPTIONS']['SEND_REPORT_TO'] = explode(';', $import['OPTIONS']['SEND_REPORT_TO']);
+								if(count($import['OPTIONS']['SEND_REPORT_TO']) > 0){
+									foreach($import['OPTIONS']['SEND_REPORT_TO'] as $email_report){
+										$phpmail->AddAddress( $email_report, "");
+									}
+								}
+							}
+							if(!$nomail && false){ $phpmail->Send();}
+						}
+						write_cron_log("End ".$import['CODE_IMPORT']."...");
+						import_log('-------------------------' , $import['CODE_IMPORT']);
+						if(!$no_data) break;
+					}else{ write_cron_log("[ERROR] import:".$import['CODE_IMPORT']." function not found:'import/".PATH_IMPORT.$import['CODE_IMPORT'].".php:".$import['CODE_IMPORT']);}
+				}else{ write_cron_log("[ERROR] import:".$import['CODE_IMPORT']." no PartnerID");}
+			}
+		}else{ write_cron_log("[ERROR] import:".$import['CODE_IMPORT']." file not found:'".PATH_IMPORT.$import['CODE_IMPORT'].".php");}	
+		sql_disconnect($db_data['name'], $import['CODE_IMPORT'], false);
+	}
+}
+write_cron_log("---------END---------");	
+exit;
+
+
+function verifProcessus( $chaine ,$searchType = 'param') {
+	if($chaine != '') $search = " | grep -i '".$chaine."'";
+	exec("ps s -C php $search",$listProcess);
+	$processEnCours = array();
+	foreach( $listProcess as $process) {
+		preg_match('#(\S{1,})\s{1,}(\S{1,})#',$process,$infosProcess);
+	
+		if($infosProcess[1] != '') 
+				return $infosProcess[2];				
+	}
+	return false;
+}
+?>

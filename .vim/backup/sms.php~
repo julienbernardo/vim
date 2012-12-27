@@ -1,0 +1,570 @@
+<?php
+
+//twilio
+function sendTwilioSMS($from, $to, $sms){
+	$return = array(
+		'request' => array("To" => $to, "From" => $from, "Body" => $sms),
+		'response' => false,
+	);
+    // twilio REST API version
+    $ApiVersion = TWILIO_APIVERSION;
+ 
+    // set our AccountSid and AuthToken
+    $AccountSid = TWILIO_ACCOUNTSID;
+    $AuthToken = TWILIO_AUTHTOKEN;
+     
+    // instantiate a new Twilio Rest Client
+    $client = new TwilioRestClient($AccountSid, $AuthToken);
+          
+    // Send a new outgoinging SMS by POSTing to the SMS resource */
+    $response = $client->request("/".$ApiVersion."/Accounts/".$AccountSid."/SMS/Messages",
+        "POST", $return['request']);
+	print_r($response);
+    if($response->IsError){ $return['response'] = "Error: ".$response->ErrorMessage;}
+    else{ $return['response'] = true;}
+    return $return;
+}
+
+// version 1.1
+
+function send_gateway($xml,$url){
+	$req = &new HTTP_Request($url);
+	$req->addHeader("Content-Type", "text/xml");
+	$req->setHttpVer("1.0");
+	$req->setMethod(POST);
+	$req->addRawPostData($xml);
+	$req->sendRequest();
+	$page = $req->getResponseBody();
+	return $page;
+}
+
+function makeXMLRequest($phone,$destination,$text,$title="",$sessionid="",$operator="",$source="MT",$format="BINARY",$tarif="0",$original_xml="",$command ="",$service_id=""){
+	global $details_sms;
+//	global $specific_needs;
+	global $config_sms;
+	
+	$details_sms = array('phone'=>$phone,'destination'=>$destination,'texte'=>$text,'title'=>$title,'operator'=>$operator,'format'=>$format,'tarif'=>$tarif);
+	$smsbookmark = $text;
+	$smstitle = $title;
+	
+	$message = "<NotificationRequest Version=\"3.5\">\n";
+	$message.= "	<NotificationHeader>\n";
+	$message.= "		<PartnerName>".$config_sms[COUNTRY][TYPE_MSG]['PARTNERNAME']."</PartnerName>\n";
+	$message.= "		<PartnerPassword>".$config_sms[COUNTRY][TYPE_MSG]['PARTNERPASSWORD']."</PartnerPassword>\n";
+	$message.= "	</NotificationHeader>\n";
+	$message.= "	<NotificationList BatchID=\"1\">\n";
+	if($format=="TEXT"){
+		$message .= "       <Notification SequenceNumber=\"0\" MessageType=\"SMS\">\n";
+		$message .= "       	<Message>".utf8_decode($text)."</Message>\n";
+		if($text == "START"){ $command = array('cmd' => 'START');}
+	}else if($format=="BINARY"){
+		$message.= "		<Notification SequenceNumber=\"0\" MessageType=\"SMS\" Format=\"Binary\">\n";
+		$message.= "			<Message>:5B:06:01:AE:02:05:6A:00:45:C6:0C:03".strtohex($smsbookmark).":00:01:03".strtohex($smstitle).":00:01:01</Message>\n";
+	}
+	$message.= "      		<Profile>".$config_sms[COUNTRY][TYPE_MSG]['PROFILE']."</Profile>\n";
+	if($format=="BINARY"){
+		$message.= "    		<Udh>:06:05:04:0B:84:23:F0</Udh>\n";
+	}
+	$message.= "      		<SenderID Type=\"Shortcode\">".$destination."</SenderID>\n";
+	$message.= "    		<ExpireDate>1231".(date('y')+1).(date('y')+1)."</ExpireDate>\n";
+	if($source != "MT"){
+		$message.= "    		<Operator>".$operator."</Operator>\n";
+		$message.= "    		<Tariff>".$tarif."</Tariff>\n";
+	}
+	
+	$message.= "    		<Subscriber> \n";
+	$message.= "        		<SubscriberNumber>".$phone."</SubscriberNumber>\n";	
+	if($sessionid!=""){
+		$message.= "        		<SessionId>".$sessionid."</SessionId>\n";
+	}
+	$message.= "    		</Subscriber> \n";
+	if($source == "MO_US"){
+		if($command['cmd'] != "" || array_search($operator, $config_sms[COUNTRY]['SPECIFIC_NEEDS']['prodDesc']) !== false){
+			$message.= "    		<Tags>\n";
+			if($command['cmd'] != ""){
+				$message.= "    			<Tag Name=\"Command\">".$command['cmd']."</Tag>\n";
+				if($command['desc'] != ""){ $message.= "    			<Tag Name=\"ProdDesc\">".$command['desc']."</Tag>\n";}
+			}
+			if(is_array($config_sms[COUNTRY]) && array_search($operator, $config_sms[COUNTRY]['SPECIFIC_NEEDS']['prodDesc']) !== false){
+				$message.= "    			<Tag Name=\"ProdDesc\">Video_Alert</Tag>\n";
+			}	
+			$message.= "    		</Tags>\n";
+		}
+		$message.= "		<ContentType>12</ContentType>\n";
+		if($service_id != ""){
+			$message.= "		<ServiceId>".$service_id."</ServiceId>\n";
+		}
+	}
+	$message.= "	</Notification> \n";
+	$message.= "  </NotificationList> \n";
+	$message.= "</NotificationRequest>";
+
+	return $message;
+}
+
+
+function strtohex($value){
+	$hexstr = "";
+	for($i=0;$i< strlen($value);$i++){
+		$hextmp = dechex(ord(substr($value, $i, 1)));
+		$hexstr = $hexstr.":".$hextmp;
+	}
+	return strtoupper($hexstr);
+}
+
+function checkIndicatif($phone){
+	//$indicatifsPays = array("FR"=>"33","JP"=>"81","US"=>"1");
+	$indicatifsPays = array();
+	$sql = "SELECT ID_PAYS,INDICATIF_TELEPHONE FROM PAYS WHERE INDICATIF_TELEPHONE IS NOT NULL";
+	$result = db_query($sql);
+	while($r=$result->fetchRow(DB_FETCHMODE_ASSOC)) {
+		$indicatifsPays[$r['ID_PAYS']] = $r['INDICATIF_TELEPHONE'];
+	}
+	$valable = false;
+	if(preg_match('/^('.implode('|',$indicatifsPays).')/',$phone) > 0){ 
+		$phone = "00".$phone;
+		$valable = true;
+	}else	if(preg_match('/^\+('.implode('|',$indicatifsPays).')/',$phone) > 0){ 
+		$phone = "00".substr($phone,1);
+		$valable = true;
+	}else if(preg_match('/^00('.implode('|',$indicatifsPays).')/',$phone) > 0){ 
+		$valable = true;
+	}
+	
+	if($valable){ return $phone;}
+	return false;
+}
+
+function checkVideo( $data, &$global){
+	global $dsn;
+	global $db;
+	global $dsn_realtor;
+	global $dsn_sms;
+	global $dsn_video;
+	global $log_file;
+
+	file_put_contents($log_file, "\n\nCheck Video: ".$data."\n",FILE_APPEND);
+	/* recup id tour ou id annonce */
+/*	$sql = "SELECT ID_ELEMENT, REF_DB, CODE_SMS FROM CODE_SMS WHERE UPPER(CODE_SMS)='".fix_text($data)."' AND STATUT_CODE=1";
+	$result = db_query($sql);
+	if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+		$global['id'] = $r['ID_ELEMENT'];
+		$global['db'] = strtolower($r['REF_DB']);
+	}else{
+*/		$replace = array(
+			'search' => array('#SHORTCODE#'),
+			'replace'=> array($data)
+		);
+		$url = str_replace($replace['search'], $replace['replace'], URL_GET_TOUR_BY_SHORTCODE);
+		$response = file_get_contents($url);
+		file_put_contents($log_file, "SHORTCODE:".$url.":".$response."\n", FILE_APPEND);	
+		if($response != "false"){ $global['id'] = $data;}
+		else{
+//			$data = convertShortCodeToTour($data);
+			if(preg_match('/^P([A-FQ-Z]{7})$/i', $data, $result) > 0 || preg_match("/^([A-F0-9]{5,10})/i", $data) > 0){
+				if(strlen($data) > 8){ $data = preg_replace('/^(.{8})(.*)/','$1-$2',$data);}
+				// déconnexion base 
+				db_close();
+				$shortId = false;
+				// Vip Realtor Code 
+				$getDsn = new GetDsn(array('MEMCACHED' => true));
+				$dsn = $getDsn->byVideoRef($data);
+				if($dsn == ""){
+					if(preg_match('/^P([A-FQ-Z]{7})$/i', $data, $result) > 0){
+						$data = convertShortCodeToTour($data);
+						$dsn = $getDsn->byVideoRef($data);
+						file_put_contents($log_file, "\n\nCheck Video: ".$data."\n",FILE_APPEND);
+					}else if(preg_match('/^([A-F0-9]{8})$/i', $data)  > 0){
+						file_put_contents($log_file, "ShortID:".$data."\n",FILE_APPEND);	
+						$dsn = $getDsn->byShortId($data);
+						$shortId = ($dsn != "");
+					}
+				}
+				$like = false;
+				if($dsn == ""){ 
+					file_put_contents($log_file, "LIKE:".$data."\n",FILE_APPEND);	
+					$dsn = $getDsn->byVideoRef($data, true);
+					$like = true;
+				}
+				file_put_contents($log_file, "DSN:".$dsn."\n",FILE_APPEND);	
+				if($dsn != ""){
+					$sql = "SELECT ID_VIDEO, VIDEO.ID_VISITE, ID_DISTRIBUTEUR, ID_UTILISATEUR, TYPE_VIDEO FROM VIDEO INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE WHERE NB_ACTIVE_IMAGE >0 AND ID_STATUT_VIDEO >0 AND ";
+					if($shortId){ $sql .= "id_Short='".fix_text($data)."'";}
+					else{ $sql .= "REF_VIDEO".(!$like ? "='".fix_text($data)."'" : " LIKE '".fix_text($data)."%'");}
+					$result = db_query($sql);
+					$r=$result->fetchRow(DB_FETCHMODE_ASSOC);
+					
+					if(!is_guid($r['ID_VIDEO']) && $shortId){
+						$sql = "SELECT ID_VISITE, ID_UTILISATEUR, ID_DISTRIBUTEUR,(SELECT VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE REF_OPTION='PROFILVIDEO' AND REF_CATEGORIE_OPTION='OPTION_BUNDLE' AND ID_UTILISATEUR=VISITE.ID_UTILISATEUR) TYPE_VIDEO, (SELECT VALEUR_OPTION FROM DISTRIBUTEUR_OPTION WHERE REF_OPTION='PROFILVIDEO' AND REF_CATEGORIE_OPTION='OPTION_BUNDLE' AND ID_DISTRIBUTEUR=SOCIETE.ID_DISTRIBUTEUR) PROFIL_DISTRIBUTEUR FROM VISITE inner join societe on societe.id_societe=visite.id_societe WHERE id_statut_visite > 0 and nb_active_image> 0 AND id_Short='".fix_text(strtoupper($data))."'";
+						$result = db_query($sql);
+						if($r=$result->fetchRow(DB_FETCHMODE_ASSOC)){
+							if($r['TYPE_VIDEO'] == ''){ $r['TYPE_VIDEO'] = $r['PROFIL_DISTRIBUTEUR'];}
+							$r['ID_VIDEO'] = $r['ID_VISITE'];
+						}
+					}
+					
+					if(is_guid($r['ID_VIDEO'])){
+						$global['id'] = $r['ID_VIDEO'];
+						$global['type'] = $r['TYPE_VIDEO'];
+						$global['tour'] = $r['ID_VISITE'];
+						$global['user'] = $r['ID_UTILISATEUR'];						
+						$global['distrib'] = $r['ID_DISTRIBUTEUR'];
+						$global['db'] = "realtor";
+					}
+				}
+				db_close();
+			}
+		}
+		// Vip Realtor Code 
+		$dsn = $dsn_sms;
+		if(!is_guid($global['id']) && is_guid($global['tour'])){
+			if($result !== 'true'){
+				$generation_worked = false;
+				file_put_contents($log_file, "\nFile not found - Generation Video\n",FILE_APPEND);
+				
+				$result = file_get_contents(str_replace('#USER#',$global['user'],str_replace('#TOUR#',$global['tour'],str_replace('#EXT#','3gp',VIDEO_GENERATION))));
+				$xml = simplexml_load_string($result);
+				file_put_contents($log_file, str_replace('#TOUR#',$global['tour'],str_replace('#EXT#','3gp',VIDEO_GENERATION)).": ".$result."\n",FILE_APPEND);
+				if($xml->VideoResultList->VideoResult->VideoResultCode == 0){ $generation_worked = true;}
+				if(!$generation_worked){ $global['id'] = "";}
+			}
+		}
+//	}
+	file_put_contents($log_file, "Result:".$global['id']."\n",FILE_APPEND);	
+}
+
+function formatNumber( $phone, $country, $internationalFormat = true){
+	$return = "";
+	$phoneLength = array("US" => 10, 'FR' => 9);  
+	$phone = preg_replace('/[^0-9]/i', '', $phone);
+	$indicatif = getIndicatifTelephone($country);
+	if($indicatif != ""){
+		if($phoneLength[$country] == ""){ $country = "FR";}
+		if($internationalFormat){
+			while(strlen($indicatif)+$phoneLength[$country] < 13){ $indicatif = "0".$indicatif;}
+		}else{ $indicatif = preg_replace('/^0+/i', '',$indicatif);}
+
+		if(preg_match('/(\d{'.$phoneLength[$country].'})$/',$phone,$result)){
+			$return = $indicatif.$result[1];
+		}
+	}
+	return $return;	
+}
+function formatNumber2($phone,$country){
+	$phone = preg_replace('/[^0-9]/i', '', $phone);
+	if($country == "US"){
+		$phone = str_replace('(','',$phone);
+		$phone = str_replace(')','',$phone);
+		if(preg_match('/(\d{10})$/',$phone,$result)){
+			return "1".$result[1];
+		}
+	}else if($country == "FR"){
+		if(preg_match('/(33|0)\d{9}$/',$phone) > 0){
+			preg_match('/(\d{9})$/',$phone,$result);
+			return "0033".$result[1];
+		}
+	}
+	return $phone;	
+}
+
+function desactivateNumber($phone, $operator, $country){											
+	$phone = formatNumber($phone,$country);
+	$sql = "SELECT NUMERO,ID_OPERATOR,ID_STATUT_NUMERO_FREE,ID_STATUT_NUMERO_PREMIUM,ID_VISITE FROM NUMERO WHERE NUMERO='".$phone."' AND REF_PAYS='".$country."'";
+	$result = db_query($sql);
+	if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){		
+		$sql = "UPDATE NUMERO SET	ID_STATUT_NUMERO_FREE='-1',ID_STATUT_NUMERO_PREMIUM='-1', DATE_MODIFICATION_NUMERO=GETDATE(),VALIDATED_TARIF=''
+								".($operator != $row['ID_OPERATOR'] && $operator != "" ? ",ID_OPERATOR='".$operator."' " : "")."
+								WHERE NUMERO='".$phone."' AND REF_PAYS='".$country."'";	
+		db_query($sql);
+	}else{
+		$sql = "INSERT INTO NUMERO(NUMERO ,REF_PAYS,ID_OPERATOR,DATE_CREATION_NUMERO,DATE_MODIFICATION_NUMERO,ID_STATUT_NUMERO_FREE,ID_STATUT_NUMERO_PREMIUM) VALUES('".$phone."','".$country."','".$operator."',GETDATE(),GETDATE(),'-1','-1')";
+		db_query($sql);
+	}
+}
+
+function activateNumber($phone, $operator, $country,$premium = false){
+	global $log_file;
+	global $tariff_spe;
+	
+	if($premium){ $field = "_PREMIUM";}
+	else{ $field = "_FREE";}
+	$phone = formatNumber($phone,$country);
+	$sql = "SELECT NUMERO,ID_OPERATOR,ID_STATUT_NUMERO".$field.",DATE_CONFIRMATION".$field.",ID_VISITE,VALIDATED_TARIF FROM NUMERO WHERE NUMERO='".$phone."' AND REF_PAYS='".$country."'";
+	$result = db_query($sql);
+	if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		if($premium){
+/*			$sql = "SELECT TOP 1 CODE_SMS FROM MO WHERE NUMERO='".$phone."' AND UPPER(CODE_SMS) != 'Y' ".($operator != "31002" ? "AND TARIF='0'" : "")." ORDER BY DATE_CREATION_MO DESC";
+			file_put_contents($log_file, "\n\n\n\n".$sql,FILE_APPEND);
+			$code_sms = db_getOne($sql);
+			file_put_contents($log_file,$sql."\n\n".$code_sms,FILE_APPEND);
+			$tarif = $tariff_spe[$code_sms];
+			//if($row['ID_OPERATOR'] > '31002' && strlen($tarif) < 3) { $tarif = 100;}
+*/			if($code_sms != "" && $tarif != "" && strpos($row['VALIDATED_TARIF'],"%".$tarif."%") === false){
+				$row['VALIDATED_TARIF'] .= "%".$tarif."%";
+			}
+			if($row['VALIDATED_TARIF'] == ""){ $row['VALIDATED_TARIF'] = "%0%";}
+		}
+		$sql = "UPDATE NUMERO SET	ID_STATUT_NUMERO".$field."='2', DATE_MODIFICATION_NUMERO=GETDATE(),DATE_CONFIRMATION".$field."=GETDATE(),VALIDATED_TARIF='".$row['VALIDATED_TARIF']."'
+								".($operator != $row['ID_OPERATOR'] && $operator != "" ? ",ID_OPERATOR='".$operator."' " : "")."
+								WHERE NUMERO='".$phone."' AND REF_PAYS='".$country."'";	
+		file_put_contents($log_file, "\n\n\n\n".$sql,FILE_APPEND);
+		db_query($sql);
+		if($code_sms != ""){ return $code_sms;}
+		return $row['ID_VISITE'];
+	}else{
+		$sql = "INSERT INTO NUMERO(NUMERO ,REF_PAYS,ID_OPERATOR,DATE_CREATION_NUMERO,DATE_MODIFICATION_NUMERO ,DATE_CONFIRMATION".$field.",ID_STATUT_NUMERO".($premium ? "_FREE" : "_PREMIUM" ).",ID_STATUT_NUMERO".(!$premium ? "_FREE" : "_PREMIUM" ).") VALUES('".$phone."','".$country."','".$operator."',GETDATE(),GETDATE(),GETDATE(),'2','0')";
+		db_query($sql);
+	}
+	return "";
+}
+
+/**
+* Vérifie si on peut envoyer un sms au numéro spécifié.
+* et met à jour le statut du numéro
+*/
+function checkNumber($phone, $operator, $country, $id_visite = "", $mo = false, $premium = false, $tarif = ""){
+	global $log_file;
+	global $config_sms;
+	
+	$phone = formatNumber( $phone, $country);
+	$activationForbidden = false;
+	if($premium){ $field = "_PREMIUM";}
+	else{ $field = "_FREE";}
+	
+	$sql = "SELECT NUMERO,ID_OPERATOR,ID_STATUT_NUMERO".$field.",DATE_CONFIRMATION".$field.",ID_VISITE,VALIDATED_TARIF FROM NUMERO WHERE NUMERO='".$phone."' AND REF_PAYS='".$country."'";
+	$result = db_query($sql);
+	if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		if($row['ID_STATUT_NUMERO'.$field] < 0 && $mo){ $row['ID_STATUT_NUMERO'.$field] = 1;}
+		if($row['ID_STATUT_NUMERO'.$field] >= 0){
+			preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i',$row['DATE_CONFIRMATION'.$field],$date);
+			if($row['ID_STATUT_NUMERO'.$field] == 2){
+				if(array_search($operator, $config_sms[COUNTRY]['SPECIFIC_NEEDS']['activationForbidden']) !== false ){
+					$row['ID_STATUT_NUMERO'.$field] = 1;
+					$activationForbidden = true;
+				}
+				if(!$premium && mktime() > mktime($date[4],$date[5],$date[6],$date[2],$date[3]+90,$date[1])){
+					$row['ID_STATUT_NUMERO'.$field] = 1;
+				}
+			}
+			$sql = "UPDATE NUMERO SET ID_STATUT_NUMERO".$field."='".$row['ID_STATUT_NUMERO'.$field]."',
+								DATE_MODIFICATION_NUMERO=GETDATE()
+								".(is_guid($id_visite) ? ",ID_VISITE='".$id_visite."'" : "")."
+								".($operator != $row['ID_OPERATOR'] && $operator != "" ? ",ID_OPERATOR='".$operator."' " : "")."
+								WHERE NUMERO='".$phone."' AND REF_PAYS='".$country."'";	
+			db_query($sql);
+			file_put_contents($log_file,"\n\nCheck Number: ".$phone." ".$row['ID_STATUT_NUMERO'.$field]."(Update| ".$field.") - ".$id_visite." (".$row['ID_VISITE'].")\n\n",FILE_APPEND);
+		}
+		if($activationForbidden){ $row['ID_STATUT_NUMERO'.$field] = 2;}
+		if($premium && $tarif != "" && strpos($row['VALIDATED_TARIF'],"%".$tarif."%") === false){ return 0;}
+		return $row['ID_STATUT_NUMERO'.$field];
+	}else{
+		if($premium) $sql = "INSERT INTO NUMERO(NUMERO ,REF_PAYS,ID_OPERATOR,DATE_CREATION_NUMERO,DATE_MODIFICATION_NUMERO,ID_STATUT_NUMERO_PREMIUM,ID_STATUT_NUMERO_FREE,ID_VISITE) VALUES('".$phone."','".$country."','".$operator."',GETDATE(),GETDATE(),'1','0',".( is_guid($id_visite) ? "'".$id_visite."'" : "NULL" ).")";
+		else $sql = "INSERT INTO NUMERO(NUMERO ,REF_PAYS,ID_OPERATOR,DATE_CREATION_NUMERO,DATE_MODIFICATION_NUMERO,ID_STATUT_NUMERO_PREMIUM,ID_STATUT_NUMERO_FREE,ID_VISITE) VALUES('".$phone."','".$country."','".$operator."',GETDATE(),GETDATE(),'0','1',".( is_guid($id_visite) ? "'".$id_visite."'" : "NULL" ).")";
+		db_query($sql);
+		file_put_contents($log_file,"\n\nCheck Number: ".$phone." (Insert) - ".$id_visite."\n\n",FILE_APPEND);
+		return 0;
+	}
+}
+
+function getOperator($phone,$country){
+	global $dsn;
+	global $dsn_sms;  
+	global $log_file;
+	$phone = formatNumber($phone,$country);
+	$sql = "SELECT ID_OPERATOR FROM NUMERO WHERE NUMERO='".$phone."' AND REF_PAYS='".$country."'";	
+	$result = db_query($sql);
+	if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+		file_put_contents($log_file ,"GetOperator: ".$row['ID_OPERATOR']."\n\n",FILE_APPEND);
+		return $row['ID_OPERATOR'];
+	}
+	return "";
+}
+
+function notifyUser($tour,$phone){
+	global $dsn;
+	global $dsn_realtor;
+	global $dsn_sms;  
+	global $log_file;
+	global $global;
+	global $config_sms;
+	
+	preg_match('/(\d{10})$/',$phone,$result);
+	$phone = $result[1];
+	
+	db_close();
+	$dsn = $dsn_realtor;
+	$notification = false;
+	$sql = "SELECT U.ID_UTILISATEUR,V.ID_VISITE,V.NOM_VISITE,V.NUMERO_MLS,NOM_UTILISATEUR,PRENOM_UTILISATEUR,EMAIL_UTILISATEUR,REF_VISITE,MOBILE_UTILISATEUR,(SELECT VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE ID_UTILISATEUR=U.ID_UTILISATEUR AND REF_OPTION='NOTIFYMAIL') NOTIFYMAIL,(SELECT VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE ID_UTILISATEUR=U.ID_UTILISATEUR AND REF_OPTION='NOTIFYSMS') NOTIFYSMS FROM UTILISATEUR U INNER JOIN VISITE V ON V.ID_UTILISATEUR=U.ID_UTILISATEUR WHERE V.ID_VISITE='".$tour."'";
+	$result = db_query($sql);
+	if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)) { 
+		$tab_user = $r;
+		$global['tab_user'] = $tab_user;
+	}
+	
+	//check credits
+	$maskNumber = true;
+	$credits = file_get_contents(str_replace('#ID#',$tab_user['ID_UTILISATEUR'],CREDITS_SMS));
+	if($credits != ""){
+		$credits = explode(';',$credits);
+		if($credits[1] == "" && $credits[0] > 0){
+			$maskNumber = false;
+			file_put_contents($log_file,"\n\n\nNumber available: OK (credits : ".$credits[0].")\n",FILE_APPEND);
+		}else if($credits[1] != "" && $credits[1] >= date('Y-m-d H:i:s')){
+			$maskNumber = false;
+			file_put_contents($log_file,"\n\n\nNumber available: OK (date limite : ".$credits[1].")\n",FILE_APPEND);
+		}
+	}
+	if($maskNumber){ file_put_contents($log_file,"\n\n\nNumber masked (date:".$credits[1]."|credits:".$credits[0].")\n",FILE_APPEND);}
+	
+	if($tab_user['NOTIFYMAIL'] != ""){
+  		$body = $config_sms[COUNTRY]['NOTIFICATION']['EMAIL_TEXT'];
+			
+		$phone_send = affPhone($phone);
+		if($maskNumber){ $phone_send = preg_replace('/\d/','#',$phone_send);}
+
+		$body = str_replace('#PHONE#', $phone_send,$body);
+		$body = str_replace('#TIME#',date('h:i a'),$body);
+		$body = str_replace('#DATE#',date('Y-m-d'),$body);
+		$body = str_replace('#TOUR#',$tab_user['NOM_VISITE'],$body);
+		$body = str_replace('#ID#',$tab_user['ID_VISITE'],$body);
+		$body = str_replace('#MLS#',$tab_user['NUMERO_MLS'],$body);
+			
+		$from = array('name'=>$config_sms[COUNTRY]['NOTIFICATION']['EMAIL_NAME'],'address'=>$config_sms[COUNTRY]['NOTIFICATION']['EMAIL_FROM']);
+		$to = array((strpos($tab_user['NOTIFYMAIL'],'@') !== false ? $tab_user['NOTIFYMAIL'] : $tab_user['EMAIL_UTILISATEUR']));
+		@send_email($from,$to,str_replace('#MLS#',$tab_user['NUMERO_MLS'],$config_sms[COUNTRY]['NOTIFICATION']['EMAIL_SUBJECT']),$body,strip_tags($body));
+		file_put_contents($log_file, "\nNotification email: to ".$to[0]."\n",FILE_APPEND);
+		$notification = true;
+	}
+
+	if($tab_user['NOTIFYSMS'] != ""){
+		list($country,$phone_notify) = checkPhoneNumber(preg_match('/(\d{6,})/',$tab_user['NOTIFYSMS']) > 0 ? $tab_user['NOTIFYSMS'] : $tab_user['MOBILE_UTILISATEUR']);
+		if($phone_notify != ""){
+      $url_mt = URL_MT_NOTIFICATION_US;
+      $url_mt = str_replace('#PHONE#', $phone_notify, $url_mt);
+      $url_mt = str_replace('#TOUR#', $tab_user['ID_VISITE'], $url_mt);
+      $url_mt = str_replace('#USER#', $tab_user['ID_UTILISATEUR'], $url_mt);
+      $url_mt = str_replace('#OPERATOR#', $operator, $url_mt);
+      
+      $text = $config_sms['US']['NOTIFICATION']['SMS'];
+      $text = str_replace('#REF#'	,$tab_user['REF_VISITE'] ,$text);
+      $text = str_replace('#PHONE#'	,affPhone($phone_notify) ,$text);
+      $text = str_replace('#DATE#'	,date("h:i a") ,$text);
+      $url_mt = str_replace('#TEXT#', urlencode($text), $url_mt);
+
+      $page = file_get_contents($url_mt);
+      $xml = new SimpleXMLElement($page);
+      $result = getResult($xml);
+      if($result['code'] == 0){ 
+      	$sql = "UPDATE UTILISATEUR_OPTION SET VALEUR_OPTION= CAST( (CAST(VALEUR_OPTION AS INT)-1) AS NVARCHAR(255)) WHERE ID_UTILISATEUR='".$tab_user['ID_UTILISATEUR']."' AND REF_CATEGORIE_OPTION='DATA_USER' AND REF_OPTION='CREDITSMS'";
+      	db_query($sql);
+      }
+      file_put_contents($log_file, "\nNotification SMS: to ".$phone." | resultCode: ".$xml->RequestResultCode."\n",FILE_APPEND);
+      $notification = true;
+		}
+	}
+
+//	if($notification){
+//		'http://logs.previsite.com/insert_log.php?todo=lead_send_sms&tour=#TOUR#&date=get_date_sql()&phone=#PHONE#'
+		$url_log = URL_NOTIFICATION_LOG;
+		$url_log = str_replace('#TOUR#',$tour,$url_log);
+		$url_log = str_replace('#PHONE#',$phone,$url_log);
+		$url_log = str_replace('#DATE#',urlencode(date('Y-m-d H:i:s')),$url_log);
+		$result = @file_get_contents($url_log);
+		file_put_contents($log_file, "\nNotification LOG: ".$url_log."\n",FILE_APPEND);
+//	}
+
+	db_close();
+	$dsn = $dsn_sms;	
+}
+
+function getResult($xml){
+	$result = array('result'=> 0,'code' => 0,'text'=>'OK');
+	if($xml->NotificationResultHeader->RequestResultCode != 0){
+		$result['code'] = $xml->NotificationResultHeader->RequestResultCode;
+		$result['text'] = $xml->NotificationResultHeader->RequestResultText;
+	}else if($xml->NotificationResultList->NotificationResult->NotificationResultCode != 0){
+		$result['code'] = $xml->NotificationResultList->NotificationResult->NotificationResultCode;
+		$result['text'] = $xml->NotificationResultList->NotificationResult->NotificationResultText;
+	}else if($xml->NotificationResultList->NotificationResult->SubscriberResult->SubscriberResultCode != 0){
+		$result['code'] = $xml->NotificationResultList->NotificationResult->SubscriberResult->SubscriberResultCode;
+		$result['text'] = $xml->NotificationResultList->NotificationResult->SubscriberResult->SubscriberResultText;
+	}
+	if($result['code'] == "11"){ $result['result'] = 0; }
+	else{ $result['result'] = $result['code'];}
+	//$result['result'] = $result['code'];
+	return $result;
+}
+
+// ajoute un credit à la colonne total_conso
+// - envoie les emails de rappel si le nouveau credit= CREDITLIMIT
+function updateTotalConso($user = "", $details_sms = "",$tour= "",$tab_user = ""){
+	global $log_file;
+	global $dsn;
+	global $dsn_realtor;
+	global $dsn_sms;  
+	global $config_sms;
+	
+	if(!is_array($tab_user) && (is_guid($tour) || is_guid($user))){
+		db_close();
+		$dsn = $dsn_realtor;
+		$notification = false;
+		if(is_guid($user)){
+			$sql = "SELECT ID_UTILISATEUR,EMAIL_UTILISATEUR,(SELECT VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE ID_UTILISATEUR=U.ID_UTILISATEUR AND REF_OPTION='NOTIFYMAIL') NOTIFYMAIL FROM UTILISATEUR U WHERE ID_UTILISATEUR='".$user."'";
+		}else{
+			$sql = "SELECT U.ID_UTILISATEUR,EMAIL_UTILISATEUR,(SELECT VALEUR_OPTION FROM UTILISATEUR_OPTION WHERE ID_UTILISATEUR=U.ID_UTILISATEUR AND REF_OPTION='NOTIFYMAIL') NOTIFYMAIL FROM UTILISATEUR U INNER JOIN VISITE V ON V.ID_UTILISATEUR=U.ID_UTILISATEUR WHERE V.ID_VISITE='".$tour."'";
+		}
+		$result = db_query($sql);
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)) { 
+			$tab_user = $r;
+			$user = $tab_user['ID_UTILISATEUR'];
+		}
+	}
+	db_close();
+	$dsn = $dsn_sms;
+	if(is_guid($user)){
+		addOneTotalConso($user,$details_sms['id'],$details_sms['type'],formatNumber($details_sms['phone'],$details_sms['country']),$details_sms['country'],-1);
+		$send_creditlimit = false;
+		$send_creditlimitByDay = false;
+		$credits = getCredits($user);
+		if( $credits['DATE_LIMITE_VALIDITE'] == NULL){
+			if(($credits['TOTAL_CREDITS']-$credits['TOTAL_CONSO'])  == $config_sms[COUNTRY]['CREDITLIMIT']['LIMIT']){
+				$send_creditlimit = true;
+			}
+		}else{
+			preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i',$credits['DATE_LIMITE_VALIDITE'],$date);
+			if(mktime(0,0,0,date('n'),date('j')+$config_sms[COUNTRY]['CREDITLIMIT']['LIMIT']) == mktime(0,0,0,$date[2],$date[3],$date[1])){
+				$send_creditlimitByDay = true;
+			}
+		}
+		if( $send_creditlimit || $send_creditlimitByDay){
+			$from = array('name'=>$config_sms[COUNTRY]['CREDITLIMIT']['EMAIL_NAME'],'address'=>$config_sms[COUNTRY]['CREDITLIMIT']['EMAIL_FROM']);	
+		  	$to = array((strpos($tab_user['NOTIFYMAIL'],'@') !== false ? $tab_user['NOTIFYMAIL'] : $tab_user['EMAIL_UTILISATEUR']));
+		 	$body = str_replace('#LIMIT#',($send_creditlimit ? $config_sms[COUNTRY]['CREDITLIMIT']['BY_SMS'] : $config_sms[COUNTRY]['CREDITLIMIT']['BY_DAY']),$config_sms[COUNTRY]['CREDITLIMIT']['EMAIL_TEXT']);	
+		 	@send_email($from,$to,$config_sms[COUNTRY]['CREDITLIMIT']['EMAIL_SUBJECT'],$body,strip_tags($body));
+		  	file_put_contents($log_file, "\nCredit limit email: to ".$to[0]."\n",FILE_APPEND);
+  		}
+	}
+}
+
+function convertShortCodeToTour($data){
+	if(preg_match('/^P([A-FQ-Z]{7})$/i', $data, $result) > 0){
+		$replace = array(
+		 	'search' => explode(',','Q,R,S,T,U,V,W,X,Y,Z'),
+		 	'replace' => explode(',','0,1,2,3,4,5,6,7,8,9')
+		 );
+		 $data = str_replace($replace['search'], $replace['replace'], $result[1]);
+	}
+	return $data;
+}
+
+function convertTourToShortCode($data){
+	if(preg_match('/^([0-9A-F]{7})/i', $data, $result) > 0){
+		$replace = array(
+		 	'search' => explode(',','Q,R,S,T,U,V,W,X,Y,Z'),
+		 	'replace' => explode(',','0,1,2,3,4,5,6,7,8,9')
+		 );
+		 $data = 'P'.str_replace($replace['replace'], $replace['search'], $result[1]);
+	}
+	return $data;
+}
+?>

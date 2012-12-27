@@ -1,0 +1,657 @@
+<?php
+/**
+*	AGENCEPLUS -> DEFAULT
+**/
+function create_stupeflix_xml_AGENCEPLUS(&$options){
+	$options['TEMPLATE'] = 'AGENCEPLUS';
+	$options['REF_VIDEO'] = "G-".$options['INFOS']['TOUR']['REF_VISITE'];
+	$options['MAP_ACTIVE'] = false;
+	$options['COUNTRY'] = "AGENCEPLUS";
+	$options['MUSIC'] = '11111117-8F9D-4405-9FFB-FCF00658E9F7';
+	$options['DPE_ACTIVATE'] = true;
+	return create_stupeflix_xml_DEFAULT($options);
+}
+
+/**
+*	US -> DEFAULT
+**/
+function create_stupeflix_xml_US(&$options){
+	$options['TEMPLATE'] = 'US';
+	$options['COUNTRY'] = "US";
+	$options['MAP_ACTIVE'] = true;
+	return create_stupeflix_xml_DEFAULT($options);
+}
+
+function create_stupeflix_xml_PACIFIC(&$options){
+	$options['TEMPLATE'] = 'PACIFIC';
+	$options['MAIN_TEMPLATE'] = 'US';
+	$options['COUNTRY'] = "US";
+	$options['MAP_ACTIVE'] = true;
+	return create_stupeflix_xml_DEFAULT($options);
+}
+
+/**
+*	FR -> DEFAULT
+**/
+function create_stupeflix_xml_FR(&$options){
+	$options['TEMPLATE'] = 'FR';
+	$options['MAP_ACTIVE'] = false;
+	$options['COUNTRY'] = "FR";
+	$options['DPE_ACTIVATE'] = true;
+	return create_stupeflix_xml_DEFAULT($options);
+}
+
+// main function
+function create_stupeflix_xml_DEFAULT(&$options){
+	global $videos_options;
+	if($options['TEMPLATE'] == ""){
+		$return = ($options['INFOS']['TOUR']['ID_PAYS'] == "US" ? create_stupeflix_xml_US($options) : create_stupeflix_xml_FR($options));
+		return $return;
+	}
+	$options['MAIN_TEMPLATE'] = "DEFAULT";
+	$map_active = ($options['MAP_ACTIVE'] === true);
+	$url_logo_video = "";
+	$url_logo_user = "";
+	$url_logo_sci = "";
+	$url_logo_corp = "";
+//	$url_logo_start = "";
+//	$url_logo_end = "";
+	$url_map = "";
+	$xml = "";
+	
+	if(is_guid($options['INFOS']['USER']['ID_LOGO_VIDEO'])){
+		$url_logo_video = clean_url(str_replace( array('#ID#','#EXT#'), array($options['INFOS']['USER']['ID_LOGO_VIDEO'], $options['INFOS']['USER']['ID_LOGO_VIDEO_EXT']), URL_IMG_VIDEO_LOGO));
+	}
+	
+	if(is_guid($options['INFOS']['USER']['ID_LOGO_SOCIETE'])){
+		$url_logo_sci = clean_url(str_replace(array('#ID#','#EXT#'), array($options['INFOS']['USER']['ID_LOGO_SOCIETE'], $options['INFOS']['USER']['ID_LOGO_SOCIETE_EXT']), URL_IMG_AGENCY));
+	}
+	
+	if(is_guid($options['INFOS']['USER']['ID_LOGO_USER'])) {
+		$url_logo_user = clean_url(str_replace(array('#ID#','#EXT#'), array($options['INFOS']['USER']['ID_LOGO_USER'],$options['INFOS']['USER']['ID_LOGO_USER_EXT']), URL_IMG_USER));
+	}
+
+	if($options['INFOS']['USER']['ID_LOGO_DISTRIB'] != ""){
+		$url_logo_corp = str_replace('#LOGO#', $options['INFOS']['USER']['ID_LOGO_DISTRIB'], URL_DIFFUSION_LOGOAGENT);
+	}	
+	$dico = loadDicoTemplate($options['INFOS']['TOUR']['ID_LANGUE'], 'DEFAULT');
+	$options['TEXT'] = array(
+		'NOM_SOCIETE' => html_entity_decode($options['INFOS']['USER']['NOM_SOCIETE'], ENT_COMPAT | ENT_HTML401, 'UTF-8'),
+		'TELEPHONE' => $options['INFOS']['USER']['TELEPHONE'.($options['INFOS']['USER']['TELEPHONE'] != "" ? '' : '_UTILISATEUR')],
+		'REF_VISITE' => $options['INFOS']['TOUR']['REF_VISITE'],
+		'EMAIL' => $options['INFOS']['USER']['EMAIL_UTILISATEUR'],
+		'NOM' => $options['INFOS']['USER']['NOM_UTILISATEUR']." ".$options['INFOS']['USER']['PRENOM_UTILISATEUR'],
+		'DPE_TITLE' => "DPE / GES",
+		'DPE' => ($options['INFOS']['TOUR']['DPE_VALEUR'] != "" ? $options['INFOS']['TOUR']['DPE_VALEUR'] : $options['INFOS']['TOUR']['DPE_LETTRE'] ),
+		'GES' => ($options['INFOS']['TOUR']['GES_VALEUR'] != "" ? $options['INFOS']['TOUR']['GES_VALEUR'] : $options['INFOS']['TOUR']['GES_LETTRE'] ),
+	);
+
+	$options['URL_LOGO'] = $url_logo_video;
+	if($options['COUNTRY'] == 'US'){
+		if($options['INFOS']['USER']['TELEPHONE_UTILISATEUR'] != ""){
+			$options['TEXT']['TELEPHONE'] = $options['INFOS']['USER']['TELEPHONE_UTILISATEUR'];
+		}else if($options['INFOS']['USER']['MOBILE_UTILISATEUR'] != ""){
+			$options['TEXT']['TELEPHONE'] = $options['INFOS']['USER']['MOBILE_UTILISATEUR'];
+		}else{
+			$options['TEXT']['TELEPHONE'] = $options['INFOS']['USER']['TELEPHONE'];		
+		}
+		if($options['URL_LOGO'] == ""){ $options['URL_LOGO'] = $url_logo_user;}
+		if($options['URL_LOGO'] == ""){ $options['URL_LOGO'] = $url_logo_sci;}
+		$options['TEXT']['NOM'] = $options['INFOS']['USER']['PRENOM_UTILISATEUR']." ".$options['INFOS']['USER']['NOM_UTILISATEUR'];
+		$options['TEXT']['INFOS'] = array();
+		$text = "";
+		if($options['INFOS']['TOUR']['NB_BATHROOM'] != "" || $options['INFOS']['TOUR']['NB_BEDROOM'] != ""){
+			if($options['INFOS']['TOUR']['NB_BEDROOM'] != ""){ $text .= $options['INFOS']['TOUR']['NB_BEDROOM']."#BR";}
+			if($options['INFOS']['TOUR']['NB_BATHROOM'] != ""){ $text .= ($options['INFOS']['TOUR']['NB_BATHROOM'] != "" ? ", " : "").$options['INFOS']['TOUR']['NB_BATHROOM']."#BA";}				
+		}
+		if($options['INFOS']['TOUR']['SQUARE_FEET']!= "" && $options['INFOS']['TOUR']['SQUARE_FEET'] > 0){ $text .= ($text != "" ? " - " : "").number_format($options['INFOS']['TOUR']['SQUARE_FEET'])." sqft";}
+		if($text != ""){ $options['TEXT']['INFOS'][] = $text;}
+		if($options['INFOS']['TOUR']['ADRESSE'] != ""){
+			$options['TEXT']['INFOS'][] = $options['INFOS']['TOUR']['ADRESSE'];
+		}
+
+		$text = "";
+		if($options['INFOS']['TOUR']['VILLE'] != ""){ $text .= $options['INFOS']['TOUR']['VILLE'];}
+		if($options['INFOS']['TOUR']['CODE_POSTAL'] != ""){ $text .= ($text != "" ? ", " : "").$options['INFOS']['TOUR']['CODE_POSTAL'];}
+		if($text != ""){ $options['TEXT']['INFOS'][] = $text;}
+		$options['TEXT']['USER'] = array();
+		if($options['TEXT']['NOM'] != ""){ $options['TEXT']['USER'][] = $options['TEXT']['NOM'];}
+		if($options['TEXT']['TELEPHONE'] != ""){ $options['TEXT']['USER'][] = $options['TEXT']['TELEPHONE'];}
+		if($options['TEXT']['EMAIL'] != ""){ $options['TEXT']['USER'][] = $options['TEXT']['EMAIL'];}
+	}else{
+		if($options['URL_LOGO'] == ""){ $options['URL_LOGO'] = $url_logo_sci;}
+		else if($options['URL_LOGO'] == ""){ $options['URL_LOGO'] = $url_logo_user;}
+	}
+	if($options['IS_CORPORTATE'] || $options['URL_LOGO'] == ""){ $options['URL_LOGO'] = $url_logo_corp;}
+	if($options['URL_LOGO'] == "" && $options['COUNTRY'] == "AGENCEPLUS"){ $options['URL_LOGO'] = URL_VIDEO_LOGO_AGENCEPLUS;}
+
+	if($options['INFOS']['USER']['URL_LOGO_SOCIETE'] != ""){ $options['URL_LOGO'] = $options['INFOS']['USER']['URL_LOGO_SOCIETE'];}
+	
+	if($options['TEXT']['TELEPHONE'] != ""){ $options['TEXT']['TELEPHONE'] = $dico['phone']." ".$options['TEXT']['TELEPHONE'];}
+	else{ $options['TEXT']['TELEPHONE'] = "";}	
+	if($options['TEXT']['REF_VISITE'] != ""){ $options['TEXT']['REF_VISITE'] = $dico['ref']." ".$options['TEXT']['REF_VISITE'];}
+	else{ $options['TEXT']['REF_VISITE'] = "";}
+
+	if($map_active){
+		if(!$options['INFOS']['TOUR']['LATITUDE'] || !$options['INFOS']['TOUR']['LONGITUDE'] ){
+			$gps = getGPS( $options['ID_VIDEO'], $options['INFOS']['TOUR']['CODE_POSTAL'], $options['INFOS']['TOUR']['VILLE'], $options['INFOS']['TOUR']['ADRESSE'], $options['INFOS']['TOUR']['ID_PAYS']);
+			list( $options['INFOS']['TOUR']['LATITUDE'], $options['INFOS']['TOUR']['LONGITUDE']) = explode('#',$gps);
+		}
+		if($options['INFOS']['TOUR']['LATITUDE'] && $options['INFOS']['TOUR']['LONGITUDE'] ){
+			$options['URL_MAP'] = createMapImage( $options['ID_VIDEO'], $options['INFOS']['TOUR']['LATITUDE'], $options['INFOS']['TOUR']['LONGITUDE'], $options['PROFIL_SIZE']['WIDTH'], $options['PROFIL_SIZE']['HEIGHT']);
+		}
+	}else $options['URL_MAP'] = "";
+
+	$xml = write_stupeflix_xml_default($options);
+	return $xml;
+}
+
+//xml function
+/*****************************************************************
+*	$tab_images[] => array('URL_IMAGE'=><url>,'TITLE'=><title>,'TYPE'=><id_type_vue>)
+******************************************************************/
+function write_stupeflix_xml_default($options){
+
+	$profiles 	= array($options['PROFIL']);
+	$tab_images = $options['IMAGES'];
+	$id_video 	= $options['ID_VIDEO'];
+	$sound 		= $options['MUSIC'];
+	$url_textospeech = $options['TTS'];
+	$url_map 	= $options['URL_MAP'];
+	$url_logo 	= $options['URL_LOGO'];
+	$lang 		= $options['INFOS']['TOUR']['ID_LANGUE']; 
+
+	$url_dpe = getImagesURL('dpe_bg'.($options['IS_YOUTUBE'] ? '' : '_mobile' ).'.png', $options['MAIN_TEMPLATE'], $options['TEMPLATE']);
+	$url_dpe_marker = getImagesURL('dpe_marker.png', $options['MAIN_TEMPLATE'], $options['TEMPLATE']);
+
+
+	if($options['IS_YOUTUBE']){
+		$more_options['VIDEO_YOUTUBE'] = $options['PROFIL'];
+	}
+	if($url_logo != ""){
+		$tmp_img = PATH_TEMP.rand().".jpg";
+		file_put_contents($tmp_img, @file_get_contents($url_logo));
+		if(preg_match('/.png$/i',$url_logo) > 0){
+			$img_src = @imagecreatefrompng($tmp_img);
+		}else{
+			$img_src = @imagecreatefromjpeg($tmp_img);
+		}
+		list($width, $height) = getimagesize($tmp_img);
+		@unlink($tmp_img);
+		if($options['COUNTRY'] != 'US'){
+			$logo_limit = array(
+				'start' => get_image_position(
+					array(	
+						'x' => 0.2, 'y' => 0.15,
+						'width' => $width,  'height' => $height, 
+						'width_max' => 0.6, 'height_max' => 0.7,
+						'width_min' => 0.2, 'height_min' => 0.3,
+						'image_width' => $options['PROFIL_SIZE']['WIDTH'], 'image_height' => $options['PROFIL_SIZE']['HEIGHT'],
+					)
+				),
+				'end' => get_image_position(
+					array(	
+						'x' => 0.1, 'y' => 0.055,
+						'width' => $width,  'height' => $height, 
+						'width_max' => 0.8, 'height_max' => 0.40,
+						'width_min' => 0.3, 'height_min' => 0.30,
+						'image_width' => $options['PROFIL_SIZE']['WIDTH'], 'image_height' => $options['PROFIL_SIZE']['HEIGHT'],
+					)
+				)
+			);
+		}else{
+			$logo_limit = get_image_position(
+				array(	
+					'x' => 0.01, 'y' => 0.52,
+					'width' => $width,  'height' => $height, 
+					'width_max' => 0.26, 'height_max' => 0.3,
+					'width_min' => 0.20, 'height_min' => 0.20,
+					'image_width' => $options['PROFIL_SIZE']['WIDTH'], 'image_height' => $options['PROFIL_SIZE']['HEIGHT'],
+				)
+			);
+		}
+	}
+
+	$dpe_marker = $options['TEXT']['DPE'];
+	$ges_marker = $options['TEXT']['GES'];
+	if($options['DPE_ACTIVATE'] === true){
+		if($dpe_marker != "" && preg_match('/^[A-G]$/', $dpe_marker) == false) $dpe_marker = fix_dpe_val($dpe_marker);
+		if($ges_marker != "" && preg_match('/^[A-G]$/', $ges_marker) == false) $ges_marker = fix_ges_val($ges_marker);
+		$options['DPE_ACTIVATE'] = ($dpe_marker != "" || $ges_marker != "");
+	}	
+		
+	$overlay_full = ' top="0" left="0" height="1" width="1" ';
+//	$result = array();
+	$xml = array();
+	$lang_infos = getLangSpec($lang);
+	if(count($tab_images) > 0){
+		// on prépares les effets si le nombre d'images est inférieur à 3
+		if(count($tab_images) < 3){ 
+			$listEffects = array('panel', 'kenburns' ,'flower');
+			do{
+				$tab_images[] = $tab_images[0];
+			}while(count($tab_images) < 3);
+		}
+//		if($more_options['VIDEO_YOUTUBE'] == ""){ $more_options['VIDEO_YOUTUBE'] = "youtube";}
+		$transitionsMade = array();
+		$effetsMade = array();
+			
+		$xml[] = '		<stack>';
+		$xml[] = '			<sequence>';
+		$xml[] = '				<!-- START LOGO START -->';
+		if($options['COUNTRY'] == 'US'){
+			$xml = write_stupeflix_xml_default_logo_us($xml, $options, $logo_limit,  2);	
+			$xml[] = '				<transition '.ChooseTransition($transitionsMade).' duration="1" />';
+		}else if($url_logo != ""){
+			$xml[] = '				<stack duration="2">';
+			$xml[] = '					<overlay '.$overlay_full.'>';
+			$xml[] = '						<image color="#FFFFFF" />';
+			$xml[] = '					</overlay>';
+			$xml[] = '					<overlay top="'.$logo_limit['start']['y'].'" left="'.$logo_limit['start']['x'].'" width="'.$logo_limit['start']['width'].'" height="'.$logo_limit['start']['height'].'">';
+			$xml[] = '						<image filename="'.fix_xml($url_logo).'" />';
+			$xml[] = '					</overlay>';
+			$xml[] = '				</stack>';
+			$xml[] = '				<transition '.ChooseTransition($transitionsMade).' duration="1" />';
+		}
+		$xml[] = '				<!-- START LOGO END -->';
+		$nb_images = 0;
+		for($i=0;$i < count($tab_images); $i++){
+			$image = $tab_images[$i];
+			$effect = 'kenburns';
+			$duration = '7.0';
+			if($listEffects[$i]){ $effect = $listEffects[$i];}
+			$direction = '';
+			if(strpos($image['URL_IMAGE'],'thumb')!== false){ $direction = 'direction="'.($i%2==0 ? 'negative' : 'positive').'"';}
+			$xml[] = '	 			<stack>';
+			$xml[] = '					<effect '.ChooseEffects($effetsMade).' duration="7.0">';
+			$xml[] = '						<image filename="'.fix_xml($image['URL_IMAGE']).'" />';
+			$xml[] = '					</effect>';
+			if($image['TITLE'] != ''){
+				if(!$lang_infos['has_special_char']){
+					$xml[] = ' 					<text type="legend" height="'.VIDEO_LEGEND_HEIGHT.'"><![CDATA['.$image['TITLE'].']]></text>';
+				}else{
+					$xml[] = '					<stack>';
+					$xml[] = '						<sequence>';
+					$xml[] = '							<text type="zone" duration="1.0"> </text>';
+					$xml[] = '							<transition type="over" direction="up" duration="1.0"/>';
+					$xml[] = '							<overlay top="0.85" bottom="0" width="1" duration="7.0">';
+					$xml[] = '									<image color="#000000">';
+					$xml[] = '										<filter type="alpha" alphaStart="0.6" alphaEnd="0.6" timeOffset="0.0" >';
+					$xml[] = '										</filter> ';
+					$xml[] = '									</image>';
+					$xml[] = '							</overlay>';
+					$xml[] = '							<transition type="under" direction="down" duration="1.0"/>';
+					$xml[] = '							<text type="zone" duration="1.0"> </text>';
+					$xml[] = '						</sequence>';
+					$xml[] = '						<stack>';
+					$xml[] = '							<text type="advanced" height="0.15" fontcolor="#FFFFFF" vector="true" stretch="condensed" reference="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" align="center" duration="7.0"><![CDATA['.$image['TITLE'].']]>';
+					$xml[] = '								<animator type="custom">';
+					$xml[] = '									<key scale="1,1,1" pos="0.0,-1.09,0" time="0.0"/>';
+					$xml[] = '									<key scale="1,1,1" pos="0.0,-1.09,0" time="1.6"/>';
+					$xml[] = '									<key scale="1,1,1" pos="0.0,-0.5,0.0" time="7.5"/>';
+					$xml[] = '								</animator>';
+					$xml[] = '							</text>';
+					$xml[] = '							<filter type="mask" opaqueColor="#000000" transparentColor="#FFFFFF">';
+					$xml[] = '								<stack>';
+					$xml[] = '									<overlay top="0" left="0" width="1" height="1" duration="7">';
+					$xml[] = '										<image color="#FFFFFF" />';
+					$xml[] = '									</overlay>';
+					$xml[] = '									<overlay top="0" height="0.85" width="1.0" duration="..">';
+					$xml[] = '										<image color="#000000" />';
+					$xml[] = '									</overlay>';
+					$xml[] = '								</stack>';
+					$xml[] = '							</filter>';
+					$xml[] = '						</stack>';
+					$xml[] = '					</stack>';
+				}
+			}
+			$xml[] = '	 			</stack>';
+			$nb_images++;
+			if($i > NB_MAX_IMG && !$options['IS_YOUTUBE']){ break;}
+		}
+		if($options['DPE_ACTIVATE'] === true){
+			$dpe_pos_x = ($options['IS_YOUTUBE'] ? "1.6" : "1.1");
+			$ges_pos_x = ($options['IS_YOUTUBE'] ? "3.05" : "2.35");
+			$dpe_line = "0.25";
+			$duration_dpe = "7";
+			$letter_pos = array(
+				"A" => "-0.320",
+				"B" => "-0.477",
+				"C" => "-0.634",
+				"D" => "-0.792",
+				"E" => "-0.949",
+				"F" => "-1.110",
+				"G" => "-1.267"
+			);
+			$xml[] = '				<transition '.ChooseTransition($transitionsMade).' duration="1" />';
+			$xml[] = '				<!-- DPE/GES START -->';
+			$xml[] = '				<stack>';
+			$xml[] = '					<overlay duration="'.$duration_dpe.'" '.$overlay_full.'>';
+			$xml[] = '						<image color="#FFFFFF" />';
+			$xml[] = '					</overlay>';
+			if($dpe_marker != ""){
+				$xml[] = '					<!-- DPE START -->';
+				$xml[] = '					<stack>';
+				$xml[] = '						<overlay top="0.039" height="0.003" left="-'.$dpe_line.'" width="'.$dpe_line.'" duration="'.$duration_dpe.'">';
+				$xml[] = '							<image color="#000000" />';
+				$xml[] = '						</overlay>';
+				$xml[] = '						<overlay top="0" height="0.08" left="0" width="0.09" duration="..">';
+				$xml[] = '							<image filename="'.fix_xml($url_dpe_marker).'" />';
+				$xml[] = '						</overlay>';
+				if(strlen($options['TEXT']['DPE']) <= 3){
+					$xml[] = '						<text type="zone" vector="true" top="-0.012" height="0.1" left="-0.017" width="0.15" align="center,center" duration=".." weight="bold" fontcolor="#FFFFFF" ><![CDATA['.$options['TEXT']['DPE'].']]></text>';
+				}
+				$xml[] = '						<animator type="custom">';
+				$xml[] = '							<key pos="'.$dpe_pos_x.','.$letter_pos[$dpe_marker].',0" time="0"/>';
+				$xml[] = '						</animator>';
+				$xml[] = '					</stack>';
+				$xml[] = '					<!-- DPE END -->';
+			}
+			if($ges_marker != ""){
+				$xml[] = '					<!-- GES START -->';
+				$xml[] = '					<stack>';
+				$xml[] = '						<overlay top="0.039" height="0.003" left="-'.$dpe_line.'" width="'.$dpe_line.'" duration="'.$duration_dpe.'">';
+				$xml[] = '							<image color="#000000" />';
+				$xml[] = '						</overlay>';
+				$xml[] = '						<overlay top="0" height="0.08" left="0" width="0.09" duration="..">';
+				$xml[] = '							<image filename="'.fix_xml($url_dpe_marker).'" />';
+				$xml[] = '						</overlay>';
+				if(strlen($options['TEXT']['GES']) <= 3){
+					$xml[] = '						<text type="zone" vector="true" top="-0.012" height="0.1" left="-0.017" width="0.15" align="center,center" duration=".." weight="bold" fontcolor="#FFFFFF" ><![CDATA['.$options['TEXT']['GES'].']]></text>';
+				}
+				$xml[] = '						<animator type="custom">';
+				$xml[] = '							<key pos="'.$ges_pos_x.','.$letter_pos[$ges_marker].',0" time="0"/>';
+				$xml[] = '						</animator>';
+				$xml[] = '					</stack>';
+				$xml[] = '					<!-- GES END -->';
+			}
+			$xml[] = '					<overlay duration=".." '.$overlay_full.'>';
+			$xml[] = '						<image filename="'.fix_xml($url_dpe).'" />';
+			$xml[] = '					</overlay>';
+			$xml[] = ' 					<text type="legend" height="'.VIDEO_LEGEND_HEIGHT.'"><![CDATA['.$options['TEXT']['DPE_TITLE'].']]></text>';
+			$xml[] = '				</stack>';
+			$nb_images++;
+		}
+		if(is_array($url_map) && count($url_map) > 0){
+			$xml[] = '				<transition '.ChooseTransition($transitionsMade).' duration="1" />';
+			$xml[] = '				<!-- URL MAP START -->';
+			$xml[] = '				<overlay duration="7.0">';
+			$xml[] = '					<image filename="'.fix_xml($url_map).'" />';
+			$xml[] = '				</overlay>';
+			$xml[] = '				<!-- URL MAP END -->';
+			$nb_images++;
+		}
+		if($options['COUNTRY'] == 'US'){
+			$xml = write_stupeflix_xml_default_logo_us($xml, $options, $logo_limit, 5);
+		}else if($url_logo != ""){
+			$xml[] = '				<!-- END LOGO START -->';
+			$xml[] = '				<transition '.ChooseTransition($transitionsMade).' duration="1" />';
+			$xml[] = '				<stack duration="5.0">';
+			$xml[] = '					<overlay '.$overlay_full.'>';
+			$xml[] = '						<image filename="'.fix_xml($tab_images[0]['URL_IMAGE']).'" />';
+			$xml[] = '					</overlay>';
+			$xml[] = '					<overlay '.$overlay_full.'>';
+			$xml[] = '						<image color="#000000">';
+			$xml[] = '							<filter type="alpha" alphaStart="0.7" alphaEnd="0.7" duration=".." />';
+			$xml[] = '						</image>';
+			$xml[] = '					</overlay>';
+			if($url_logo != ""){
+				$border = array( 'y' => 2/$options['PROFIL_SIZE']['HEIGHT'], 'x' => 2/$options['PROFIL_SIZE']['WIDTH'] );
+				$xml[] = '					<overlay top="'.($logo_limit['end']['y']-$border['y']).'" left="'.($logo_limit['end']['x']-$border['x']).'" width="'.($logo_limit['end']['width']+$border['x']*2).'" height="'.($logo_limit['end']['height']+$border['y']*2).'">';
+				$xml[] = '						<image color="#FFFFFF" />';
+				$xml[] = '					</overlay>';
+				$xml[] = '					<overlay top="'.$logo_limit['end']['y'].'" left="'.$logo_limit['end']['x'].'" width="'.$logo_limit['end']['width'].'" height="'.$logo_limit['end']['height'].'">';
+				$xml[] = '						<image filename="'.fix_xml($url_logo).'" />';
+				$xml[] = '					</overlay>';
+			}
+			$font_limit = getAdvancedTextFontSize(590, $options['TEXT']['NOM'.($options['COUNTRY'] == "FR" ? '_SOCIETE' : '')], 22, true);
+			$xml[] = '					<text type="advanced" fontcolor="#FFFFFF" vector="true" stretch="condensed" align="center" weight="bold" '.$font_limit.'><![CDATA['.$options['TEXT']['NOM'.($options['COUNTRY'] == "FR" ? '_SOCIETE' : '')].']]>';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key pos="0,-0.25,0" time="0"/>';
+			$xml[] = '						</animator>';
+			$xml[] = '					</text>';
+			$font_limit = getAdvancedTextFontSize(590, $options['TEXT']['REF_VISITE'], 20, true);
+			$xml[] = '					<text type="advanced" fontcolor="#FFFFFF" vector="true" stretch="condensed" align="center" '.$font_limit.'><![CDATA['.$options['TEXT']['REF_VISITE'].']]>';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key pos="0,-0.55,0" time="0" />';
+			$xml[] = '						</animator>';
+			$xml[] = '					</text>';
+			$font_limit = getAdvancedTextFontSize(590, $options['TEXT']['TELEPHONE'], 20, true);
+			$xml[] = '					<text type="advanced" fontcolor="#FFFFFF" vector="true" stretch="condensed" align="center" '.$font_limit.'><![CDATA['.$options['TEXT']['TELEPHONE'].']]>';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key pos="0,-0.85,0" time="0" />';
+			$xml[] = '						</animator>';
+			$xml[] = '					</text>';
+			$xml[] = '				</stack>';
+			$xml[] = '				<!-- END LOGO END -->';			
+		}
+		$xml[] = ' 			</sequence>';
+
+		$volume_sound = '0.7';
+		if($url_textospeech != ''){ 
+			$xml[] = '			<audio filename="'.fix_xml($url_textospeech).'" duration="'.(($nb_images*7)-1).'" margin-start="2.0" volume="1.0"/>';
+			$volume_sound = '0.15';
+		}
+		$xml[] = ChooseSoundDuration((($nb_images*7)-(round($nb_images/7)-1)*7-$nb_images%7-1), $volume_sound, $sound);
+		$xml[] = '		</stack>';
+		$xml = implode("\n", $xml);
+	}
+	return $xml;
+}
+
+function write_stupeflix_xml_default_logo_us($xml, $options, $logo_limit, $duration ){
+	$overlay_full = ' top="0" left="0" width="1" height="1" ';
+	$xml[] = '				<stack duration="'.$duration.'">';
+	$xml[] = '					<overlay '.$overlay_full.'>';
+	$xml[] = '						<image filename="'.fix_xml($options['IMAGES'][0]['URL_IMAGE']).'" />';
+	$xml[] = '					</overlay>';
+	$xml[] = '					<overlay top="0.14" left="0" width="1" height="'.((1+9*count($options['TEXT']['INFOS']))/100).'">';
+	$xml[] = '						<image color="#000000">';
+	$xml[] = '							<filter type="alpha" alphaStart="0.7" alphaEnd="0.7" duration=".." />';
+	$xml[] = '						</image>';
+	$xml[] = '					</overlay>';
+	if(count($options['TEXT']['INFOS']) > 0){
+		$line_start = 0.55;
+		foreach($options['TEXT']['INFOS'] as $v){
+			$font_limit = getAdvancedTextFontSize(590, $v, 18, true);
+			$xml[] = '					<text type="advanced" fontcolor="#FFFFFF" vector="true" stretch="condensed" align="left" 	weight="bold" '.$font_limit.'><![CDATA['.$v.']]>';
+			$xml[] = '						<animator type="custom">';	
+			$xml[] = '							<key pos="-1.76,'.$line_start.',0" time="0"/>';
+			$xml[] = '						</animator>';
+			$xml[] = '					</text>';
+			$line_start -= 0.16;
+		}
+	}
+	$xml[] = '					<overlay  top="0.5" left="0" width="1" height="0.45">';
+	$xml[] = '						<image color="#000000">';
+	$xml[] = '							<filter type="alpha" alphaStart="0.7" alphaEnd="0.7" duration=".." />';
+	$xml[] = '						</image>';
+	$xml[] = '					</overlay>';
+	if($options['URL_LOGO'] != ""){
+		$logo_limit['y'] = 0.52;
+//		$logo_limit['x'] = 0.01;
+		$xml[] = '					<overlay top="'.$logo_limit['y'].'" left="'.$logo_limit['x'].'" width="'.($logo_limit['width']).'" height="'.($logo_limit['height']).'">';
+		$xml[] = '						<image filename="'.fix_xml($options['URL_LOGO']).'" />';
+		$xml[] = '					</overlay>';
+		$xml[] = '					<overlay top="0.53" left="0.270" width="0.001" height="0.221">';
+		$xml[] = '						<image color="#FFFFFF" />';
+		$xml[] = '					</overlay>';
+	}
+	if(count($options['TEXT']['USER']) > 0){
+		$line_start = -0.15;
+		foreach($options['TEXT']['USER'] as $v){
+			$font_limit = getAdvancedTextFontSize(($options['URL_LOGO'] != "" ? 410 : 590), $v, 15, true);
+			$xml[] = '					<text type="advanced" fontcolor="#FFFFFF" vector="true" stretch="condensed" align="left" 	weight="bold" '.$font_limit.'><![CDATA['.$v.']]>';
+			$xml[] = '						<animator type="custom">';
+			$xml[] = '							<key pos="'.($options['URL_LOGO'] != "" ? -0.8 : '-1.76').','.$line_start.',0" time="0"/>';
+			$xml[] = '						</animator>';
+			$xml[] = '					</text>';
+			$line_start -= 0.16;
+		}
+	}
+	$xml[] = '					<overlay bottom="0.06" right="0.005" width="'.(96/$options['PROFIL_SIZE']['WIDTH']).'" height="'.(74/$options['PROFIL_SIZE']['HEIGHT']).'">';
+	$xml[] = '						<image filename="'.fix_xml(URL_VIDEO_LOGO_EQUALHOUSING).'" />';
+	$xml[] = '					</overlay>';
+	$xml[] = '				</stack>';			
+	return $xml;
+}
+/*
+function write_stupeflix_xml_content($options){
+
+	$profiles 	= array($options['PROFIL']);
+	$tab_images = $options['IMAGES'];
+	$id_video 	= $options['ID_VIDEO'];
+	$sound 		= $options['MUSIC'];
+	$url_textospeech = $options['TTS'];
+	$url_map 	= $options['URL_MAP'];
+	$url_logo 	= $options['URL_LOGO_START'];
+	$logo_end 	= $options['URL_LOGO_END'];
+	$lang 		= $options['INFOS']['TOUR']['ID_LANGUE']; 
+	if($options['IS_YOUTUBE']){
+		$more_options['VIDEO_YOUTUBE'] = $options['PROFIL'];
+	}
+	
+	$result = array();
+	$content = array();
+	$lang_infos = getLangSpec($lang);
+	if(count($tab_images) > 0 && count($profiles) > 0){
+		// on prépares les effets si le nombre d'images est inférieur à 3
+		if(count($tab_images) < 3){ 
+			$listEffects = array('panel', 'kenburns' ,'flower');
+			do{
+				$tab_images[] = $tab_images[0];
+			}while(count($tab_images) < 3);
+		}
+		if($more_options['VIDEO_YOUTUBE'] == ""){ $more_options['VIDEO_YOUTUBE'] = "youtube";}
+		$transitionsMade = array();
+		$effetsMade = array();
+			
+		$content[] = "		<stack>\n";
+		$content[] =	"			<sequence>\n";
+		if($url_logo != ""){
+//			$content[] = "				<effect type=\"none\" duration=\"2.0\">\n";
+			$content[] = "				<overlay duration=\"2.0\">\n";
+			$content[] = array(
+				'default'=>"					<image filename=\"".fix_xml($url_logo)."\" />\n",
+//				$more_options['VIDEO_YOUTUBE']=>"					<image filename=\"".fix_xml($url_logo."&resolution=".$more_options['VIDEO_YOUTUBE'])."\" />\n"
+				$more_options['VIDEO_YOUTUBE']=>"					<image filename=\"".fix_xml($url_logo)."\" />\n"
+			);
+			$content[] = "				</overlay>\n";
+//			$content[] = "				</effect>\n";
+			$content[] = "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+		}
+		$nb_images = 0;
+		for($i=0;$i < count($tab_images);$i++){
+			$image = $tab_images[$i];
+			$effect = "kenburns";
+			$duration = "7.0";
+			if($listEffects[$i]){ $effect = $listEffects[$i];}
+			$direction = "";
+			if(strpos($image['URL_IMAGE'],"thumb")!== false){ $direction = "direction=\"".($i%2==0 ? "negative" : "positive")."\"";}
+			$tmp = "	 			<stack>\n";
+			$tmp .= "					<effect ".ChooseEffects($effetsMade)." duration=\"7.0\">\n";
+			$tmp .= "						<image filename=\"".fix_xml($image['URL_IMAGE'])."\" />\n";
+			$tmp .= "					</effect>\n";
+			if($image['TITLE'] != ""){
+				if(!$lang_infos['has_special_char']){
+					$tmp .= " 					<text type=\"legend\" height=\"".VIDEO_LEGEND_HEIGHT."\"><![CDATA[".$image['TITLE']."]]></text>\n";
+				}else{
+					$tmp .= "					<stack>\n";
+					$tmp .= "						<sequence>\n";
+					$tmp .= "							<text type=\"zone\" duration=\"1.0\"> </text>\n";
+					$tmp .= "							<transition type=\"over\" direction=\"up\" duration=\"1.0\"/>\n";
+					$tmp .= "							<overlay top=\"0.85\" bottom=\"0\" width=\"1\" duration=\"7.0\">\n";
+//					$tmp .= "								<effect type=\"none\" duration=\"..\">\n";
+					$tmp .= "									<image color=\"#000000\">\n";
+					$tmp .= "										<filter type=\"alpha\" alphaStart=\"0.6\" alphaEnd=\"0.6\" timeOffset=\"0.0\" >\n";
+					$tmp .= "										</filter> \n";
+					$tmp .= "									</image>\n";
+	//				$tmp .= "								</effect>\n";
+					$tmp .= "							</overlay>\n";
+					$tmp .= "							<transition type=\"under\" direction=\"down\" duration=\"1.0\"/>\n";
+					$tmp .= "							<text type=\"zone\" duration=\"1.0\"> </text>\n";
+					$tmp .= "						</sequence>\n";
+					$tmp .= "						<stack>\n";
+					$tmp .= "							<text type=\"advanced\" height=\"0.15\" fontcolor=\"#FFFFFF\" vector=\"true\" stretch=\"condensed\" reference=\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\" align=\"center\" duration=\"7.0\"><![CDATA[".$image['TITLE']."]]>\n";
+					$tmp .= "								<animator type=\"custom\">\n";
+					$tmp .= "									<key scale=\"1,1,1\" pos=\"0.0,-1.09,0\" time=\"0.0\"/>\n";
+					$tmp .= "									<key scale=\"1,1,1\" pos=\"0.0,-1.09,0\" time=\"1.6\"/>\n";
+					$tmp .= "									<key scale=\"1,1,1\" pos=\"0.0,-0.5,0.0\" time=\"7.5\"/>\n";
+					$tmp .= "								</animator>\n";
+					$tmp .= "							</text>\n";
+					$tmp .= "							<filter type=\"mask\" opaqueColor=\"#000000\" transparentColor=\"#FFFFFF\">\n";
+					$tmp .= "								<stack>\n";
+					$tmp .= "									<overlay top=\"0\" left=\"0\" width=\"1\" height=\"1\" duration=\"7\">\n";
+					$tmp .= "										<image color=\"#FFFFFF\" />\n";
+					$tmp .= "									</overlay>\n";
+					$tmp .= "									<overlay top=\"0\" height=\"0.85\" width=\"1.0\" duration=\"..\">\n";
+					$tmp .= "										<image color=\"#000000\" />\n";
+					$tmp .= "									</overlay>\n";
+					$tmp .= "								</stack>\n";
+					$tmp .= "							</filter>\n";
+					$tmp .= "						</stack>\n";
+					$tmp .= "					</stack>\n";
+				}
+			}
+			$tmp .= "	 			</stack>\n";
+			$tmp .= "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+			$nb_images++;
+			if($i < NB_MAX_IMG){ $content[] = $tmp;}
+			else{ $content[] = array($more_options['VIDEO_YOUTUBE']=>$tmp,'default'=>''); }
+		}
+		if(is_array($url_map) && count($url_map) > 0){
+//			$url_map = str_replace('maps.google.com/staticmap', 'apirr.previsite.com/publication/get_static_map.php', $url_map);
+//			$content[] = "				<effect type=\"none\" duration=\"7.0\">\n";
+			$content[] = "				<overlay duration=\"7.0\">\n";
+			$content[] = array(
+				'default' => "					<image filename=\"".fix_xml($url_map['default'])."\" />\n",
+				$more_options['VIDEO_YOUTUBE'] => "					<image filename=\"".fix_xml($url_map[$more_options['VIDEO_YOUTUBE']])."\" />\n"
+			);
+			$content[] = "				</overlay>\n";
+//			$content[] = "				</effect>\n";
+			$content[] = "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+			$nb_images++;
+		}
+		if($logo_end == "" && $url_logo != ""){ $logo_end = $url_logo;}
+		if($logo_end != ""){
+//			$content[] = "				<effect type=\"none\" duration=\"5.0\">\n";
+			$content[] = "				<overlay duration=\"5.0\">\n";
+			$content[] = array(
+				'default' => "					<image filename=\"".fix_xml($logo_end)."\" />\n",
+//				$more_options['VIDEO_YOUTUBE'] => "					<image filename=\"".fix_xml($logo_end."&resolution=".$more_options['VIDEO_YOUTUBE'])."\" />\n"
+				$more_options['VIDEO_YOUTUBE'] => "					<image filename=\"".fix_xml($logo_end)."\" />\n"
+			);
+			$content[] = "				</overlay>\n";
+//			$content[] = "				</effect>\n";
+		}
+		$content[] = " 			</sequence>\n";
+
+		$volume_sound = "0.7";
+		if($url_textospeech != ""){ 
+			$content[] = array(
+				'default' => "			<audio filename=\"".fix_xml($url_textospeech)."\" duration=\"".((($nb_images > NB_MAX_IMG ? NB_MAX_IMG : $nb_images)*7)-1)."\" margin-start=\"2.0\" volume=\"1.0\"/>\n",
+				$more_options['VIDEO_YOUTUBE'] => "			<audio filename=\"".fix_xml($url_textospeech)."\" duration=\"".(($nb_images*7)-1)."\" margin-start=\"2.0\" volume=\"1.0\"/>\n"
+			);
+			$volume_sound = "0.15";
+		}
+
+		$content[] = array(
+			'default' => ChooseSoundDuration(((($nb_images > NB_MAX_IMG ? NB_MAX_IMG+($url_map != ""?1:0) : $nb_images)*7)-1), $volume_sound, $sound),
+			$more_options['VIDEO_YOUTUBE'] => ChooseSoundDuration((($nb_images*7)-(round($nb_images/7)-1)*7-$nb_images%7-1), $volume_sound, $sound)
+		);
+
+		$content[] = "		</stack>\n";
+
+//		foreach($profiles as $profile){
+		$xml = "";
+		foreach($content as $row){
+			if(is_array($row)){ $xml .= $row[(!$options['IS_YOUTUBE'] ? "default" : $more_options['VIDEO_YOUTUBE'])];}
+			else{ $xml .= $row;}
+		}
+//		$result[] = array( 'profile'=>$profile, 'xml'=>$xml);
+//		}
+	}
+	return $xml;
+}
+ */
+?>

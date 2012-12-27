@@ -1,0 +1,767 @@
+<?php
+
+function centris($script_name, $tab_enabled, $workPath, $archive_path, $archive_file, $prefixe_archive) {
+	$path_ftp = PATH_FTP.'centrisca/';
+	$tab_zip_files = glob($path_ftp.'*.zip');
+
+//	$agence_file =  PATH_IMPORT_CONFIG.'centris.csv';
+//	$tab_enabled = get_enabled_accounts($agence_file);
+//	$tab_enabled = $users;
+	$testmode = isset($_GET['test']);
+
+	$tab_sql = array();
+
+	// transferer les fichiers recus vers un autre ftp...
+	$tab_srv = array(
+		array('host' => 'cobra.emedianet.com', 'log' => 'centris', 'pwd' => 'YouHaveAccess$')
+	);
+
+	// Controle apres modif CSV
+	if(isset($_GET['show_accounts'])) {
+		header('Content-type: text/plain; charset=UTF-8');
+		print_r($tab_enabled);
+		die;
+	}
+
+	// Portail supplementaires pour les clients offre Worldposting
+	$tab_partners_wp = array(
+		'SEGUNDAMANO' => ID_SEGUNDAMANO,
+		'LEBONCOIN' => ID_LEBONCOIN,
+		'CLASSADV' => ID_CLASSADV,
+		'ADCLIP' => ID_ADCLIP,
+		'MITULA' => ID_MITULA,
+		'LOCANTO' => ID_LOCANTO,
+		'VIVASTREET' => ID_VIVASTREET,
+		'RIGHTMOVE' => ID_RIGHTMOVE,
+		'IDEALISTA' => ID_IDEALISTA,
+		'IDEALISTAGM' => ID_IDEALISTAGM,
+		'LGSELOGER' => ID_LGSELOGER,
+		'LGTRULIA' => ID_LGTRULIA,
+		'OLX' => ID_OLX,
+		'IMMOSCOUT' => ID_IMMOSCOUT,
+		'99ACRES' => ID_99ACRES,
+		'REALESTATECOJP' => ID_REALESTATECOJP,
+		'HOMEIN' => ID_HOMEIN,
+		'REALESTATELB' => ID_REALESTATELB,
+		'IPROPSG' => ID_IPROPSG,
+		'IPROPMY' => ID_IPROPMY,
+		'PROPFINDER' => ID_PROPFINDER,
+		'SPITI24' => ID_SPITI24,
+		'DOMAVIN' => ID_DOMAVIN,
+		'METROSCUBICOS' => ID_METROSCUBICOS,
+		'GOHOME' => ID_GOHOME,
+		'PRIVPROP' => ID_PRIVPROP,
+		'LGIMMOIT' => ID_LGIMMOIT,
+		'DOMAINCOM' => ID_DOMAINCOM,
+		'ENORMO' => ID_ENORMO,
+		'OFERTY' => ID_OFERTY
+	);
+
+	// dernier fichier
+	rsort($tab_zip_files);
+	$zip_file = $tab_zip_files[0];
+
+	$data = array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array());
+	if(is_file($zip_file)) {
+		// fichier a transferer sur ftp...
+		$tab_transfer = array($zip_file);
+
+		$cmd = 'unzip -j '.$zip_file.' -d '.$workPath;
+		exec($cmd);
+
+		// Lorsque envoi full, sauvegarde du fichier dico
+		$file = $workPath.'VALEURS_FIXES.TXT';
+		$file_sav = PATH_CACHE.'centris-'.strtolower(basename($file));
+		if(is_file($file)) {
+			copy($file, $file_sav);
+			copy($zip_file, PATH_CACHE.'centris-'.strtolower(basename($zip_file)));
+		} else if(is_file($file_sav)) {
+			$file = $file_sav;
+			$tab_transfer[] = $file;
+		}
+		$dico_centris = centris_parse_dico($file);
+
+		// Lorsque envoi full, sauvegarde du fichier dico
+		$file = $workPath.'MUNICIPALITES.TXT';
+		$file_sav = PATH_CACHE.'centris-'.strtolower(basename($file));
+		if(is_file($file)) {
+			copy($file, $file_sav);
+		} else if(is_file($file_sav)) {
+			$file = $file_sav;
+			$tab_transfer[] = $file;
+		}
+		$cities_centris = centris_parse_villes($file);
+
+		// Lorsque envoi full, sauvegarde du fichier dico
+		$file = $workPath.'QUARTIERS.TXT';
+		$file_sav = PATH_CACHE.'centris-'.strtolower(basename($file));
+		if(is_file($file)) {
+			copy($file, $file_sav);
+		} else if(is_file($file_sav)) {
+			$file = $file_sav;
+			$tab_transfer[] = $file;
+		}
+		$quartiers_centris = centris_parse_quartiers($file);
+
+		// Lorsque envoi full, sauvegarde du fichier dico
+		$file = $workPath.'DEPENSES.TXT';
+		$file_sav = PATH_CACHE.'centris-'.strtolower(basename($file));
+		if(is_file($file)) {
+			copy($file, $file_sav);
+		} else if(is_file($file_sav)) {
+			$file = $file_sav;
+			$tab_transfer[] = $file;
+		}
+		$depenses_centris = centris_parse_depenses($file);
+
+		// Lorsque envoi full, sauvegarde du fichier dico
+		$file = $workPath.'GENRES_PROPRIETES.TXT';
+		$file_sav = PATH_CACHE.'centris-'.strtolower(basename($file));
+		if(is_file($file)) {
+			copy($file, $file_sav);
+		} else if(is_file($file_sav)) {
+			$file = $file_sav;
+			$tab_transfer[] = $file;
+		}
+		$type_bien_centris = centris_parse_type_bien($file);
+		//print_p($type_bien_centris);
+
+
+		// Transfert des fichiers reçu
+		if(!$testmode) {		
+			$tab_logs = array();
+			foreach($tab_srv as $srv) {
+				$ftp = ftp_connect($srv['host']);
+				$tab_logs[] = 'starting connection ftp://'.$srv['host'];
+				if($ftp!==false && ftp_login($ftp, $srv['log'], $srv['pwd'])) {
+					foreach($tab_transfer as $file) {
+						$dst_file = date('Ymd-').str_replace('CENTRIS-', '', strtoupper(basename($file)));
+						if(ftp_put($ftp, $dst_file, $file, FTP_BINARY)) {
+							$tab_logs[] = 'upload success for '.$dst_file;
+						} else {
+							$tab_logs[] = 'upload error for '.$dst_file;
+						}
+					}
+				} else {
+					$tab_logs[] = 'connection error for '.$srv['host'];
+				}
+				$tab_logs[] = '-';
+			}
+			foreach($tab_logs as $log) {
+				import_log($log , 'centris');
+			}
+		}
+
+		$file = $workPath.'REMARQUES.TXT';
+		$tab_desc = centris_parse_description($file);
+
+		foreach($tab_enabled as $usercode => $user) {
+			$tab_tmp = array(
+				'USERCODE' => $usercode,
+				'NOM_SOCIETE' => $user['NOM_SOCIETE'],
+				'NOM_UTILISATEUR' => empty($user['NOM_UTILISATEUR']) ? ' ' : $user['NOM_UTILISATEUR']
+			);
+
+			if(!empty($user['WORLDPOSTING_INFO'])) {
+				$tab_parts = explode('#', $user['WORLDPOSTING_INFO']);
+
+				$user['WORLDPOSTING_LOG'] = $tab_parts[0];
+				$user['WORLDPOSTING_PWD'] = $tab_parts[1];
+				$user['WORLDPOSTING_LIMIT'] = $tab_parts[2];
+			
+				list($mail_user, $mail_domain) = explode('@', $user['WORLDPOSTING_LOG'], 2);
+				
+				foreach($tab_partners_wp as $partner_alias => $partner_id) {
+					$final_email = $mail_user.'.'.$partner_alias.'@'.$mail_domain;
+					$dsn_imap = 'imap://'.$mail_user.'.'.$partner_alias.':'.$user['WORLDPOSTING_PWD'].'@'.$mail_domain;
+					
+					$limit = (int)$user['WORLDPOSTING_LIMIT'];
+
+					$tab_tmp['DIFFUSIONS'][$partner_id] = array(
+						'LOGIN' => strtolower($final_email),
+						'PASSWORD' => $user['WORLDPOSTING_PWD'],
+						'DSN_IMAP' => strtolower($dsn_imap)
+					);
+					if($limit>0) {
+						$tab_tmp['DIFFUSIONS'][$partner_id]['LIMIT'] = $limit;
+					}
+				}
+			}
+
+			$tab_tmp['MD5_USER'] = md5(serialize($tab_tmp));
+			//test julien
+			if($tab_tmp['USERCODE'] != "88605") continue;
+			//testmode julien end
+			$data['USERS'][] = $tab_tmp;
+		}
+
+		$file = $workPath.'PHOTOS.TXT';
+		$tab_photos = centris_parse_photos($file, $dico_centris);
+
+		$csv = $workPath.'INSCRIPTIONS.TXT';
+		if(is_file($csv)) {
+			if(($handle=fopen($csv, 'r'))!==false) {
+				while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+					// Utilisateurs rattaches a l'annonce (4 max)
+					// Le 1er ref_portail = row[0]
+					// Les autres ref_portail = usercode+row[2]
+					$tab_users = array();
+					if(!empty($row[2]) && centris_check_valid_user($row[2], $tab_enabled)) $tab_users[] = array('USERCODE' => $row[2], 'PREFIXE_DIFF' => '');
+					if(!empty($row[4]) && centris_check_valid_user($row[4], $tab_enabled)) $tab_users[] = array('USERCODE' => $row[4], 'PREFIXE_DIFF' => $row[4].'-');
+					if(!empty($row[135]) && centris_check_valid_user($row[135], $tab_enabled)) $tab_users[] = array('USERCODE' => $row[135], 'PREFIXE_DIFF' => $row[135].'-');
+					if(!empty($row[137]) && centris_check_valid_user($row[137], $tab_enabled)) $tab_users[] = array('USERCODE' => $row[137], 'PREFIXE_DIFF' => $row[137].'-');
+
+					$process_row  = $limit_tours<1 || count($data['TOURS'])<$limit_tours;
+					$process_row &= count($tab_users)>0;
+
+					if($process_row) {
+						if($row[0]==$_GET['ref']) {
+							print_p($row);
+						}
+						// creer 1 annonce pour chaque utlisateur
+						foreach($tab_users as $userinfo) {
+							// user dans fichier de config
+							$found_user  = isset($tab_enabled[$userinfo['USERCODE']]);
+							$found_user |= isset($tab_enabled[$userinfo['USERCODE'].'FR']) && isset($tab_enabled[$userinfo['USERCODE'].'EN']); // Si multilangue, doit etre declare dans les 2 langues
+							$found_user |= isset($tab_enabled[$userinfo['USERCODE'].'fr']) && isset($tab_enabled[$userinfo['USERCODE'].'en']);
+
+							if($found_user) {
+								$is_multilangue  = isset($tab_enabled[$userinfo['USERCODE'].'fr']) || isset($tab_enabled[$userinfo['USERCODE'].'FR']);
+								$is_multilangue &= isset($tab_enabled[$userinfo['USERCODE'].'en']) || isset($tab_enabled[$userinfo['USERCODE'].'EN']);
+
+								if($is_multilangue) {
+									// creer l'annonce dans toutes les langues
+									$tab_languages = array('FR', 'EN');
+								} else {
+									// langue du client
+									$tab_languages = array($tab_enabled[$userinfo['USERCODE']]['LANGUES']);
+								}
+
+								foreach($tab_languages as $lang) {
+									$is_english = 'EN'==$lang;
+
+									if($is_multilangue) {
+										// suffixe si multilangue
+										$usercode = $userinfo['USERCODE'].$lang;
+									} else {
+										$usercode = $userinfo['USERCODE'];
+									}
+
+									$is_loc = empty($row[6])&&!empty($row[9]);
+									$listing_status = 'VE'===$row[115] ? 'sold' : 'active';
+
+									$url_annonce = $row[132];
+									if(!empty($url_annonce)) {
+										if(stripos($url_annonce, '?')===false) {
+											$url_annonce .= '?Lang=';
+										} else {
+											$url_annonce .= '&Lang=';
+										}
+										$url_annonce .= $is_english ? 'E' : 'F';
+									}
+
+									$tmp = array(
+										'REF_PORTAIL' => '',
+										'REF_VISITE' => $row[0],
+										'USERCODE' => $usercode,
+										'ID_TYPE_BIEN' => centris_fix_type($row[53], $row[54]),
+										'ID_PAYS' => 'CA',
+										'REF_ETAT' => 'QC',
+										'URL_ANNONCE' => $url_annonce,
+										'ID_TYPE_TRANSACTION' => $is_loc ? '2' : '1',
+										'ID_LANGUE' => $lang,
+										'PRIX_BIEN' => $is_loc ? $row[9] : $row[6],
+										'REF_DEVISE' => $is_loc ? $row[10] : $row[8],
+										'VOISINNAGE' => clean_utf8(utf8_encode($row[24])),
+										'ADRESSE' => centris_fix_addr($row[25], $row[26], $row[27], $row[28]),
+										'VILLE' => centris_sanitize_string($cities_centris[ $row[22] ]),
+										'CODE_POSTAL' => $row[29],
+										'NOMBRE_ETAGES' => $row[58],
+										'ANNEE_CONSTRUCTION' => $row[59],
+										'NOMBRE_PIECE' => $row[81],
+										'NOMBRE_CHAMBRE' => $row[82],
+										'NOMBRE_SALLE_BAIN' => $row[85],
+										'NOMBRE_DEMI_SALLE_BAIN' => $row[86],
+										'COMPLEMENTS' => array()
+									);
+
+//									if(0==$tmp['ID_TYPE_BIEN']) {
+//										$tab_all_val[ $row[53].'-'.$row[54] ]++;
+//									}
+
+									$is_prestige  = in_array($tmp['ID_TYPE_BIEN'], array(1, 28, 50));
+									$is_prestige &= $tmp['PRIX_BIEN']>1000000;
+
+									if($is_prestige) {
+										$tmp['ID_PRESTIGE'] = 0;
+									} else {
+										$tmp['ID_PRESTIGE'] = 0;
+									}
+
+									if($is_multilangue) {
+										$tmp['REF_PORTAIL'] = $userinfo['PREFIXE_DIFF'].$row[0].$lang;
+									} else {
+										$tmp['REF_PORTAIL'] = $userinfo['PREFIXE_DIFF'].$row[0];
+									}
+
+
+									$key_property_type = $row[53].'-'.$row[54];
+									// Bug Centris Fermette, Chambres
+									if('F-'==$key_property_type) {
+										$key_property_type = 'R-F';
+									}
+						
+
+									$tab_features = array();
+									$tab_title = array();
+
+									if($is_english) {
+										$desc = is_array($tab_desc['EN'][$row[0]]) ? trim(implode("\n\n", $tab_desc['EN'][$row[0]])) : '';
+
+										if(!empty($row[101])) $tab_features[] = 'Includes : '.$row[101];
+										if(!empty($row[103])) $tab_features[] = 'Excludes : '.$row[103];
+
+										if(isset($type_bien_centris['EN'][ $key_property_type ])) {
+											$tab_title[] = $type_bien_centris['EN'][ $key_property_type ];
+										}
+										$tab_title[] = $is_loc ? 'for rent' : 'for sale';
+										$tab_title[] = $tmp['VILLE'];
+
+									} else {
+										$desc = is_array($tab_desc['FR'][$row[0]]) ? trim(implode("\n\n", $tab_desc['FR'][$row[0]])) : '';
+
+										if(!empty($row[100])) $tab_features[] = 'Inclus : '.$row[100];
+										if(!empty($row[102])) $tab_features[] = 'Exclus : '.$row[102];
+
+										if(isset($type_bien_centris['FR'][ $key_property_type ])) {
+											$tab_title[] = $type_bien_centris['FR'][ $key_property_type ];
+										}
+										$tab_title[] = $is_loc ? 'à louer' : 'à vendre';
+										$tab_title[] = $tmp['VILLE'];
+									}
+
+									if(!empty($tab_features)) {
+										$tmp['COMPLEMENTS'][] = array('FIELD' => 'features', 'VALUE' => centris_sanitize_string(implode("\n", $tab_features)));
+									} else {
+										$tmp['COMPLEMENTS'][] = array('FIELD' => 'features', 'VALUE' => '');
+									}
+
+									$title = centris_fix_title(implode(' - ', $tab_title));
+
+									$tmp['DESCRIPTION'] = $tmp['DESCRIPTION_VIDEO'] = $desc;
+
+						
+									if(!$is_loc) {
+										$tmp['COMPLEMENTS'][] = array('FIELD' => 'mutation_tax', 'VALUE' => centris_fix_mutation_tax($tmp['PRIX_BIEN']));
+									} else {
+										$tmp['COMPLEMENTS'][] = array('FIELD' => 'mutation_tax', 'VALUE' => '');
+									}
+									$tmp['COMPLEMENTS'][] = array('FIELD' => 'listing_status', 'VALUE' => $listing_status);
+
+									if(!empty($depenses_centris[$row[0]])) {
+										$tmp['COMPLEMENTS'][] = array('FIELD' => 'fee_agency', 'VALUE' => $depenses_centris[$row[0]]);
+									}
+
+									$tmp['SURFACE_HABITABLE'] = centris_fix_area_field_sqft($row[68],$row[69]);//centris_fix_area_field_m2($row[68], $row[69]);
+									$tmp['ID_UNITE_SURFACE_HABITABLE'] = 2;//centris_fix_unit($row[69]);
+									$tmp['SURFACE_TERRAIN'] = $row[75];
+									$tmp['ID_UNITE_SURFACE_TERRAIN'] = centris_fix_unit($row[76]);
+
+									$lot_size = centris_fix_area_field_sqft($row[75], $row[76]);
+									$lot_size = $row[75];
+									if(!empty($lot_size)) {
+										$tmp['COMPLEMENTS'][] = array('FIELD' => 'lot_size', 'VALUE' => $lot_size);
+										$tmp['COMPLEMENTS'][] = array('FIELD' => 'area_field_unit', 'VALUE' => centris_fix_unit($row[76])); // sqft
+									}
+							
+									$tmp['NOM_VISITE'] = $title;
+									if(!empty($tmp['NOM_VISITE'])) {
+										$tmp['DESCRIPTION'] = trim($tmp['NOM_VISITE'].'. '.$tmp['DESCRIPTION']);
+									}
+
+									// 2012-02-23 : Ajout real estate dans desc EN sur certains type de bien
+									if($is_english && in_array($key_property_type, array('T-TV', 'R-AP', 'R-PP', 'R-MPM', 'R-MEM', 'R-ME'))) {
+										$tmp['DESCRIPTION'] = 'Real-estate '.$tmp['DESCRIPTION'];
+										// remplacer House par Home pour tout sauf apartement
+										if('R-AP'!==$key_property_type) {
+											$tmp['DESCRIPTION'] = str_replace('Real-estate House', 'Real-estate Home', $tmp['DESCRIPTION']);
+										}
+									}
+
+									if(is_numeric($userinfo) && $tmp['PRIX_BIEN']>1000000) {
+										$tmp['DIFFUSIONS'][ID_LUXURY] =  array('LOGIN' => $tmp['USERCODE'], 'PREFIXE_DIFFUSION' => '', 'PASSWORD' => '');
+									}
+									$tmp['MD5_TOUR'] = md5(serialize($tmp));
+									// test julien start
+									if($tmp['REF_PORTAIL'] != '9738865') continue;
+									// test julien end
+									$data['TOURS'][] = $tmp;
+									if(isset($tab_photos[$row[0]])) {
+										foreach($tab_photos[$row[0]] as $photo) {
+											$photo['REF_PORTAIL'] = $tmp['REF_PORTAIL'];
+											$photo['MD5_IMAGE'] = md5(serialize($photo));
+											// Changer url apres le md5 pour éviter de tout retelecharger...
+											$photo['URL_IMAGE'] = str_replace('w=640&h=480', 'w=1600&h=1200', $photo['URL_IMAGE']);
+											$data['IMAGES'][] = $photo;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				fclose($handle);
+			}
+		}
+		
+		if(!empty($tab_sql)) {
+			echo 'BEGIN TRANSACTION<br>'.implode('<br>', $tab_sql).'<br>ROLLBACK TRANSACTION<br><br>';
+		}
+
+		if(!empty($tab_all_val)) {
+			echo '<pre>';
+			ksort($tab_all_val);
+			print_r($tab_all_val);
+			echo '</pre>';
+		}
+
+		if($archive_file) {
+			rename($zip_file, $archive_path.$prefixe_archive.basename($zip_file));
+		}
+	}
+
+	if(empty($dico_centris)||empty($cities_centris)) {
+		$data = array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array());
+	}
+
+	return $data;
+}
+
+function centris_fix_unit($unit) {
+	if('PC'==$unit) {
+		return 2;
+	} else {
+		return 1;
+	}
+}
+
+function centris_check_valid_user($usercode, $accounts=array()) {
+	$valid  = isset($accounts[$usercode]);
+	$valid |= isset($accounts[$usercode.'fr']);
+	$valid |= isset($accounts[$usercode.'FR']);
+	$valid |= isset($accounts[$usercode.'en']);
+	$valid |= isset($accounts[$usercode.'EN']);
+	return $valid;
+}
+
+function centris_parse_users($csv) {
+	$result = array();
+	if(is_file($csv)) {
+		if(($handle=fopen($csv, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				$result[ $row[0] ] = $row[1];
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+
+function centris_fix_addr($num_start, $num_end, $addr, $appt) {
+	$tab_num = array($num_start);
+	if(!empty($num_end)) $tab_num[] = $num_end;
+	
+	$tab_addr = array(implode('-', $tab_num));
+	if(!empty($addr)) $tab_addr[] = $addr;
+	if(!empty($appt)) $tab_addr[] = $appt;
+	
+	return centris_sanitize_string( implode(' ', $tab_addr) );
+}
+
+function centris_parse_description($csv) {
+	$result = array();
+	if(is_file($csv)) {
+		if(($handle=fopen($csv, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				if('F'==$row[2]) {
+				 $result['FR'][$row[0]][$row[3]] = centris_sanitize_string($row[6]);
+				} else {
+				 $result['EN'][$row[0]][$row[3]] = centris_sanitize_string($row[6]);
+				}
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+
+function centris_fix_mutation_tax($price) {
+	$price = abs((int)$price);
+
+	// 0 pour l'infini
+	// Ajouter la case précédente pour les paliers : Ex array(50000, 200000) => paliers : 50000 et 250000
+	// Palier jusqu'a 50000 : 0.5%
+	// Palier jusqu'a 250000 : 1%
+	// Au dela de 250000 : 1.5%
+	$tab_paliers = array(50000, 200000, 0);
+	$tab_percent = array(0.005, 0.01, 0.015);
+	$loop = $tax = 0;
+
+	do {
+		if(0==$tab_paliers[$loop] || $price<=$tab_paliers[$loop]) {
+			$tax2 = $price*$tab_percent[$loop];
+		} else {
+			$tax2 = $tab_paliers[$loop]*$tab_percent[$loop];
+		}
+		$tax += $tax2;
+		$price -= $tab_paliers[$loop];
+	} while(isset($tab_paliers[++$loop]) && $price>=0);
+
+	return $tax;
+}
+
+function centris_parse_depenses($file) {
+	$result = array();
+	$tax_to_count = array('TAXMUN', 'TAXSCO');
+	if(is_file($file)) {
+		if(($handle=fopen($file, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				if(in_array($row[1], $tax_to_count)) {
+					$result[$row[0]] += (float)$row[2];
+				}
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+function centris_fix_area_field_m2($val, $unit) {
+	$result = $val;
+	if(!empty($val)) {
+		// conversion sqft -> m2
+		if('PC'==$unit) {
+			$result /= 10.7639104167;
+		}
+	}
+	return round((float)$result, 1);
+}
+
+function centris_fix_area_field_sqft($val, $unit) {
+	$result = $val;
+	if(!empty($val)) {
+		// conversion m2 -> sqft
+		if('MC'==$unit) {
+			$result *= 10.7639104167;
+		}
+	}
+	return round((float)$result, 1);
+}
+
+function centris_parse_type_bien($csv) {
+	$result = array();
+	if(is_file($csv)) {
+		if(($handle=fopen($csv, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				$result['FR'][$row[0].'-'.$row[1]] = centris_sanitize_string($row[3]);
+				$result['EN'][$row[0].'-'.$row[1]] = centris_sanitize_string($row[5]);
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+
+
+function centris_parse_quartiers($csv) {
+	$result = array();
+	if(is_file($csv)) {
+		if(($handle=fopen($csv, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				$result['FR'][$row[0].'-'.$row[1]] = centris_sanitize_string($row[2]);
+				$result['EN'][$row[0].'-'.$row[1]] = centris_sanitize_string($row[3]);
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+
+function centris_sanitize_string($str) {
+	return iconv('ISO-8859-15', 'UTF-8', $str);
+}
+
+function centris_parse_photos($csv, $dico_centris) {
+	$result = array();
+	if(is_file($csv)) {
+		if(($handle=fopen($csv, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				$tmp = array(
+					'REF_PORTAIL' => $row[0],
+					'POIDS' => $row[1],
+					'TITRE_IMAGE' => $row[4],
+					'URL_IMAGE' => $row[6]
+				);
+				if(!empty($row[4])) {
+					$tmp['TITRE_IMAGE'] = $row[4];
+				} else if(!empty($dico_centris['CODE_DESCRIPTION_PHOTO'][ $row[3] ])) {
+					$tmp['TITRE_IMAGE'] = $dico_centris['CODE_DESCRIPTION_PHOTO'][ $row[3] ];
+				}
+				$tmp['TITRE_IMAGE'] = centris_sanitize_string($tmp['TITRE_IMAGE']);
+				$result[ $row[0] ][] = $tmp;
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+
+function centris_fix_title($title) {
+	$tab_pattern = array(
+		'Maison à étage',
+		'Maison de plain-pied',
+		'Maison à un étage et demie',
+		'Maison à paliers multiples',
+		'Maison à étages mansardés',
+		'Maisons',
+		'Terrain vacant',
+		'Appartement',
+		'Cottage',
+		'One-and-a-half-storey house',
+		'Split-level',
+		'Bungalow',
+		'Apartment',
+		'Chalet',
+		'Small farmhouse',
+		'Loft / Studio',
+		'Vacant lot'
+
+	);
+	$tab_replace = array(
+		'Maison',
+		'Maison',
+		'Maison',
+		'Maison',
+		'Maison',
+		'Maison',
+		'Terrain',
+		'Condo',
+		'House',
+		'House',
+		'House',
+		'House',
+		'Condo',
+		'Country-Home',
+		'Small farmhouse',
+		'Loft',
+		'Lot'
+
+	);
+	return str_replace($tab_pattern, $tab_replace, $title);
+}
+
+function centris_parse_dico($csv) {
+	$result = array();
+	if(is_file($csv)) {
+		if(($handle=fopen($csv, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				$result[ $row[0] ][ utf8_decode($row[1]) ] = $row[4];
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+
+function centris_parse_villes($csv) {
+	$result = array();
+	if(is_file($csv)) {
+		if(($handle=fopen($csv, 'r'))!==false) {
+			while(($row=fgetcsv($handle, 0, ',', '"'))!==false) {
+				$result[ $row[0] ] = $row[1];
+			}
+			fclose($handle);
+		}
+	}
+	return $result;
+}
+
+function centris_fix_type($val, $val2) {
+
+	switch(strtoupper($val.'-'.$val2)) {
+		case 'R-AP': return 1; break;
+
+		default:
+			switch(strtoupper($val)) {
+				case 'F': return 12; break;
+				case 'M': return 28; break;
+				case 'R': return 50; break;
+				case 'T': return 3; break;
+				case 'C': return 9; break;
+				case 'I': return 20; break;
+				default: return 0;
+			}
+			break;
+	}
+
+
+/*
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 0, N'Autre')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 0, N'Other')
+
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 1, N'Appartement')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 1, N'Condo')
+
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 3, N'Terrain')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 3, N'Field')
+
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 9, N'Commerces')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 9, N'Commercial')
+
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 12, N'Ferme')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 12, N'Farm')
+
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 20, N'Industriel')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 20, N'Industrial')
+
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 28, N'Multi-family')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 28, N'Multi-family')
+
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'FR', 50, N'Residentiel')
+INSERT INTO TYPE_BIEN_DISTRIBUTEUR(id_distributeur, id_langue, id_type_bien, nom_type_bien) VALUES('B8567109-8BC5-CDFC-7B0F-4C6453B70823', 'EN', 50, N'Residential')
+
+
+3	Terrain
+9	Commerce
+12	Ferme
+20	Industrial (Industriel)
+28	Multi-family (Plusieurs familles)
+50	Residentiel
+
+[0#P-##] => 11
+[12#R-F#Fermette#Small farmhouse] => 4
+[20#I-BAI#Bâtisse industrielle#Industrial building] => 4
+[20#I-CI#Condo industriel#Industrial condo] => 20
+[20#I-LEI#Location d'espace industriel#Industrial space leasing] => 2
+[28#M-2X#Duplex#Duplex] => 22
+[28#M-3X#Triplex#Triplex] => 24
+[28#M-4X#Quadruplex#Quadruplex] => 15
+[28#M-5X#Quintuplex#Quintuplex] => 2
+[3#T-TV#Terrain vacant#Vacant lot] => 103
+[50#R-AP#Appartement#Apartment] => 192
+[50#R-F#Fermette#Small farmhouse] => 17
+[50#R-LS#Loft/Studio#Loft / Studio] => 5
+[50#R-ME#Maison à étages#Cottage] => 263
+[50#R-MEM#Maison à un étage et demie#One-and-a-half-storey house] => 28
+[50#R-MM#Maison mobile#Mobile home] => 15
+[50#R-MPM#Maison à paliers multiples#Split-level] => 25
+[50#R-PP#Maison de plain-pied#Bungalow] => 281
+[9#C-BCB#Bâtisse commerciale/Bureau#Commercial building/Office] => 30
+[9#C-BVE#Bâtisse et vente d'entreprise#Building and business sale] => 6
+[9#C-CC#Condo commercial#Commercial condo] => 11
+[9#C-LEC#Location d'espace commercial/Bureau#Commercial rental space/Office] => 14
+[9#C-VEN#Vente d'entreprise#Business sale] => 11
+
+*/
+}
+
+

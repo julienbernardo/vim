@@ -1,0 +1,386 @@
+<?php
+
+//main function
+/*
+/**
+*	Profil par défaut VIDEOTOURDEMO
+*	- logo start: detail annonce
+* - logo end: detail annonce + infos contact
+* - url map if gps is available
+* - logo VIDEOTOUR on all video
+**
+function create_stupeflix_xml_VIDEOTOURDEMO($tour, $id_video,$ref_video,$list_profiles = "", $wait_for_tts = false){
+	global $db_data;
+	global $videos_options;
+	$type_function = "VIDEOTOURDEMO";
+	//reference visite
+	if(preg_match('/^VID-.*$/',$ref_video) == 0){	$ref_video = "VID-".substr($id_video,0,8);}
+	$result = array('error_code'=> 0, 'ref_video'=>$ref_video);
+	$db_data['name'] = 'videotour';
+	$tab_tour = get_videotour_data($id_video);
+
+	if(is_guid($tab_tour['ID_VIDEOTOUR'])){
+		$url_img = URL_GETIMAGE_VIDEOTOURDEMO;
+		$bgimg = "";
+		$images = array();
+		for($i=0; $i < $tab_tour['NB_IMAGE']; $i++){
+			$tmp = str_replace('#ID#',$id_video,str_replace('#NUM#',$i,$url_img));
+			$header = get_headers($tmp);
+			if(strpos($header[0],'404') === false){
+				if($bgimg == ""){ $bgimg = $tmp;}
+				$images[] = array('url_image'=> $tmp);
+			}
+		}
+		
+		if(count($images) > 0){
+			$url_mp3 = URL_GETMUSIC_VIDEOTOURDEMO;
+			$url_mp3 = str_replace('#ID#',$id_video,$url_mp3);
+			$header = get_headers($url_mp3);
+			$stronger = false;
+			if(strpos($header[0],'404') === false){
+				$VoiceUrl = str_replace('&', '&amp;',$url_mp3);//."&amp;r=".rand();
+				$stronger = ($tab_tour['TTS_VOICE'] != '');
+			}else if($wait_for_tts && $tab_tour['DESCRIPTION'] != "" && $videos_options['VOICES'][strtoupper($tab_tour['ID_LANGUE'])] != ""){
+				$result['error_code'] = 5;
+				$result['type'] = $type_function;
+				$result['tour']	= $tab_tour;
+				$result['user']	= $tab_user;
+				return $result;
+			}
+			if(getSoundState($tab_tour['ID_MUSIQUE_VIDEO'])) {
+				$url_music = str_replace('&', '&amp;',str_replace('#ID#',$tab_tour['ID_MUSIQUE_VIDEO'], URL_SOUND));
+			}			
+			
+			$url_logo = "";
+			$url_logo_end = "";
+			$url_map = "";
+			$replace = array(
+				'search' => array('#TYPE#','#TOUR#','#DISTRIB#'),
+				'replace'=> array('VIDEOTOURDEMO', $id_video, '')
+			);
+			$url_logo = str_replace($replace['search'],$replace['replace'], URL_VIDEO_TMP_LOGO);
+			$url_logo_end = str_replace('#POS#','end',$url_logo);                               
+			$url_logo = str_replace('#POS#','start',$url_logo);                                 
+			file_get_contents($url_logo."&create=true");
+			file_get_contents($url_logo_end."&create=true");
+			 
+			$gps = getGPS($id_video,$tab_tour['CODE_POSTAL'],$tab_tour['VILLE'],$tab_tour['ADRESSE'],$tab_tour['ID_PAYS']);
+			list($tab_tour['LATITUDE'],$tab_tour['LONGITUDE']) = explode('#',$gps);
+			if($tab_tour['LATITUDE'] != "" && $tab_tour['LONGITUDE']){
+				$url_map = createMapImage($id_video,$tab_tour['LATITUDE'],$tab_tour['LONGITUDE']);
+			}
+						
+			$xml_header = write_stupeflix_xml_head();
+			$xml_footer = write_stupeflix_xml_foot();
+			$list_profiles = explode(';',($list_profiles != "" ? $list_profiles : "flash-hq"));
+		 	$profiles = write_stupeflix_xml_content_videotour( $list_profiles, $images, $id_video, $tab_tour['DESCRIPTION'],$url_music, $VoiceUrl,$url_map,$url_logo,$url_logo_end,true,$stronger);
+			for($i=0;$i<count($profiles);$i++){ $profiles[$i]['xml'] = $xml_header.$profiles[$i]['xml'].$xml_footer;}
+						
+			$result['ref_video']	= $ref_video;
+			$result['id_video'] 	= $id_video;
+			$result['tour'] 		= $tab_tour;
+			$result['user'] 		= $tab_user;
+			$result['nb_image'] 	= count($images);
+			$result['type'] 		= $type_function;
+			$result['bgimg']		= $bgimg;
+			$result['profiles']		= $profiles;
+			$result['error_code'] 	= 0;
+		}else{
+			$result['error_code'] 	= 3;
+		}
+	}else{
+		$result['error_code'] = 2;
+	}
+//	$db_data['name'] = "video";
+	return $result;
+}
+
+ 
+/**
+*	Profil par défaut VIDEOTOUR
+*	- logo start: detail annonce
+* - logo end: detail annonce + infos contact
+* - url map if gps is available
+* - logo VIDEOTOUR on all video
+**
+function create_stupeflix_xml_VIDEOTOUR($tour, $id_video,$ref_video,$list_profiles = "", $wait_for_tts = false){
+	global $db_data;
+	global $videos_options;
+	$type_function = "VIDEOTOUR";
+	//reference visite
+	if(preg_match('/^VID-.*$/',$ref_video) == 0){	$ref_video = "VID-".substr($id_video,0,8);}
+	$result = array('error_code'=> 0, 'ref_video'=>$ref_video);
+	$db_data['name'] = 'videotour';
+	$tab_tour = get_videotour_data($id_video);
+	
+	//on récupère la dernière conversion
+	if(is_guid($tab_tour['ID_VIDEOTOUR'])){
+//		$db_data['name'] = 'video';
+		$filter = "WHERE DETAIL_VIDEO.ID_VIDEO='".$tab_tour['ID_VIDEOTOUR']."' AND ID_STATUT_CONVERSION > 0";
+		$tab_last_conversions = get_last_conversions($filter);
+		$keys = array_keys($tab_last_conversions);  
+		if(count($tab_last_conversions) > 0){
+			$conv 	= $tab_last_conversions[$keys[0]]['flash-hq'];
+			$xml 	= simplexml_load_string($conv['XML_SOURCE']);
+			$img 	= $xml->xpath('body/stack/sequence/stack/effect/image');
+			$bgimg	= $img[0]->attributes()->filename."";
+			$conv['XML_SOURCE'] = preg_replace('/[\t ]*<effect type=\"none\" .* depthEnable="false">[\n\r\t ]*<image filename=.*'.basename(URL_VIDEO_LOGO_VIDEOTOUR).'" \/>[\n\r\t ]*<\/effect>[\n\r\t ]*\/','',$conv['XML_SOURCE']);
+			
+			$url_map = "";
+			$replace = array(
+				'search' => array('#TYPE#','#TOUR#','#DISTRIB#'),
+				'replace'=> array('VIDEOTOUR', $id_video, '')
+			);
+			$url_logo = str_replace($replace['search'],$replace['replace'], URL_VIDEO_TMP_LOGO);
+			$url_logo_end = str_replace('#POS#','end',$url_logo);                               
+			$url_logo = str_replace('#POS#','start',$url_logo);
+			if(file_get_contents($url_logo."&create=true") == "false"){
+				$url_logo = str_replace('VIDEOTOUR','VIDEOTOURDEMO',$url_logo);
+				$url_logo_end = str_replace('VIDEOTOUR','VIDEOTOURDEMO',$url_logo_end);
+				file_get_contents($url_logo."&create=true");
+			}
+			file_get_contents($url_logo_end."&create=true");
+						
+			//if($conv['TYPE_VIDEO'] == 'VIDEOTOUR'){
+			if(preg_match('/VIDEOTOURDEMO/',$url_logo) == 0){
+				$conv['XML_SOURCE'] = str_replace('VIDEOTOURDEMO','VIDEOTOUR',$conv['XML_SOURCE']);
+				//define('URL_GETIMAGE_VIDEOTOURDEMO','http://'.(SERVEUR_DEV ? "dev." :"").'www.videotour.com/tmp/#ID#/#ID#-#NUM#.jpg');
+				$mask = str_replace('#NUM#','(\d+)',URL_GETIMAGE_VIDEOTOURDEMO);
+				$mask = str_replace('#ID#','([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})',$mask);
+				$mask = str_replace('/','\\/',$mask);
+				$replace = str_replace('#NUM#','$3',str_replace('#ID#','$1',URL_GETIMAGE_VIDEOTOUR));
+				$conv['XML_SOURCE'] = preg_replace('/'.$mask.'/i',$replace,$conv['XML_SOURCE']);
+			}
+
+			$gps = getGPS($id_video,$tab_tour['CODE_POSTAL'],$tab_tour['VILLE'],$tab_tour['ADRESSE'],$tab_tour['ID_PAYS']);
+			list($tab_tour['LATITUDE'],$tab_tour['LONGITUDE']) = explode('#',$gps);
+			if($tab_tour['LATITUDE'] != "" && $tab_tour['LONGITUDE']){
+				$url_map = createMapImage($id_video,$tab_tour['LATITUDE'],$tab_tour['LONGITUDE']);
+			}
+			
+
+			$filename = PATH_TEMP.$id_video.".xml";
+			file_put_contents($filename,$conv['XML_SOURCE']);
+			$profiles = array();
+			$tmp = explode(';',($list_profiles != "" ? $list_profiles : "flash-hq;youtube"));
+			foreach($tmp as $v){
+				$content =  file_get_contents($filename);
+				if($v == 'youtube'){
+					$content = str_replace(fix_xml($url_logo),fix_xml($url_logo."&resolution=youtube"),$content);
+					$content = str_replace(fix_xml($url_logo_end),fix_xml($url_logo_end."&resolution=youtube"),$content);
+					file_get_contents($url_logo."&create=true&resolution=youtube");
+					file_get_contents($url_logo_end."&create=true&resolution=youtube");
+					if($url_map != ""){
+						$content = str_replace(fix_xml($url_map),fix_xml(str_replace(IMAGE_WIDTH.'x'.IMAGE_HEIGHT,IMAGE_YOUTUBE_WIDTH.'x'.IMAGE_YOUTUBE_HEIGHT,$url_map)),$content);
+					}
+				}
+				$profiles[] = array('profile' => $v,'xml' => $content);
+			}
+			
+			$result['ref_video']	= $conv['REF_VIDEO'];
+			$result['id_video'] 	= $id_video;
+			$result['tour'] 		= $tab_tour;
+			$result['user'] 		= $tab_user;
+			$result['nb_image'] 	= $conv['NOMBRE_IMAGE'];
+			$result['type'] 		= $type_function;
+			$result['bgimg']		= $bgimg;
+			$result['profiles']		= $profiles;
+			$result['error_code'] 	= 0;
+			return $result;
+		}
+		$url_img = URL_GETIMAGE_VIDEOTOURDEMO;
+		$bgimg = "";
+		$images = array();
+		for($i=0; $i < $tab_tour['NB_IMAGE']; $i++){
+			$tmp = str_replace('#ID#',$id_video,str_replace('#NUM#',$i,$url_img));
+			$header = get_headers($tmp);
+			if(strpos($header[0],'404') === false){
+				if($bgimg == ""){ $bgimg = $tmp;}
+				$images[] = array('url_image'=> $tmp);
+			}
+		}
+		
+		if(count($images) > 0){
+			$url_mp3 = URL_GETMUSIC_VIDEOTOURDEMO;
+			$url_mp3 = str_replace('#ID#',$id_video,$url_mp3);
+			$header = get_headers($tmp);
+			if(strpos($header[0],'404') === false){
+				$VoiceUrl = str_replace('&', '&amp;',$url_mp3);//."&amp;r=".rand();
+			}else if($wait_for_tts && $tab_tour['DESCRIPTION'] != "" && $videos_options['VOICES'][strtoupper($tab_tour['ID_LANGUE'])] != ""){
+				$result['error_code'] = 5;
+				$result['type'] = $type_function;
+				$result['tour']	= $tab_tour;
+				$result['user']	= $tab_user;
+				return $result;
+			}
+//			if(file_get_contents(get_storage_path('exist', $id_video, 'mp3'))){// && $tab_tour['REF_VOICE'] != "") {
+//				$VoiceUrl = str_replace('&', '&amp;',str_replace('#ID#',$id_video, str_replace('#EXT#', 'mp3', URL_GETFILE)));
+//			}
+			
+			if(getSoundState($tab_tour['ID_MUSIQUE_VIDEO'])) {
+				$url_music = str_replace('&', '&amp;',str_replace('#ID#',$tab_tour['ID_MUSIQUE_VIDEO'], URL_SOUND));
+			}			
+			
+			$url_logo = "";
+			$url_logo_end = "";
+			$url_map = "";
+			$replace = array(
+				'search' => array('#TYPE#','#TOUR#','#DISTRIB#'),
+				'replace'=> array('VIDEOTOUR', $id_video, '')
+			);
+			$url_logo = str_replace($replace['search'],$replace['replace'], URL_VIDEO_TMP_LOGO);
+			$url_logo_end = str_replace('#POS#','end',$url_logo);                               
+			$url_logo = str_replace('#POS#','start',$url_logo);
+			file_get_contents($url_logo."&create=true");
+			file_get_contents($url_logo_end."&create=true");
+			
+			$gps = getGPS($id_video,$tab_tour['CODE_POSTAL'],$tab_tour['VILLE'],$tab_tour['ADRESSE'],$tab_tour['ID_PAYS']);
+			list($tab_tour['LATITUDE'],$tab_tour['LONGITUDE']) = explode('#',$gps);
+			if($tab_tour['LATITUDE'] != "" && $tab_tour['LONGITUDE']){
+				$url_map = createMapImage($id_video,$tab_tour['LATITUDE'],$tab_tour['LONGITUDE']);
+			}
+			
+			$xml_header = write_stupeflix_xml_head();
+			$xml_footer = write_stupeflix_xml_foot();
+			$list_profiles = explode(';',($list_profiles != "" ? $list_profiles : "flash-hq;youtube"));			
+		 	$profiles = write_stupeflix_xml_content_videotour( $list_profiles, $images, $id_video, $tab_tour['DESCRIPTION'],$url_music, $VoiceUrl,$url_map,$url_logo,$url_logo_end,false);
+		 	for($i=0;$i<count($profiles);$i++){ $profiles[$i]['xml'] = $xml_header.$profiles[$i]['xml'].$xml_footer;}
+			
+			$result['ref_video']	= $ref_video;
+			$result['id_video'] 	= $id_video;
+			$result['tour'] 		= $tab_tour;
+			$result['user'] 		= $tab_user;
+			$result['nb_image'] 	= count($images);
+			$result['type'] 		= $type_function;
+			$result['bgimg']		= $bgimg;
+			$result['profiles']		= $profiles;
+			$result['error_code'] 	= 0;
+		}else{
+			$result['error_code'] 	= 3;
+		}
+	}else{
+		$result['error_code'] = 2;
+	}
+//	$db_data['name'] = "video";
+	return $result;
+}
+*/
+
+//xml function
+function write_stupeflix_xml_content_videotour( $profiles, $tab_images, $id_video, $description = "",$url_sound="", $url_textospeech= "",$url_map = "",$url_logo = "",$logo_end = "",$demo = true,$stronger = false){
+	$result = array();
+	$listEffectsImg = 
+			array(array('type' => 'type="diving"'	,	'nb_child_max'=>	4),
+						array('type' => 'type="rotator"', 'nb_child_max'=>	4),
+						array('type' => 'type="sliding"', 'nb_child_max'=>	4),
+						array('type' => 'type="square"'	, 'nb_child_max'=>	4),
+						array('type' => 'type="rectangles" filterType="grow"', 'nb_child_max'=>	1),
+						array('type' => 'type="explode"'	, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						array('type' => 'type="flower"'		, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						array('type' => 'type="panel"'		, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						array('type' => 'type="slice"'		, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"')),
+						array('type' => 'type="kenburns"'	, 'nb_child_max'=> 1,'adapter' => array('adapter="panoramicAdapter"','adapter="zoomAdapter"','adapter="fixedAdapter"','adapter="kenburnsAdapter"'),'direction' => array('direction="positive"','direction="negative"'))
+					);
+	$listEffectsImg_made = array();
+	if(count($tab_images) > 0 && count($profiles) > 0){
+		// on prépares les effets si le nombre d'images est inférieur à 3
+		if(count($tab_images) < 3){ 
+//			$listEffects = array('panel', 'kenburns' ,'flower');
+			do{
+				$tab_images[] = $tab_images[0];
+			}while(count($tab_images) < 3);
+		}
+		$handle = fopen($filename,"a");
+		$transitionsMade = array();
+		
+		if($url_logo == ""){ $url_logo = URL_VIDEO_LOGO_DEFAULT;}
+		$nb_images = 0;
+		$duration_final = 0;
+		$img_content = "";
+		for($i=0;$i < count($tab_images);$i++){
+			$image = $tab_images[$i];
+			$img_content_add = "";
+			if(count($listEffectsImg_made) == count($listEffectsImg)){ 
+				$listEffectsImg_made = array();
+			}
+			do{
+				$key = rand(0,count($listEffectsImg)-1);
+			}while(array_key_exists($key,$listEffectsImg_made));
+			$listEffectsImg_made[$key] = true;
+			$duration = 7;
+			$effect = $listEffectsImg[$key]['type'];
+			if(is_array($listEffectsImg[$key]['adapter'])){ $effect .= " ".$listEffectsImg[$key]['adapter'][rand(0,count($listEffectsImg[$key]['adapter'])-1)];}
+			if(is_array($listEffectsImg[$key]['direction'])){ $effect .= " ".$listEffectsImg[$key]['direction'][rand(0,count($listEffectsImg[$key]['direction'])-1)];}
+			if($listEffectsImg[$key]['nb_child_max'] > 1){
+				$nb_img = count($tab_images)-$i; 
+				if($nb_img > $listEffectsImg[$key]['nb_child_max']){ $nb_img = $listEffectsImg[$key]['nb_child_max'];}
+				$nb_img =  rand(2,$nb_img);
+				for($k=1;$k < $nb_img;$k++){
+					$img_content_add .= "						<image filename=\"".fix_xml($tab_images[$i+$k]['URL_IMAGE'])."\" />\n";		
+					$duration += 3;
+				}
+				$i += $k-1;
+			}
+			
+			$img_content .= "	 			<stack>\n";
+//			$img_content .= "					<effect type=\"".($listEffects[$i] ? $listEffects[$i] : "kenburns")."\" duration=\"7.0\" ".$direction.">\n";
+			$img_content .= "					<effect ".$effect." duration=\"".$duration.".0\" >\n";
+			$img_content .= "						<image filename=\"".fix_xml($image['URL_IMAGE'])."\" />\n";
+			$img_content .= $img_content_add;
+			$img_content .= "					</effect>\n";
+//			$img_content .= " 				<text type=\"legend\" height=\"".VIDEO_LEGEND_HEIGHT."\">".fix_xml($image['TITLE'])."</text>\n";
+			$img_content .= "	 			</stack>\n";
+			$img_content .= "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+			$nb_images++;
+			$duration_final += $duration;
+		}
+		
+		$content = "		<stack>\n";
+		$content .=	"			<sequence>\n";
+		$content .= "				<effect type=\"none\" duration=\"2.0\">\n";
+		$content .= "					<image filename=\"".fix_xml($url_logo)."\" />\n";
+		$content .= "				</effect>\n";
+		$content .= "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+		$content .= $img_content;
+		if($url_map != ""){
+				$content .= "				<effect type=\"none\" duration=\"7.0\">\n";
+				$content .= "					<image filename=\"".fix_xml($url_map)."\" />\n";
+				$content .= "				</effect>\n";
+				$content .= "				<transition ".ChooseTransition($transitionsMade)." duration=\"1\" />\n";
+				$duration_final += 7;
+		}
+		if($logo_end == ""){ $logo_end = $url_logo;}
+		$content .= "				<effect type=\"none\" duration=\"7.0\">\n";
+		$content .= "					<image filename=\"".fix_xml($logo_end)."\" />\n";
+		$content .= "				</effect>\n";
+		$content .= " 		</sequence>\n";			
+		if($demo){
+			$content .= " 		<sequence>\n";		
+			$content .= "				<stack>\n";
+				//$content .= "				<effect type=\"none\" duration=\"".(($nb_images*7)-1).".0\" depthEnable=\"false\">\n";
+				$content .= "				<effect type=\"none\" duration=\"".$duration_final.".0\" depthEnable=\"false\">\n";
+				$content .= "					<image filename=\"".fix_xml(URL_VIDEO_LOGO_VIDEOTOUR)."\" />\n";
+				$content .= "				</effect>\n";
+			if($description != ""){
+				$content .= "					<text type=\"legend\" height=\"".VIDEO_LEGEND_HEIGHT_VIDEOTOUR."\" fontsize=\"10\" duration=\"".$duration_final."\"><![CDATA[".$description."]]></text>\n";
+			}
+			$content .= " 			</stack>\n";
+			$content .= " 		</sequence>\n";
+		}
+		
+		//if($url_sound == "") { $url_sound = ChooseSound();}
+		$volume_sound = "0.7";
+		if($url_textospeech != ""){ 
+			//$content .= "			<audio filename=\"".fix_xml($url_textospeech)."\" duration=\"".(($nb_images*7)-1)."\" margin-start=\"2.0\" fadeout=\"2.0\" volume=\"1.0\"/>\n";
+			$content .= "			<audio filename=\"".fix_xml($url_textospeech)."\" duration=\"".$duration_final."\" margin-start=\"2.0\" fadeout=\"2.0\" volume=\"1.0\"/>\n";
+			$volume_sound = ($stronger ? "0.07" : "0.02");
+		}
+		//if($url_sound != ""){ $content .= "			<audio filename=\"".fix_xml($url_sound)."\" duration=\"".(($nb_images*7)-1)."\" fadein=\"2.0\" fadeout=\"2.0\" volume=\"".$volume_sound."\"/>\n";}
+		if($url_sound != ""){ $content .= "			<audio filename=\"".fix_xml($url_sound)."\" duration=\"".$duration_final."\" fadein=\"2.0\" fadeout=\"10.0\" volume=\"".$volume_sound."\"/>\n";}
+		
+		$content .= "		</stack>\n";
+		foreach($profiles as $profile){ $result[] = array('profile'=>$profile,'xml'=>$content);}
+	}
+	return $result;
+}
+?>

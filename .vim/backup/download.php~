@@ -1,0 +1,164 @@
+<?php
+//complète les fichiers agents.txt et request.txt
+DEFINE('DEBUG',	true);
+
+if(DEBUG){
+	$log = "";
+	foreach($_SERVER as $k=>$v){ $log .= $k."=>".$v."\n";}
+	@file_put_contents("../tmp/request.txt", "--------------------------------------------------------------\n".$_SERVER['HTTP_USER_AGENT']."\n".date('Y-m-d H:i:s')."\n".$log, FILE_APPEND);
+}
+require_once('../include/fonctions.php');
+require_once('../include/fonction.db.php');
+require_once('../include/fonction.mobile.php');
+require_once('../include/mobile_user_agent.php');
+require_once('../include/global.php');
+require_once('DB.php');
+require_once('previsite/GetDsn.php');
+
+//repasse en ancienne version
+DEFINE('ROLLBACK', false);
+
+//DEFINE('URL_IMAGE',			'http://images.previsite.net/getimage.asp?path=flat&id=#ID#&perw=90&perh=90&width=300');
+//DEFINE('URL_IMAGE',			'http://images.previsite.net/getimage.asp?path=flat&id=#ID#&perw=90&perh=90&width=300');
+define('URL_IMAGE', 		'http://media.previsite.com/flat/max_2048x1024/#ID#.jpg?width=300');
+DEFINE('URL_BACK',			'http://'.(SERVEUR_DEV ? 'dev.' : '').'m.previsite.com/#REF#');
+DEFINE('URL_VIDEO_MOBILE', 	'http://media.previsite.com/video/#ID#.#EXT#');
+
+$ext 	= ($_REQUEST['ext'] != ""? $_REQUEST['ext'] : '3gp');
+$id 	= $_REQUEST['id'];
+$p		= $_REQUEST['p'];
+if(!is_guid($id)){
+	/* Insertion stat */
+	$mobile = new MobileUserAgent();
+	$tab_mobile = array();
+	$tab_mobile['ADRESSE_IP'] = $_SERVER['REMOTE_ADDR'];
+	$tab_mobile['ID_VIDEO'] = $id." VIDEO";
+	$tab_mobile['PARTNER'] = $p;
+	$tab_mobile['MARQUE_MOBILE'] = $mobile->vendor();
+	$tab_mobile['MODELE_MOBILE'] = $mobile->model();
+	$tab_mobile['AGENT_MOBILE'] = $mobile->userAgent();
+	$tab_mobile['IMODE'] = $mobile->isImode();
+	$tab_mobile['OPERATOR'] = $mobile->operator();
+	$tab_mobile['IPHONE'] = $mobile->isIPhone();
+	insert_stat($tab_mobile);
+	$url_redirect = 'http://'.(SERVEUR_DEV ? "dev." : "").'m.previsite.com/video/videos/'.$id.'.'.$ext;
+	if(strtoupper($p) == "KAUFMAN"){ $url_redirect = str_replace('#REF#', $id, URL_GET_KAUFMAN_VIDEO);}
+	header('Location: '.$url_redirect);
+	exit;
+}else{
+	$getDsn = new GetDsn();
+	$db_data['pool']["realestate"]['DSN'] = $getDsn->byTourID($id);
+	if($db_data['pool']["realestate"]['DSN'] != ""){
+		$sql = "SELECT TOP 1 ID_VIDEO FROM VIDEO WHERE ID_VISITE='".$id."' AND PROFIL_AVAILABLE LIKE '%mobile%' ORDER BY DATE_MODIFICATION_VIDEO DESC";
+		$id = db_getOne($sql ,"realestate");
+	}
+}
+
+$url_video = str_replace(array('#ID#', '#EXT#'), array($id, $ext), URL_VIDEO_MOBILE);
+$video 	= substr($id,0,8);
+if( (preg_match('/(\*\/\*|video\/3gpp)/i',$_SERVER['HTTP_ACCEPT']) > 0 && $_REQUEST['novideo'] != "true") || $_SERVER['HTTP_ACCEPT'] == ""){
+	$url_getfile = $url_video."?r=".rand();
+	//$headers = get_headers($url_getfile);
+	//for ($i = 0; $i < count($headers); $i++) {
+		//if(preg_match('/(location|302)/i', $headers[$i], $location) > 0){
+			//header($headers[$i]);
+		//}
+	//}
+	//exit;
+	$content 	= file_get_contents($url_getfile);
+	@file_put_contents("../tmp/request.txt", "\n".$url_getfile." (Length:".strlen($content).")\n",FILE_APPEND);
+	$http_range = isset($_SERVER['HTTP_RANGE']) || false;
+	$range = "";
+	$size  = strlen($content);
+	$md5   = md5($content);
+	if($http_range) {
+	    list($size_unit, $range_orig) = explode('=', $_SERVER['HTTP_RANGE'], 2);
+	    if($size_unit == 'bytes') {
+	        list($range, $extra_ranges) = explode(',', $range_orig, 2);
+	    }
+	}
+	list($seek_start, $seek_end) = explode('-', $range, 2);
+	$seek_end   = (empty($seek_end)) ? ($size - 1) : min(abs(intval($seek_end)),($size - 1));
+	$seek_start = (empty($seek_start) || $seek_end < abs(intval($seek_start))) ? 0 : max(abs(intval($seek_start)),0);
+	
+	//Only send partial content header if downloading a piece of the file (IE workaround)
+	if($seek_start > 0 || $seek_end < ($size - 1)) {
+	    header('HTTP/1.1 206 Partial Content');
+	}
+	if($http_range || ROLLBACK){
+		header('Accept-Ranges: bytes');
+		header('Content-Range: bytes '.$seek_start.'-'.$seek_end.'/'.$size);
+	}
+	
+	//header('Accept-Ranges: bytes');
+	//header('Content-Type: binary/octet-stream');
+	header('Content-Type: video/mp4');
+	//header('Content-Type: video/3gpp');
+	header('Content-Length: '.($seek_end - $seek_start + 1));
+	header('ETag: "'.$md5.'"');
+	header('Last-Modified: '.gmdate("D, d M Y H:i:s", time()-2));
+	header('Connection: keep-alive');
+	
+	if($http_range || ROLLBACK){
+		$content = substr($content, $seek_start, $seek_end);
+	}
+	if (stripos($_SERVER['REQUEST_METHOD'], 'HEAD') !== FALSE) {
+		exit();
+	}
+	echo $content;
+	if(DEBUG){
+		$log = "\n\n\n";
+		foreach(apache_response_headers() as $k=>$v){ $log .= $k.": ".$v."\n";}
+		@file_put_contents("../tmp/request.txt",$log,FILE_APPEND);
+		@file_put_contents("../tmp/agent.txt", $_SERVER['HTTP_USER_AGENT']."\n", FILE_APPEND);
+	}
+}else{
+	$visite = get_visite_description($id);
+	$images = get_image_visite($id);
+?>
+<!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.0//EN" "http://www.wapforum.org/DTD/xhtml-mobile10.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>Previsite Mobile</title>
+<style type="text/css">
+	a:link { color: #FF6600; }
+	a:visited { color: #FF6600; }
+	a:hover { color: #FF6600; }
+	a { font-size: 11px; }
+	td { font-size: 11px; text-align:left;}
+	.footer  { border-top: 1px dashed #666; margin-top: 10px;}
+	div{ margin: 0 auto;width:500px;}
+	table{ margin: 0 auto;}
+	
+	body {
+		background-color: #333;
+		margin-top: 0px;
+		margin-left: 0px;
+		margin-right: 0px;
+		font-family: Verdana, Arial, Helvetica, sans-serif;
+		font-size: 11px;
+		color: #FFF;
+		text-align:center;
+	}
+</style>
+</head>
+<body>
+	<table width="200">
+<?php
+	if(count($images) > 0){
+		foreach($images as $image){
+?>
+			<tr><td><img src="<?=str_replace('#ID#',$image,URL_IMAGE);?>" alt="" title="" /></td></tr>
+<?php
+		}
+	}
+?>
+	</table>
+</div>
+<div class="footer">Copyright &copy; <?=date('Y');?> Previsite S.A.</div>
+</body>
+</html>
+<?php
+}
+exit;
+?>

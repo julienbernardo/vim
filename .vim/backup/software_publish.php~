@@ -1,0 +1,1316 @@
+<?php
+
+require_once 'DB.php';
+require_once '../include/global.php';
+require_once '../include/fonctions.php';
+require_once '../include/fonction.db.php';
+require_once '../include/fonction.db.publish.php';
+require_once 'HTTP/Request.php';
+require_once 'previsite/GetDsn.php';
+require_once 'previsite/fonctions.crypt.php';
+
+$dico['syndication_missing_fields'] = "All fields required for syndication";
+$dico['mls_number_wrong_format'] = "This doesn't look like an MLS number";
+
+$tab_default_user_code = array(
+	ID_TWITTER => TWITTER_LOG
+);
+
+//-----------PARAM
+$diffusion = $_REQUEST['diffusion'];
+
+// mandatory params
+$tour	= $_REQUEST['tour'];
+$user	= $_REQUEST['user'];
+$ref	 = trim($_REQUEST['ref']);
+$partner = $_REQUEST['partner'];
+// additionnal params for video
+$title   = $_REQUEST['title'];
+$city	 = $_REQUEST['city'];
+$mode	= $_REQUEST['mode'];
+
+$skip_limitations = !empty($_REQUEST['skip_limit']); // Pour la synchro, ne pas tenir compte des limitations
+
+
+$mode_auto = ($mode == "auto");
+$mode_async = $mode=='async';
+
+
+// 2012-06-11 : Virer Youtube US
+if(ID_YOUTUBE_US==$partner) {
+	$partner = ID_YOUTUBE_FR;
+}
+
+
+
+
+$output  = 'false';
+
+//-----------DSN
+$getdsn = new GetDsn(array('MEMCACHED' => !SERVER_DEV));
+
+//-----------GET DSN by id_diffusion or by id_tour
+if(is_guid($diffusion)) {
+	$dsn = $getdsn->byTourPub($diffusion);
+} else {
+	$dsn = $getdsn->byTourID($tour);
+}
+
+
+$db = DB::connect($dsn);
+
+//----------GET INFO
+if(is_guid($diffusion)) {
+	if(!PEAR::isError($db)) {
+		$tab_diffusion = get_param_diffusion($diffusion);
+	}
+	$tour = $tab_diffusion['Id_visite'];
+	$user = $tab_diffusion['Id_utilisateur'];
+	$ref = $tab_diffusion['Ref_portail'];
+	$partner = $tab_diffusion['Id_portail'];
+	$tab_tour = get_tour_data($tour, $user);
+	$todo_realtor = "submit";
+} else {
+	if(!is_guid($tour) || !is_guid($partner) || strlen($ref)==0) die('not_enough_params');
+	if(!PEAR::isError($db)) {
+		$tab_tour = get_tour_data($tour, $user);
+		$user = $tab_tour['ID_UTILISATEUR'];
+	}
+	$todo_realtor = "check";
+}
+
+$multidiffusion = false;
+$tab_debug = array();
+
+// dev.api.previsite.com/publication/software_publish.php?tour=C94CE1F1-3769-095E-8C0A-FBA835A989A2&partner=7B056BB9-BB68-B193-9D7C-28C1819F9C8E&ref=toto
+// Check limit diffusion + si client relie
+$tab_limit = check_publication_limit($partner, $tour);
+
+if(empty($tab_limit['ID_UTILISATEUR'])) {
+	die('not_registered_to_partner');
+}
+
+$check_block_diff  = !$mode_auto; // Bloquer la diffusion pour diff manuelle
+$check_block_diff |= stripos($tab_limit['ORDRE_DIFFUSION'], 'DATEM_')!==false; // Ou pour diffusion par date de dernière modif
+$check_block_diff &= !$skip_limitations; // Ne pas checker les limites si force synchro sur autre portail
+
+if($check_block_diff) {
+	// Blocker si depassement quota si diffusion manuelle ( diffusion auto : Dediffuser les annonces en trop en fin de script)
+	if(empty($tab_limit['ID_UTILISATEUR'])) {
+		die('unknow_tour');
+	} else if($tab_limit['LIMITE_DIFFUSION']>0 && $tab_limit['NB_DIFF']>=$tab_limit['LIMITE_DIFFUSION']) {
+		die('limit_publication_reached');
+	}
+}
+
+
+
+
+if(PEAR::isError($db)) {
+	die('db_error');
+}
+
+if(!empty($tab_tour)) {
+	$partner_type = get_partner_type($partner);
+	$company = $tab_tour['ID_SOCIETE'];
+	$lang	= strtolower($tab_tour['ID_LANGUE']);
+
+	if(!empty($tab_tour['URL_VIEWER'])) $url_viewer = $tab_tour['URL_VIEWER'];
+	else								$url_viewer = 'http://tour.previsite.com/#ID#';
+	$url_viewer = str_replace('#ID#', $tour, $url_viewer);
+
+	if($partner_type == 7 || $partner == ID_TRULIA || $partner == ID_ZILLOW) {
+		$tab_tour = array_merge(get_tour_details_us($tour),$tab_tour);
+		$tab_user = get_user_infos($user);
+		$good  = strlen($tab_tour['NOMBRE_CHAMBRE']) > 0 && strlen($tab_tour['NOMBRE_SALLE_BAIN']) > 0;
+		$good &= !empty($tab_user['NOM_UTILISATEUR']) && !empty($tab_user['PRENOM_UTILISATEUR']) && !empty($tab_user['EMAIL_UTILISATEUR']) && !empty($tab_user['TELEPHONE_UTILISATEUR']);
+		$good &= !empty($tab_user['NOM_SOCIETE']) && !empty($tab_user['SITEWEB_SOCIETE']) && !empty($tab_user['TELEPHONE_SOCIETE']);
+		$good &= !empty($tab_user['ADRESSE']) && (!empty($tab_user['VILLE']) || !empty($tab_user['CODE_POSTAL']));
+
+		// return error
+		if(!$good) die($dico['syndication_missing_fields']);
+	} else if($partner == ID_HOMES) {
+		$tab_tour = get_tour_details_us($tour);
+		$tab_user = get_user_infos($user);
+
+		$good  = !empty($tab_user['NOM_UTILISATEUR']) && !empty($tab_user['PRENOM_UTILISATEUR']) && !empty($tab_user['EMAIL_UTILISATEUR']) && !empty($tab_user['TELEPHONE_UTILISATEUR']);
+		$good &= !empty($tab_user['NOM_SOCIETE']) && !empty($tab_user['SITEWEB_SOCIETE']) && !empty($tab_user['TELEPHONE_SOCIETE']);
+		$good &= !empty($tab_user['ADRESSE']) && (!empty($tab_user['VILLE']) || !empty($tab_user['CODE_POSTAL']));
+
+		// return error
+		if(!$good) die($dico['syndication_missing_fields']);
+	} else if($partner_type == 5) {
+		$good = ereg("^[0-9A-Za-z_-]*$", $ref);
+		// return error
+		if(!$good) {
+			die($dico['mls_number_wrong_format']);
+		}
+	}
+	
+	// Antoine, a toi de jouer ;-)
+	// Remettre chaque id_portail dans le switch($partner)
+	$etat_diffusion = true;
+	$tab_options = get_portail_options($partner);
+
+	if(isset($tab_options['PUBLICATION'])) {
+		// Cas Realtor.com
+		if($partner == 'F98D6CFA-E7E4-9F63-0249-C16C38A8C477') {
+		   // $todo_realtor = "check";
+			require 'auto/'.$tab_options['PUBLICATION'];
+			list($status, $output) = explode("|", $data);
+			
+			if($status == "Success") {
+				list($element, $Id_diffusion_portail) = explode("#", $output);
+				if(ereg("order_existing", $element)) {
+					$order_number = str_replace("order_existing=", "", $element);
+					require 'auto/'.$tab_options['PUBLICATION'];
+					list($element, $Id_diffusion_portail) = explode("#", $data);
+				}
+				$prix = str_replace("Prix=", "", $element);
+				if($prix!=0) {
+					$output = "Paiement";
+					$status = "Check";
+				} else {
+					$todo_realtor = "submit";
+					require 'auto/'.$tab_options['PUBLICATION'];
+					list($status, $output) = explode("|", $data);
+				}
+			}
+			$etat_diffusion = false;
+		} else {
+			$url  = URL_MLS_PUBLICATION.$tab_options['PUBLICATION'];
+			$url .= '?portail='.$partner.'&mls_number='.$ref.'&tour='.$tour.'&user='.$user.'&db_name='.$db_data['name'].'&todo=add';
+			if(USER_NCI) $url .= '&user_nci=on';
+			$todo = "add";
+			require 'auto/'.$tab_options['PUBLICATION'];
+			list($status, $output) = explode("|", $data);
+		}
+		if($status != "Success") {
+			$etat_diffusion = false;
+			if($output == "") $output = 'false';
+		}
+	}
+
+	// RS 2012-07-02 : Prendre les options pour tt le monde...
+	$tab_distrib_options = get_distrib_option($tab_tour['ID_DISTRIBUTEUR']);
+	$tab_user_options = get_user_option($user);
+	$tab_options = array_merge($tab_distrib_options, $tab_user_options);
+	switch($partner) {
+		// Diffusion US custom
+		case '51CE4B96-7977-E3DA-E90A-B242F7078EA6':
+				try {
+					require_once 'previsite/fonctions.url.php';
+				// dev.api.previsite.com/publication/software_publish.php?partner=51CE4B96-7977-E3DA-E90A-B242F7078EA6&tour=650DC744-2571-891F-5168-D5940BD19EE1&ref=bibi
+//				$tab_url = array();
+//				if(!empty($tab_tour['NOM_VISITE'])) {
+//					$tab_url[] = $tab_tour['NOM_VISITE'];
+//				}
+//				if(!empty($tab_tour['ADRESSE'])) {
+//					$tab_url[] = $tab_tour['ADRESSE'];
+//				}
+//				if(!empty($tab_tour['VILLE'])) {
+//					$tab_url[] = $tab_tour['VILLE'];
+//				}
+//				if(!empty($tab_tour['CODE_POSTAL'])) {
+//					$tab_url[] = $tab_tour['CODE_POSTAL'];
+//				}
+//				if(empty($tab_url)) {
+//					throw new Exception('not_enough_info_for_seo');
+//				}
+//				$tab_partner = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+//				if(!empty($tab_partner[$partner]['PREFIX']) && stripos($tab_partner[$partner]['PREFIX'], 'http://')===false) {
+//					$tab_partner[$partner]['PREFIX'] = 'http://'.$tab_partner[$partner]['PREFIX'];
+//				}
+//				$tab_domain = @parse_url($tab_partner[$partner]['PREFIX']);
+//				$domain = $tab_domain['host'];
+//				if(empty($domain)) {
+//					throw new Exception('unknown_domain'.$tab_partner[$partner]['PREFIX']);
+//				}
+//				$url = preg_replace('/[^a-z0-9]+/i', '-', replace_accents(strtolower(implode('-', $tab_url)))).'.html';
+
+				if(!add_manual_publication($company, $partner, $tour, $tour, $multidiffusion)) {
+					throw new Exception('insert_error');
+				}
+//				$final_url = 'http://'.$domain.'/'.substr(str_replace('-', '',$pub), 0, 12).'_'.$url;
+
+				$pub = strtolower(get_id_diffusion_portail($tour, $partner));
+				$final_url = build_url_custom_listing($pub, $tab_options['URLCUSTOMLISTING'], $tab_tour);
+
+				update_diffusion_portail_option($pub, 'URL_ANNONCE', substr($final_url, 0, 255));
+				$output = 'true';
+			} catch(Exception $e) {
+				$output = $e->getMessage();
+			}
+			break;
+
+
+		// Forcer le mode auto pour les portails en attente
+		case '72C95173-B883-3C3C-AC86-F766C540C44C':
+		case '7768D1E2-6966-C0C6-D078-1586F6F3FCF4':
+		case '4472C6DB-0F66-33FD-58AD-2B035C80C0C4':
+		case 'EC37D041-F13E-DAC4-AA1F-495122B18BC1':
+		case 'F0259E38-9E97-F30D-9D1F-4B88E6EB75DB':
+		case '1AD785BD-1D43-B186-DAA1-A8CC0BCE473F':
+		case 'BF1750CC-F1CC-887D-1681-C1CAA0A49665':
+		case 'E3F34FE5-C98C-3B89-C79D-9344C011748F':
+		case '4471FFC0-A96C-D041-77EF-D62C4B63E993':
+			if(add_manual_publication($company, $partner, $tour, $tour, $multidiffusion, true)) {
+				$output = 'true';
+			}
+			break;
+
+
+		// Portail list globally : Mettre l'id visite comme ref pour etre sur d'etre unique
+		// // Sauf pour les premiers clients deja integres (BSI & IGP & proprivee) pour pouvoir matcher les stats
+		/*case '73A8FA2D-902C-D186-5F92-4C2FF6466A9A':
+		case '00FDEFFE-4289-09C4-6E66-0F013B5B1963':
+		case '84713D2B-B1B8-33E1-EB2F-A09518E50D98':
+		case '4471FFC0-A96C-D041-77EF-D62C4B63E993':
+		case '0D576B65-417E-CDB3-B56E-82E6535EE7AA':
+		case '2DC75E30-B140-DEB9-A248-0D7328A6E71C':
+		case '1F800B1B-6A8C-F555-D9E8-9802B9CFA75B':
+		case 'D89FA112-8A55-342C-D29F-DBCA4055A5B2':
+		case '7DC79995-6EA1-D803-7DA2-47329C7F81B8':
+		case '12271412-6DE4-C5FD-156D-E7CB548FD787':
+		case 'EA9A7996-9875-4257-BF6E-B9EF3F383A74':
+		case 'FBE8719B-EC89-3DEF-5FCE-4DAA5BF813EB':
+		case 'FCCD205A-FA97-CF83-99BA-937134003BCD':
+		case 'DCEC1C84-82E0-1644-74EE-F50B50A14C00':
+		case '3D76A756-E61B-3902-EBF8-57B9CCE2C31D':
+		case 'A13A304A-FAAE-0146-C57F-44DDB68767E9':
+		case '30DDA510-3718-974A-40A8-9FDEE6204787':
+		case 'D79FCD76-DA09-9BE0-F321-C66291777E11':*/
+		case ID_VIVAREAL:
+		case ID_HOMEIN_COM:
+		case ID_CHINASPLASH:
+		case ID_REALESTATE_COM_LB:
+		case ID_IPROPERTY_MY:
+		case ID_ACRES_COM:
+		case ID_OFERTY_NET:
+		case ID_REALESTATE_CO_JP:
+		case ID_IDEALISTA_COM:
+		case ID_GOHOME_COM_HK:
+		case ID_PRIVATEPROPERTY_CO_ZA:
+		case ID_IMMOBILIARE_IT:
+		case ID_RIGHTMOVE_CO_UK:
+		case ID_DOMAVIN_RU:
+		case ID_METROSCUBICOS_COM:
+		case ID_SPITI24_GR:
+		case ID_IMMOBILIENSCOUT24_DE:
+		case ID_IPROPERTY_SG:
+		case ID_PROPERTYFINDER_AE:
+		case ID_DOMAIN_COM_AU:			
+			
+			$tab_tour = get_tour_detail($tour);
+			
+			// RS 2012-07-06 : Pour les loc, diffuser et flagger avec le message d'erreur
+			// Ex : dev.api.previsite.com/publication/software_publish.php?partner=84713D2B-B1B8-33E1-EB2F-A09518E50D98&tour=7C903CC1-657C-42C4-95F2-8B1081C14027&ref=7C903CC1-657C-42C4-95F2-8B1081C14027
+			if(1!=$tab_tour['ID_TYPE_TRANSACTION']) {
+				$is_export = true; // pour recuperer l'id_diff
+				$waiting = true;
+				$tab_diff = add_manual_publication($company, $partner, $tour, $tour, $multi_diffusion, true, $is_export);
+				
+				// Changement du statut
+				$url_update_diff  = 'http://api.previsite.com/rest/publication/'.urlencode($tab_diff['id']);
+				$url_update_diff .= '?method=post';
+				$url_update_diff .= '&status=-3';
+				$url_update_diff .= '&pub_error_mess='.urlencode('Only sales allowed');
+				$result = json_decode( @file_get_contents($url_update_diff), true );
+
+				// Si erreur enlever la ligne
+				if(!$result['success']) {
+					delete_publication($partner, $tour);
+				} else {
+					$output = 'true';
+				}
+
+			} else {
+				// dev.api.previsite.com/publication/software_publish.php?partner=1F800B1B-6A8C-F555-D9E8-9802B9CFA75B&tour=00F0A0E8-7507-6067-23A5-EC9C766EF31E&ref=8738110
+				$old_ref  = in_array($tab_tour['ID_UTILISATEUR'], array('5E9EABEC-4FD3-1D95-34C4-16467D786F42', '569E03DB-8955-E41F-F3EB-B2C058A3A26F', 'C38DEE9B-6CD2-4040-A622-4B7D3831B1ED', 'D2DA6232-990D-9906-A995-B0A303D896E7', 'F8888BF8-1E82-DCE6-BB35-EA9F60FAC389'));
+				$old_ref |= 'DC1E1651-0948-86D8-8268-D97E5C3A7AB1'==$tab_tour['ID_DISTRIBUTEUR'];
+				if(!$old_ref) {
+					$ref = $tour;
+				}
+
+				if(add_manual_publication($company, $partner, $tour, $tour, $multidiffusion,true)) {
+					$output = 'true';
+				}
+			}
+
+			break;
+
+
+		// Facebook Wall
+		// http://dev.api.previsite.com/publication/software_publish.php?partner=A47CFC83-DB74-13CA-82C8-E3D981A0F5BA&user=0848C622-82BA-6B0E-DB03-7414818E08E5&tour=F3D5EE79-F0D3-047E-365D-1661F9948E9B
+		// dev.api.previsite.com/publication/software_publish.php?partner=A47CFC83-DB74-13CA-82C8-E3D981A0F5BA&tour=8C9A085E-91CD-5BDE-7695-8AD7F7F6FE10&user=B794C9FC-1506-9164-B624-146D5ED1080B&ref=toto
+		
+		case 'A47CFC83-DB74-13CA-82C8-E3D981A0F5BA':
+			if(add_manual_publication($company, $partner, $tour, $tour, $multidiffusion,true)) {
+				// Diffusion Fb Wall En asynchrone
+				$output = 'true';
+/*
+			} else {
+				$tab_user = get_user_infos($tab_tour['ID_UTILISATEUR']);
+				$tab_tour = array_merge($tab_tour, get_tour_detail($tour, $tab_tour['ID_TEMPLATE']));
+		
+				$tab_partners = get_user_partner_infos($company, $partner);
+
+				$url_thumb = str_replace(array('%PATH%', '%SIZE%', '%ID%'), array('thumb', SIZE_THUMB, $tab_tour['ID_PREMIERE_IMAGE']), URL_MEDIA);
+			
+
+				$tab_pattern = array('%COMPANY_WWW%', '%COMPANY_NAME%');
+				$tab_replace = array($tab_user['SITEWEB_SOCIETE'], $tab_user['NOM_SOCIETE']);
+
+				$domain = SERVER_DEV ? 'dev.facebook.previsite.net' : 'facebook.previsite.net';
+				$url_publish  = 'http://'.$domain.'/newsfeed/pub.php';
+				$url_publish .= '?usercode='.urlencode($tab_partners[$partner]['PREFIX']);
+				$url_publish .= '&token='.urlencode($tab_partners[$partner]['PASSWORD']);
+				$url_publish .= '&title='.urlencode($tab_tour['NOM_VISITE']);
+			
+				//$url_publish .= '&subtitle='.urlencode($tab_tour['NOM_VISITE']);
+				$url_publish .= '&desc='.urlencode($tab_tour['DESCRIPTION']);
+				$url_publish .= '&url_listing='.urlencode($tab_tour['URL_ANNONCE']);
+				$url_publish .= '&tour='.urlencode($tour);
+				$url_publish .= '&thumb='.urlencode($url_thumb);
+				$result = @file_get_contents($url_publish);
+
+				if(preg_match('/^[0-9]+_[0-9]+$/', $result)) {
+					add_manual_publication($company, $partner, $tour, (string)$result, $multidiffusion);
+					$output = 'true';
+				} else if(SERVER_DEV) {
+					$output = 'false '.$url_publish;
+				}
+*/
+			}
+			break;
+
+
+		case ID_TWITTER:
+			// http://dev.api.previsite.com/publication/software_publish.php?partner=E5607DDA-327B-2432-8A43-C5E25D54432C&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&ref=bibi
+			// http://dev.api.previsite.com/publication/software_publish.php?partner=E5607DDA-327B-2432-8A43-C5E25D54432C&tour=EE0BA478-5DC4-56D8-E6F7-B8DA016D6E13&ref=bibi
+
+			// AMTT
+			// http://dev.api.previsite.com/publication/software_publish.php?partner=E5607DDA-327B-2432-8A43-C5E25D54432C&tour=4366C0C8-2BA4-6C0A-9934-AF3DAF0DC331&ref=bibi
+
+			$nb_pub = count_tour_publictions($tour, $partner);
+
+			// Depublication ancien pour eviter les statut duplicate
+			if($nb_pub>0) {
+				$url_unpublish  = URL_UNPUBLISH;
+				$url_unpublish .= '?partner='.urlencode($partner);
+				$url_unpublish .= '&tour='.urlencode($tour);
+				@file_get_contents($url_unpublish);
+			}
+
+
+			// RS 2012-10-16 : déplacé dans gateway2
+			if(true) {
+				$ref_to_use = $nb_pub>0 ? $tour.'updated' : $tour; // Pour mettre le texte Mise a jour au lieu de nouvelle
+				if(add_manual_publication($company, $partner, $tour, $ref_to_use, $multidiffusion, true)) {
+					// Diffusion Twitter En asynchrone
+					$output = 'true';
+				}
+			} else {
+				// A degager....
+				$tab_partners = get_user_partner_infos($company, $partner);
+				$title = !empty($tab_tour['NOM_VISITE']) ? $tab_tour['NOM_VISITE'] : $tab_tour['REF_VISITE'];
+
+				$is_amtt = '688497C9-F915-674B-6F5A-C65452CBFEB4'==$tab_tour['ID_DISTRIBUTEUR'];
+
+
+				$force_redirect_viewer = !empty($tab_distrib_options['FORCEFBURLTOUR']) || !empty($tab_user_options['FORCEFBURLTOUR']);
+
+				$tab_tags = array();
+				if(!empty($tab_options['TWITTERTAGS'])) {
+					$tab_tags = explode(',', $tab_options['TWITTERTAGS']);
+				}
+
+				if(!empty($tab_partners[$partner]['PREFIXE_DIFFUSION'])) {
+					$dico['text_twitter'] = $tab_partners[$partner]['PREFIXE_DIFFUSION'];
+				
+					$is_custo  = strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%TYPE%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%BR%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%CITY%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%TRANSACTION%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%TR%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%PRICE%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%ZIP%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%STATE%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%AG_FNAME%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%AG_LNAME%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%CNY_NAME%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%AREA%')!==false;
+					$is_custo |= strpos($tab_partners[$partner]['PREFIXE_DIFFUSION'], '%ROOMS%')!==false;
+					$is_custo |= preg_match('/%(MARQUE|MODELE|FINITION|ENERGIE)%/', $tab_partners[$partner]['PREFIXE_DIFFUSION']);
+
+
+					// http://dev.api.previsite.com/publication/software_publish.php?partner=E5607DDA-327B-2432-8A43-C5E25D54432C&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&ref=osef
+					if($is_custo) {
+						$tab_data = array_merge($tab_tour, get_tour_detail($tour));
+
+						$tab_user = get_user_infos($tab_data['ID_UTILISATEUR']);
+						unset($tab_user['VILLE']);
+						$tab_data = array_merge($tab_data, $tab_user);
+
+						$nom_type_bien = !empty($tab_data['NOM_TYPE_BIEN_DISTRIB']) ? $tab_data['NOM_TYPE_BIEN_DISTRIB'] : $tab_data['NOM_TYPE_BIEN'];
+
+						$tab_pattern = array();
+						$tab_replace = array();
+
+						if($is_amtt) {
+							$local_json = '/tmp/amtt.json';
+							if(!is_file($local_json) || time()-filemtime($local_json)>3600) {
+								$contents = @file_get_contents('http://api.previsite.com/facebook/get_amtt_datas.php');
+								file_put_contents($local_json, $contents);
+							}
+							$json = @json_decode(@file_get_contents($local_json), true);
+
+							$tab_amtt = get_amtt_data($tour);
+							$tab_pattern[] = '%MARQUE%';
+							$tab_pattern[] = '%MODELE%';
+							$tab_pattern[] = '%FINITION%';
+							$tab_pattern[] = '%ENERGIE%';
+						
+							$marque = $tab_amtt['ID_MARQUE'];
+							$modele = $tab_amtt['ID_MODELE'];
+							$version = $tab_amtt['ID_VERSION'];
+
+							$tab_replace[] = isset($json[$marque]) ? $json[$marque]['NOM_MARQUE'] : '';
+							$tab_replace[] = isset($json[$marque]['MODELES'][$modele]['VERSIONS'][$version]) ? $json[$marque]['MODELES'][$modele]['VERSIONS'][$version]['NOM_VERSION'] : '';
+							$tab_replace[] = isset($json[$marque]['MODELES'][$modele]['VERSIONS'][$version]) ? $json[$marque]['MODELES'][$modele]['VERSIONS'][$version]['NOM_FINITION'] : '';
+							$tab_replace[] = $tab_amtt['NOM_TYPE_ENERGIE'];
+						}
+
+						// Enlever les 0ch... cf Bedin
+						if(empty($tab_data['NOMBRE_CHAMBRE'])) {
+							$tab_pattern[] = '%BR%ch';
+							$tab_replace[] = '';
+							$tab_pattern[] = '%BR%';
+							$tab_replace[] = '';
+						}
+
+						if(!empty($tab_pattern)) $dico['text_twitter'] = str_replace($tab_pattern, $tab_replace, $dico['text_twitter']);
+
+						// RS 2012-06-12 : Pouvoir cacher le prix
+						if(empty($tab_data['ID_PRIX_CACHE'])) {
+							if(INTL) {
+								$intl = intl(strtolower($tab_data['ID_LANGUE']).'_'.$tab_data['ID_PAYS'], '');
+								$price = format_price_integer($intl, $tab_data['PRIX_BIEN'], $tab_data['REF_DEVISE']);
+							} else {
+								$price = $tab_data['PRIX_BIEN'].$tab_data['REF_DEVISE'];
+							}
+						}
+
+						if('FR'==$tab_data['ID_LANGUE']) {
+							$transaction = 2==$tab_data['ID_TYPE_TRANSACTION'] ? 'Location' : 'Vente';
+							$dico['rooms'] = 'pièces';
+							$dico['text_update'] = 'Modification: ';
+						} else if('HE'==$tab_data['ID_LANGUE']){
+							$transaction = 2==$tab_data['ID_TYPE_TRANSACTION'] ? 'השכרה' : 'למכירה';
+							$dico['rooms'] = 'חדרים';
+						} else if('ES'==$tab_data['ID_LANGUE']){
+							$transaction = 2==$tab_data['ID_TYPE_TRANSACTION'] ? 'Alquiler' : 'Venta';
+							$dico['text_update'] = 'Corregido: ';
+						} else if('PL'==$tab_data['ID_LANGUE']){
+							$transaction = 2==$tab_data['ID_TYPE_TRANSACTION'] ? 'Na wynajem' : 'Na sprzedaz';
+							$dico['rooms'] = 'rooms';
+							$dico['text_update'] = 'Poprawione: ';
+						} else {
+							$transaction = 2==$tab_data['ID_TYPE_TRANSACTION'] ? 'Rent' : 'Sale';
+							$dico['rooms'] = 'rooms';
+							$dico['text_update'] = 'Revised: ';
+						}
+
+						if('AR'==$tab_tour['ID_PAYS']) {
+							$dico['text_update'] = '';
+						}
+
+						if(!empty($tab_data['ESPACE_UTILE'])) {
+							$tab_area_unit = array('1' => 'm²', '2' => 'sqft', '3' => 'acres', '4' => 'ha');
+							$area = $tab_data['ESPACE_UTILE'].$tab_area_unit[$tab_data['ESPACE_UTILE_UNITE']];
+							if('HE'==$tab_data['ID_LANGUE']) {
+								$area = str_replace($tab_area_unit['1'], 'מ"ר', $area);
+							}
+						} else {
+							$area = '';
+						}
+
+						if(!empty($tab_data['NOMBRE_PIECE'])) {
+							$rooms = $tab_data['NOMBRE_PIECE'].' '.$dico['rooms'];
+						} else {
+							$rooms = '';
+						}
+
+						$dico['text_twitter'] = str_replace(
+							array('%TYPE%', '%BR%', '%CITY%', '%ZIP%', '%TRANSACTION%', '%TR%', '%PRICE%', '%STATE%', '%AG_FNAME%', '%AG_LNAME%', '%AREA%', '%CNY_NAME%', '%ROOMS%'),
+							array($nom_type_bien, $tab_data['NOMBRE_CHAMBRE'], $tab_data['VILLE'], $tab_data['CODE_POSTAL'], $transaction, $transaction, $price, $tab_data['REF_ETAT'], $tab_data['PRENOM_UTILISATEUR'], $tab_data['NOM_UTILISATEUR'], $area, $tab_data['NOM_SOCIETE'], $rooms),
+							$dico['text_twitter']
+						);
+
+						// Ajout prefixe modification dans message...
+						if($nb_pub>0) {
+							if(preg_match('/^New (.*)$/i', $dico['text_twitter'], $tmp)) {
+								$dico['text_twitter'] = $dico['text_update'].$tmp[1];
+							} else {
+								$dico['text_twitter'] = $dico['text_update'].$dico['text_twitter'];
+							}
+						}
+
+					}
+				} else {
+					switch($tab_tour['ID_LANGUE']) {
+						case 'FR':
+							if($nb_pub>0) {
+								$dico['text_twitter'] = "Modification '%REF%': %URL%";
+							} else {
+								$dico['text_twitter'] = "Nouveau '%REF%': %URL%";
+							}
+							$dico['text_twitter_invalid'] = "Ce compte est invalide";
+							break;
+
+						case 'ES':
+							$dico['text_twitter'] = "Nuevo: '%REF%': %URL%";
+							$dico['text_twitter_invalid'] = "Invalid account";
+							break;
+
+						default:
+							if($nb_pub>0) {
+								$dico['text_twitter'] = "Revised '%REF%': %URL%";
+							} else {
+								$dico['text_twitter'] = "New '%REF%': %URL%";
+							}
+							$dico['text_twitter_invalid'] = "Invalid account";
+							break;
+					}
+				}
+
+				$log = $tab_partners[$partner]['PREFIX'];
+				$pwd = $tab_partners[$partner]['PASSWORD'];
+
+				if(empty($log) || empty($pwd)) {
+					$log = TWITTER_LOG;
+					$pwd = TWITTER_PWD;
+				}
+
+				if(!$force_redirect_viewer && !empty($tab_tour['URL_ANNONCE'])) {
+					$url_annonce = $tab_tour['URL_ANNONCE'];
+					$url_bitly = str_replace('%URL%', urlencode($url_annonce), URL_BITLY);
+					if(($xml = simplexml_load_file($url_bitly)) !== false) {
+						$valid  = (int)$xml->status_code === 200;
+						$valid &= (string)$xml->status_txt === 'OK';
+
+						if($valid) {
+							$short_url = (string) $xml->data->url;
+						} else {
+							$short_url = $tab_tour['URL_ANNONCE'];
+						}
+					}
+				} else {
+					$short_url = 'http://pvt.fm/'.substr($tour, 0, 8);
+				}
+
+				$size_url = mb_strlen($short_url);
+
+
+				if(strpos($dico['text_twitter'], '%URL%')===false) {
+					$message = $dico['text_twitter']."\n ".$short_url;
+				} else {
+					$tab_pattern = array('%REF%', '%URL%');
+					$tab_replace = array($title, $short_url);
+					$message = str_replace($tab_pattern, $tab_replace, $dico['text_twitter']);
+				}
+
+				$overflow = mb_strlen($message) - 140;
+
+				if($overflow>0) {
+					$to_keep = mb_strcut($title, 0, -$overflow, 'UTF-8');
+					$message = str_replace($title, $to_keep, $message);
+				}
+
+				$message = trim($message);
+
+				// Ajout des tags tant qu'on depasse pas...
+				for($i=0; isset($tab_tags[$i]) && mb_strlen($message)+mb_strlen($tab_tags[$i])<139; $i++) {
+					$tag = mb_strtolower($tab_tags[$i]);
+					$tag = preg_replace('/\s+/', '_', $tag);
+					if('#'!=$tag[0]) {
+						$tag .= '#'.$tag;
+					}
+					$message .= ' '.$tag;
+				}
+
+				// connexion oauth
+				if(true) {
+					require_once '../include/twitteroauth/twitteroauth.php';
+
+					$connection = new TwitterOAuth(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, $log, $pwd);
+
+					$status = $connection->post('statuses/update', array(
+						'status' => $message
+					));
+					$status_id = $status->id_str;
+
+					if(!isset($status->error) && !empty($status_id) && is_numeric($status_id) && add_manual_publication($company, $partner, $tour, $status_id, $multidiffusion)) {
+						$output = 'true';
+					} else if(SERVER_DEV && !empty($status->error)) {
+						$output = $status->error;
+					} else {
+						$output = $dico['text_twitter_invalid'];
+					}
+				}
+			}
+			break;
+
+
+		case ID_GOOGLE4HOME:
+			$tab_pattern  = array('#TODO#', '#TOUR#');
+			$tab_replace 	= array('insert', $tour);
+			$url_diffusion = str_replace($tab_pattern,$tab_replace,URL_DIFFUSION_GOOGLE4HOME);
+			$data = @file_get_contents($url_diffusion);
+			$xml = simplexml_load_string($data);
+			if(count($xml->home) > 0 && $xml->home->id != ""){
+				if(add_manual_publication($company, $partner, $tour, $xml->home->id, $multidiffusion)){
+					$output = 'true';
+				}
+			}
+			break;
+
+		/*case ID_LEBONCOIN:
+			if(!$mode_auto) {
+				// http://dev.api.previsite.com/publication/software_publish.php?partner=80E55BC7-C6EA-BFE7-C7DB-D3C94B132285&tour=1FD98C53-2068-F93D-36A7-1C6F90DA07E8&ref=1FD98C53-2068-F93D-36A7-1C6F90DA07E8&mode=auto
+		 		$user_infos 	= get_user_infos($user);
+				$tab_pattern  	= array('#ID#', '#PWD#', '#REF#');
+				$tab_replace 	= array($tour,urlencode($user_infos['PASSWORD_UTILISATEUR']), urlencode($ref));
+				$url_diffusion 	= str_replace($tab_pattern, $tab_replace, URL_DIFFUSION_LEBONCOIN);
+				$tab_partners = get_user_partner_infos($company, $partner);
+
+				$data = file_get_contents($url_diffusion);
+				$xml = simplexml_load_string($data);
+				$success = count($xml) > 0 && $xml->DiffusionResultCode == "0";
+			} else {
+				$success = true;
+				$ref = $tour;
+			}
+			if($success) {
+				if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion, $mode_auto)){
+					$output = 'true';
+				}
+			} else if(SERVER_DEV) {
+				$output = 'false '.$url_diffusion.'&debug';
+			}
+			break;*/		
+
+
+		case ID_LINKEDIN:
+			$tab_partners = get_user_partner_infos($company, $partner);
+			$log = "";
+		   	$pwd = "";
+		   	if(!is_guid($tab_partners[$partner]['PREFIX'])){
+				$log = $tab_partners[$partner]['PREFIX'];
+				$pwd = $tab_partners[$partner]['PASSWORD'];
+			}			
+			$replace = array(
+	   			'search' => array( '#TODO#', '#ID#', '#LOGIN#', '#PASSWORD#', '#REF#'),
+	   			'replace' => array( 'diffuse', $tour, urlencode($log), urlencode($pwd), '')
+	   		);
+	   		$url_diffusion = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_LINKEDIN);
+			$data = @file_get_contents($url_diffusion);
+			$xml = simplexml_load_string($data);
+			if(count($xml) > 0 && $xml->DiffusionResultCode == "0"){
+				if(add_manual_publication($company, $partner, $tour, $xml->DiffusionResultId, $multidiffusion)){
+					$output = 'true';
+				}
+			}
+			break;
+			
+		case ID_VIADEO:
+			$tab_partners = get_user_partner_infos($company, $partner);
+			$log = "";
+		   	$pwd = "";
+		   	if(!is_guid($tab_partners[$partner]['PREFIX'])){
+				$log = $tab_partners[$partner]['PREFIX'];
+				$pwd = $tab_partners[$partner]['PASSWORD'];
+			}
+//			d=#ID#&login=#LOGIN#&password=#PASSWORD#&ref=#REF#&todo=#TODO#&county=#COUNTY#&country=#COUNTRY#&category=#CATEGORY#&ref=#REF#
+			$replace = array(
+	   			'search' => array( '#TODO#', '#ID#', '#LOGIN#', '#PASSWORD#',  '#COUNTY#', '#COUNTRY#', '#CATEGORY#', '#REF#'),
+	   			'replace' => array( 'diffuse', $tour, urlencode($log), urlencode($pwd), urlencode($_REQUEST['county']), urlencode($_REQUEST['country']), urlencode($_REQUEST['category']), '')
+	   		);
+	   		$url_diffusion = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_VIADEO);
+			$data = @file_get_contents($url_diffusion);
+			$xml = simplexml_load_string($data);
+			if(count($xml) > 0 && $xml->DiffusionResultCode == "0"){
+				if(add_manual_publication($company, $partner, $tour, $xml->DiffusionResultId, $multidiffusion)){
+					$output = 'true';
+				}
+			}
+			break;
+			
+		case '5A798E04-A84C-9A63-79C2-2DFA8709CBFC':
+			require_once('HTTP/Request.php');
+			$posturl = "http://partners.birdview.com/vtp/webpush.htm";
+			$login = "previsite";
+			$password = "andre99";
+
+			$url_tour = "http://tour.previsite.com/".$tour;
+			if(count($tab_tour)>0) {
+				$req = &new HTTP_Request($posturl);
+				$req->addHeader("Content-Type", "text/html");
+				$req->setMethod(POST);
+				$req->addPostData("VT_USER", $login);
+				$req->addPostData("BAMPASS", $password);
+				$req->addPostData("MLS-CODE", $tab_tour['NUMERO_MLS']);
+				$req->addPostData("POSTAL-CODE", $tab_tour['CODE_POSTAL']);
+				$req->addPostData("TourBaseURL", $url_tour);
+				$req->addPostData("B1", "Submit");
+				$req->sendRequest();
+				$response = $req->getResponseBody();
+			}
+			if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion)) {
+				$output = 'true';
+			}
+			break;
+
+		case ID_REALTOR:
+#			if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion)) {
+			if($etat_diffusion)	$output = 'true';
+#			}
+			break;
+
+		case ID_CRAIGSLIST:
+			$ref = $tour;
+			if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion)) {
+				$output = 'true';
+			}
+			break;
+
+
+		case ID_OLX:		
+		case ID_OODLE:
+		case ID_LOCANTO:
+		case ID_ADSDECK:
+		case ID_VIVAREAL:
+		case ID_REALTOR_COM:
+        case ID_BERTRAND:
+        case ID_GRUPO_UNION: 
+			// RS 2012-06-25 : Ne pas mettre en pending les exports full qu'on genere
+			if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion,false)){
+				$output = 'true';
+			}
+		break;
+
+		case ID_KIJIJI:
+			if($mode == "export" ){
+				$replace = array(
+					'search' => array( '#ID#', '#CITY#'),
+					'replace' => array( $tour, urlencode($city))
+				);
+				$url_diffusion = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_KIJIJI);
+				//echo $url_diffusion;exit;
+				$data = @file_get_contents($url_diffusion);
+				$xml = simplexml_load_string($data);
+				if(count($xml) > 0){
+					if($xml->DiffusionResultCode == "0"){
+						if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion)){
+							$output = 'true';
+						}
+					}else if($xml->DiffusionResultDesc != ""){ 
+						$output = $xml->DiffusionResultDesc."";
+					}else if($xml->DiffusionResultText != ""){ 
+						$output = ucfirst(strtolower($xml->DiffusionResultText.""));	
+					}
+				}else{ 
+					$output = $data;
+				}
+				if($output != 'true'){
+					$diffusion = add_manual_publication($company, $partner, $tour, $ref, $multidiffusion, false, true);
+					if(is_guid($diffusion['id']))  update_diffusion_portail_option($diffusion['id'], 'PUBLICATIONERRORCODE', $output);
+				}
+			}else{
+				$diffusion = add_manual_publication($company, $partner, $tour, $ref, $multidiffusion, true, true);
+				if(is_guid($diffusion['id'])){
+					if($city != "") update_diffusion_portail_option($diffusion['id'], 'CITY', $city);
+					$output = 'true';
+				}
+			}
+			break;
+ 
+		case ID_GOOGLEPLUS:
+			if($mode == "export"){
+				$replace = array(
+					'search' => array('#REF#', '#TOUR#', '#ACTION#'),
+					'replace' => array($ref, $tour, 'publish'),
+				);
+				$url = str_replace($replace['search'], array_map('urlencode', $replace['replace']), URL_DIFFUSION_GOOGLEPLUS);
+				$output = file_get_contents($url);
+				$json = json_decode($output, true);
+				if($json['status'] == 'success'){
+					if(!add_manual_publication($company, $partner, $tour, $json['id'], $multidiffusion)){
+						$output = "false";
+					}
+				}else{
+					$diffusion = add_manual_publication($company, $partner, $tour, $ref, $multidiffusion, false, true);
+					if(is_guid($diffusion['id']))  update_diffusion_portail_option($diffusion['id'], 'PUBLICATIONERRORCODE', $json['error']);
+				}
+			}else{
+				$diffusion = add_manual_publication($company, $partner, $tour, $ref, $multidiffusion, true, true);
+				if(is_guid($diffusion['id'])){
+					$output = 'true';
+				}
+			}
+			break;
+
+		case ID_PINTEREST:
+		case ID_PINTEREST_CORP:
+		case ID_PINTEREST_IMAGE:
+		case ID_MERCADO:
+		case ID_VIVASTREET:
+		case ID_MITULA:		
+			if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion,true)){
+				$output = 'true';
+			}
+		break;
+
+		case ID_METACAFE:
+		case ID_YOUTUBE_FR:
+		case ID_YOUTUBE_US:
+		case ID_DAILYMOTION_FR:
+		case ID_VIEWTHISHOME:
+		case ID_KEWEGO:
+		case ID_YAHOO:
+		case ID_WATTV:
+		case ID_YOUTUBECORP:
+		case ID_DAILYCORP:
+			$is_corp = in_array($partner, array(ID_YOUTUBECORP, ID_DAILYCORP));
+			$tab_partners = get_user_partner_infos($company, $partner);
+			$type = '';
+			switch($partner) {
+				case ID_YOUTUBECORP:
+					$website = 'YOUTUBE';
+					break;
+				case ID_DAILYCORP:
+					$website = 'DAILYMOTION';
+					break;
+				case ID_VIEWTHISHOME:
+					$website = 'VIEWTHISHOME';
+					$type	 = 'US';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "viewthishome@previsite.com";
+						$tab_partners[$partner]['PASSWORD'] = "viewthishome007!";
+					}
+					break;
+				case ID_KEWEGO:
+					$website = 'KEWEGO';
+					$type	 = 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "kewego@previsite.com";
+						$tab_partners[$partner]['PASSWORD'] = "Previsite2010";
+					}
+					break;
+				case ID_YAHOO:
+					$website = 'YAHOO';
+					$type	 = 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "previsitevideo@yahoo.com";
+						$tab_partners[$partner]['PASSWORD'] = "Previsite2010!";
+					}
+					break;
+				case ID_WATTV:
+					$website = 'WATTV';
+					$type	 = 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "wattv@previsite.com";
+						$tab_partners[$partner]['PASSWORD'] = "Previsite2010!";
+					}
+					break;
+				case ID_YOUTUBE_FR:
+					$website = 'YOUTUBE';
+					$type	= 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "VisiteVirtuelleImmo";
+						$tab_partners[$partner]['PASSWORD'] = "youtube007!";
+						//$tab_partners[$partner]['PREFIX'] = "PrevisiteChannel";
+						//$tab_partners[$partner]['PASSWORD'] = "youtube007!";
+					}
+					break;
+				case ID_METACAFE:
+					$website = 'METACAFE';
+					$type	= 'FR';
+					break;
+				default:
+					$website = 'DAILYMOTION';
+					$type	= 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						//$tab_partners[$partner]['PREFIX'] = "PrevisiteChannel";
+						//$tab_partners[$partner]['PASSWORD'] = "dailymotion007!";
+						$tab_partners[$partner]['PREFIX'] = "VisiteVirtuelleImmo";
+						$tab_partners[$partner]['PASSWORD'] = "dailymotion007!";
+					}
+					break;
+			}
+
+			// http://dev.api.previsite.com/publication/software_publish.php?tour=3E3EE821-463C-3298-6268-B23561A826D7&partner=1876B6F8-6894-1335-44C5-D984D5C8E04E&ref=toto
+			// FR_DOOR pour tous les imports Fr
+			if('FR'==$type && $mode_auto) {
+				$type = 'FR_DOOR';
+			}
+
+			if($is_corp) {
+				// RS 2012-07-20 : Useless : Deja pris en debut de script
+//				$tab_distrib_options = get_distrib_option($tab_tour['ID_DISTRIBUTEUR'], array('PROFILVIDEO'));
+				if(!empty($tab_distrib_options['PROFILVIDEO'])) {
+					$type = $tab_distrib_options['PROFILVIDEO'].'_CORP';
+				}
+			} else {
+				$tab_user_options = get_user_option($user);
+				if($tab_user_options['PROFILVIDEO'] != "") {
+					$type = $tab_user_options['PROFILVIDEO'];
+				} else if(!empty($tab_distrib_options['PROFILVIDEO'])) {
+					// RS 2012-07-20 : Prendre le profil distrib si pas de profil utilisateur (Bug VIA auto)
+					$type = $tab_distrib_options['PROFILVIDEO'];
+				}
+			}
+			
+
+			if(($is_corp && empty($tab_distrib_options['PROFILVIDEO'])) || empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+				die('need profile or login');
+			}
+
+			$last = get_tour_date_last_modified($tour);
+
+			if(empty($title) && !empty($tab_tour['NOM_VISITE'])) {
+				$title = $tab_tour['NOM_VISITE'];
+			}
+
+			if(!empty($tab_partners[$partner]['PREFIX']) && !empty($tab_partners[$partner]['PASSWORD'])) {
+				$tab_replace = array(
+					urlencode($last),
+					urlencode($website),
+					'publication',
+					urlencode($tour),
+					urlencode($ref),
+					urlencode($type),
+					urlencode($tab_partners[$partner]['PREFIX']),
+					urlencode($tab_partners[$partner]['PASSWORD']),
+					urlencode(URL_NOTIFICATION_VIDEO),
+					urlencode($title),
+					urlencode($tab_tour['ID_DISTRIBUTEUR']),
+					urlencode($mode)
+				);
+ 			}
+
+			$tab_pattern  = array('%DATE%', '%SITE%', '%TODO%', '%ID%', '%REF%', '%TYPE%', '%LOGIN%', '%PASSWORD%', '%URL%', '%TITLE%', '%DISTRIB%','%MODE%');
+			$url_diffusion = str_replace($tab_pattern, $tab_replace, URL_DIFFUSION_VIDEO);
+
+			if(isset($_GET['new'])) {
+				$url_diffusion .= '&new='.urlencode($_GET['new']);
+			}
+			if(isset($_GET['no_tts'])) {
+				$url_diffusion .= '&no_tts='.urlencode($_GET['no_tts']);
+			}
+			if(isset($_GET['rediffuse'])) {
+				$url_diffusion .= '&rediffuse='.urlencode($_GET['rediffuse']);
+			}
+
+			$output = 'false';
+
+			// RS 2012-04-18 : Insertion de la diff avant pour pouvoir mettre url en pvt.fm/p/guid
+			// Ex : dev.api.previsite.com/publication/software_publish.php?partner=59C4948B-DB6D-FDAF-E15D-CD67B8347126&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&ref=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1
+
+			// RS 2012-04-30 : Toujours mettre en mode_auto (0)
+			// JB 2012-06-01: Modification pour passer les vidéos en mode export
+			$do_it = (!$mode_auto || ($mode_auto && $_REQUEST['action'] == 'do'));
+
+			$diffusion = add_manual_publication($company, $partner, $tour, $tour, $multidiffusion, !$do_it, true);
+
+			if(is_guid($diffusion['id']) ){
+
+				$options = array('NO_TTS' => $_REQUEST['no_tts'], 'REDIFFUSE' => $_REQUEST['rediffuse'], 'Title' => $title);
+				foreach($options as $ref=>$val){
+					update_diffusion_portail_option($diffusion['id'], $ref, $val);
+				}
+				if(is_guid($_REQUEST['liaison'])){
+					update_diffusion_portail_liaison($_REQUEST['liaison'], $diffusion['id']);
+				}
+
+				$id_diff = get_id_diffusion_portail($tour, $partner);
+				$diff_liaisons = get_diffusion_portail_liaison($id_diff, false);
+				for($i=0;$i < count($diff_liaisons);$i++){
+					$params = array(
+						'tour' => $tour,
+						'user' => $user,
+						'ref' => $tour,
+						'title' => $title,
+						'city' => $title,
+						'mode' => 'liaison',
+						'partner' => $diff_liaisons[$i]['ID_PORTAIL'],
+					);	
+					$url_publish_liaison = "";
+					foreach($params as $k=>$v){
+						$url_publish_liaison .= "&".$k."=".urlencode($v);
+					}
+					$url_publish_liaison = URL_PUBLISH.preg_replace('/^&/i', '?', $url_publish_liaison);
+					file_get_contents($url_publish_liaison);
+				}
+
+				if($do_it || ($diffusion['already_done'] == true && $_REQUEST['rediffuse'] === 'true')){
+				echo $url_diffusion;	
+					$data = @file_get_contents($url_diffusion);
+
+					// Desactivation de la diff si echec
+					if($data !== 'true') {
+						delete_publication($partner, $tour);
+					} else {
+						$output = 'true';
+					}
+				}else{ $output = 'true';}
+			}
+
+			break;
+
+
+		// zonaprop
+		case 'EAA329DE-B60A-8ACB-458F-3D747CF16650':
+			//dev.api.previsite.com/publication/software_publish.php?tour=7577DEEA-FBB9-3B01-BCDD-3F0064CD21D5&ref=7577DEEA-FBB9-3B01-BCDD-3F0064CD21D5&user=0848C622-82BA-6B0E-DB03-7414818E08E5&partner=EAA329DE-B60A-8ACB-458F-3D747CF16650
+			$tab_user = get_user_infos($tab_tour['ID_UTILISATEUR']);
+//			$tab_options = get_user_option($tab_tour['ID_UTILISATEUR']);
+			$tab_tour = array_merge($tab_tour, get_tour_detail($tour, $tab_tour['ID_TEMPLATE']));
+			$tab_complement = get_tour_complement($tour);
+
+			$enough_data  = !empty($tab_complement['LOCATION_ID']);
+			$enough_data &= !empty($tab_tour['ADRESSE']);
+			$enough_data &= in_array(strtoupper($tab_tour['ID_PAYS']), array('AR'));
+			$enough_data &= !empty($tab_user['NOM_UTILISATEUR']);
+			$enough_data &= !empty($tab_user['PRENOM_UTILISATEUR']);
+			$enough_data &= !empty($tab_user['EMAIL_UTILISATEUR']);
+			$enough_data &= !empty($tab_user['TELEPHONE_UTILISATEUR']);
+			$enough_data &= !empty($tab_options['AREACODEPHONE']);
+			$enough_data &= !empty($tab_tour['ESPACE_TOTAL']) || !empty($tab_tour['ESPACE_UTILE']);
+			
+			if(!$enough_data) {
+				$output = 'zonaprop_missing_fields';
+			} else if(add_manual_publication($company, $partner, $tour, $tour, $multidiffusion)) {
+				$output = 'true';
+			}
+			break;
+
+
+		// Liste des portail ou ref = id_visite
+		case '191F4B45-53AD-2D10-DBE2-E7479443BBE7': // Facebook
+		case '7692679A-A00B-C66B-18AF-68923D0B8C4C': // Remax Ranananaa
+		case '194036F8-8CD1-7DEB-CCFE-BCBA579C5D03': // Agence reunies
+		case 'F3C587F0-3F52-3C6A-0ED5-21B3F0C2D028': // Goldenhouse
+		case '12406C50-3552-E00E-CC8B-EA21D6DF25B4': // YAKAZ
+		case 'C3187B7F-3F56-86C5-EF9D-BFECE5CC7FFA': // MYListings
+			if(add_manual_publication($company, $partner, $tour, $tour, $multidiffusion)) {
+				$output = 'true';
+			}
+			break;
+			
+		case "6094FB43-68C0-F106-2F87-DAD6AA4CC749": // vitevitevite
+		case 'CE7D8CD9-9014-954E-FCB9-40B5B9F5983E': // anibis
+		// dev in progress
+		case '79775614-56AD-211C-2492-262B9131751B': // craigslistExp
+		// dev blocked
+		case "5B1CC2DE-4AFB-F4D3-F6F0-99FE6BB22887": // koreanBridge
+		case "76EBE089-AD7F-6B8F-C06F-422F0A9600A8": // ganji
+		case "FC090F0B-D799-FE7E-CC2B-2B7E7B33DA36": // custojusto
+		//case "4A24A75D-FBC9-BC06-27AA-6D9036D78BE2": // gumtree
+		//case "86446E91-C011-851C-EE1D-E6179A6F2233": // enjoyshanghai
+		
+		// dev in progress
+		//case "16E67D55-B258-60DB-A0BF-41ACD6CC1447": // arrenda
+        case "80E55BC7-C6EA-BFE7-C7DB-D3C94B132285": // leboncoin
+        case "0F0143E3-07CC-8E57-253B-3C12B9C371E8": // Tokobagus
+		
+			$partner_code = get_partner_code($partner);
+			$exportFile = PATH_PUBLICATION_EXPORT.strtolower($partner_code).".php";
+			
+			if(file_exists($exportFile)){
+				$todo_export = "publish";
+				if(!$mode_auto){
+					$tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+					$tab_tour_infos = get_tour_detail($tour, $tab_tour['ID_TEMPLATE']);
+					$tab_tour_infos['ID_VISITE']=$tour;
+					$tab_user = get_user_infos($tab_tour['ID_UTILISATEUR']);
+					$tab_user['OPTIONS'] = get_user_option_diffusion($tab_tour['ID_UTILISATEUR']);
+
+					$keys = array_keys($tab_partners);
+					$tab_partners = $tab_partners[$keys[0]];
+
+					$tab_partners['ID_DIFFUSION_PORTAIL']=get_id_diffusion_portail($tour,$partner);
+
+					$infos = array(
+						'TOUR' => array_merge($tab_tour, $tab_tour_infos), 
+						'PARTNER' => $tab_partners,
+						'USER' => $tab_user, 
+						'IMAGES' => get_tour_images($tour),
+						'OPTION_DIFF' => get_user_option_diffusion($tab_tour['ID_UTILISATEUR'])
+					);
+					//include export
+					include($exportFile);
+					
+					
+				} else {
+					$ref = $tour;
+				}
+				
+				
+				if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion, $mode_auto)) {
+					$output = 'true';
+				}	
+				
+				
+			} else {
+				$output = 'no_script';
+			}
+			break;
+			
+		case "7ABC8087-5B53-C754-B502-75ABAD0E1FC1": // _58
+		case "CE23928B-9BED-F4C8-DE69-94816C55939F": // quikr
+		case '9ABBE05A-6DDF-9069-5FCD-7FA0CC62C56C': // segundamano
+		case "33DDD024-C1FC-E676-E86E-948EB0633BFE": // tablica
+		case "3EAA306D-D3B4-6D7C-57D2-E91B8E0E8A1D": // emarket
+		case "1C335697-CC37-C565-BBBB-5637F461BD9D": // adspost
+		case "A13B5F8E-A0B5-3CDA-4D7F-6CF5A25F02EB": // kapaza
+		case "BF1750CC-F1CC-887D-1681-C1CAA0A49665": // classificadosmil
+		case "92DC7378-DBEA-20C6-9E85-BA23238B970C": // adoos
+		case "E3F34FE5-C98C-3B89-C79D-9344C011748F": // syiok
+		
+			$partner_code = get_partner_code($partner);
+			$exportFile = PATH_PUBLICATION_EXPORT.strtolower($partner_code).".php";
+			
+			if(file_exists($exportFile)){
+				$todo_export = "publish";
+				if(!$mode_auto){
+					
+					$tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+					$tab_tour_infos = get_tour_detail($tour, $tab_tour['ID_TEMPLATE']);
+					$tab_tour_infos['ID_VISITE']=$tour;
+					$tab_user = get_user_infos($tab_tour['ID_UTILISATEUR']);
+					$tab_user['OPTIONS'] = get_user_option($tab_tour['ID_UTILISATEUR'],get_user_option_diffusion($tab_tour['ID_UTILISATEUR']));
+					$keys = array_keys($tab_partners);
+					$tab_partners = $tab_partners[$keys[0]];
+					$tab_diffusion=get_id_diffusion_portail_full($tour,$partner);
+					
+					$tab_partners['ID_DIFFUSION_PORTAIL']=$tab_diffusion['ID_DIFFUSION_PORTAIL'];
+					$tab_partners['ID_SHORT_DIFFUSION']=$tab_diffusion['ID_SHORT'];
+					
+					$infos = array(
+						'TOUR' => array_merge($tab_tour, $tab_tour_infos), 
+						'PARTNER' => $tab_partners,
+						'USER' => $tab_user, 
+						'IMAGES' => get_tour_images($tour),
+						'OPTIONS' => $tab_options,
+						'OPTION_DIFF' => get_user_option_diffusion($tab_tour['ID_UTILISATEUR'])
+					);
+					
+					//include export
+					include($exportFile);
+					
+					$className=strtolower($partner_code);
+					$class=new $className($className,$infos);
+					$class->diffuse();
+					
+					$s=$tab_diffusion['ID_SHORT'];
+					
+					$url='http://api.previsite.com/rest/shortpub/'.$s.'?method=post&reference='.urlencode($class->id);
+					$url.='&status='.urlencode($class->status);
+					$url.='&pub_error_mess='.urlencode($class->output);
+					$url.='&expiration='.urlencode($class->dateExpiration);
+					$url.='&url_listing='.urlencode($class->urlAd);
+					
+					$r=file_get_contents($url);
+										
+					if ($class->isError) {
+						$output=$class->output;
+					} else {
+						$output='true';
+					}
+					
+				} else {
+					$ref = $tour;
+				}
+				
+				if (empty($tab_partners['ID_DIFFUSION_PORTAIL'])) {
+					if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion, $mode_auto)) {
+						$output = 'true';
+					}	
+				}
+				
+			} else {
+				$output = 'no_script';
+			}
+			break;
+
+		case '19A2E13B-D292-AD02-0549-27AF56F7ACA6':
+			// Statut 1 tt le temps
+			if(add_manual_publication($company, $partner, $tour, $tour, false, false)) {
+				$output = 'true';
+			}
+			break;
+
+		case '43804474-0801-AAF8-D1C5-ED73A199AE2C': // luxury hmes uk
+		case 'E6464C3B-5618-5648-CEBF-E7922C9DDEAC': // luxury hoems
+			$tab_tour_infos = get_tour_detail($tour, $tab_tour['ID_TEMPLATE']);
+			$is_luxury  = 1==$tab_tour_infos['ID_PRESTIGE'];
+			$is_luxury &= $tab_tour['PRIX_BIEN']>1000000 && stripos('EUR,USD,GBP,CHF', $tab_tour['REF_DEVISE'])!==false;
+
+			if(!$is_luxury){
+				$output = 'not_considered_luxury';
+			}elseif(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion)){
+				$output = 'true';
+			}
+			break;
+
+		case ID_LUXURY: 
+			$tab_tour_infos = get_tour_detail($tour, $tab_tour['ID_TEMPLATE']);
+			if($tab_tour_infos['ID_PRESTIGE'] !== 1 ){
+				$output = 'not_considered_luxury';
+			}
+			elseif(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion)){
+			$output = 'true';
+			}
+			break;
+		default:
+			if(add_manual_publication($company, $partner, $tour, $ref, $multidiffusion)) {
+				$output = 'true';
+			}
+	}
+
+// Test quotas...
+// dev.api.previsite.com/publication/software_publish.php?partner=191F4B45-53AD-2D10-DBE2-E7479443BBE7&ref=ref&tour=C8F6E809-B827-5DB5-14A9-11C543A83862
+// dev.api.previsite.com/publication/software_publish.php?partner=191F4B45-53AD-2D10-DBE2-E7479443BBE7&ref=ref&tour=F3D5EE79-F0D3-047E-365D-1661F9948E9B
+// dev.api.previsite.com/publication/software_publish.php?partner=191F4B45-53AD-2D10-DBE2-E7479443BBE7&ref=ref&tour=03AA88E4-53AA-9273-53AF-1A5AAF2A4BA4
+// dev.api.previsite.com/publication/software_publish.php?partner=191F4B45-53AD-2D10-DBE2-E7479443BBE7&ref=ref&tour=F3D5EE79-F0D3-047E-365D-1661F9948E9B
+	// Si diffusion automatisee, dediffuser les annonces en trop...
+
+
+//	if('true'==$output) {
+//		// 2012-11-20 : Modifier date_modification_visite si option sur portail
+//		update_tour_date_on_publication($partner, $tour);
+//	}
+
+
+	if(!$skip_limitations && $mode_auto && 'true'==$output) {
+		$tab_unpublished = unpublish_tours_overquota($partner, $tour);
+
+		// Si annonce fait finalement partie des dediffusees...
+		if(in_array($tour, $tab_unpublished)) {
+			$output = 'limit_publication_reached';
+		}
+	}
+
+	$db->disconnect();
+}
+
+
+	
+
+
+
+if(SERVER_DEV && $output=='false' && !empty($_REQUEST['debug']) && !empty($tab_debug)) {
+	echo implode('<br />', $tab_debug);
+} else {
+	echo $output;
+}

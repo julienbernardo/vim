@@ -1,0 +1,1102 @@
+<?php
+
+require_once('../../include/global.php');
+require_once('../../include/fonctions.php');
+require_once('../../include/fonction.db.php');
+require_once('../../include/fonction.db.diffusion.php');
+require_once('phpmailer/class.phpmailer.php');
+require_once('DB.php');
+require_once('include/header.php');
+require_once('include/dico.php');
+
+$tour	= $_REQUEST['tour'];
+$partner = $_REQUEST['partner'];
+
+$todo = $_REQUEST['todo'];
+
+switch($todo) {
+	case 'refresh_zonaprop_loc':
+		$tab_all_locations = @json_decode(@file_get_contents(PATH_PUBLIC.'zonaprop_locations.json'), true);
+		if(isset($tab_all_locations[$_REQUEST['zone1']][$_REQUEST['zone2']])) {
+			$tab_loc = $tab_all_locations[$_REQUEST['zone1']][$_REQUEST['zone2']];
+		} else {
+			$tab_loc = $tab_all_locations[$_REQUEST['zone1']];
+		}
+
+		$labels = array_keys($tab_loc);
+
+		$html = '<option value=""></option>';
+		for($i=0; isset($labels[$i]); $i++) {
+			$value = is_numeric($tab_loc[$labels[$i]]) ? $tab_loc[$labels[$i]] : $labels[$i];
+			$html .= '<option value="'.htmlspecialchars($value, ENT_QUOTES).'">'.htmlspecialchars($labels[$i], ENT_QUOTES).'</option>';
+		}
+		echo $html;
+		break;
+	case 'more_details':
+		$filename = 'tmp/'.$_REQUEST['partner'].'/'.$_REQUEST['name'].'.txt';
+		if(!(is_file($filename) && filemtime($filename) > mktime()-86400)){
+			$content = file_get_contents($_REQUEST['url']);
+			file_put_contents($filename, $content);
+		}
+		$content = file_get_contents($filename);
+		echo $content;
+		exit;
+	case 'autopublish_old':
+		$tab_old = get_unpublished_tours($_POST['partner'], $_SESSION['ID_UTILISATEUR']);
+		$nb = count($tab_old);
+		$all_ok = true;
+		for($i=0; $i<$nb; $i++) {
+			$res = tour_autopublish(URL_API_PUBLISH, $tab_old[$i]['ID_VISITE'], $_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $tab_old[$i]['REF_VISITE']);
+			if(!$res) $all_ok = false;
+		}
+		echo $all_ok ? 'true' : 'false';
+		break;
+
+	case 'open_delete_partner':
+?>
+<div class="float_l" style="width: 350px;"><?=$dico['service_diffusion']['text_website_delete_confirm']?></div>
+<span class="btn form_align_right float_l" style="margin-top: 3px; width: 50px;" onclick="return deleteCustomPartner();">
+  <span class="inner_btn"><a href="#" onclick="return false;"><?=$dico['common']['yes']?></a></span>
+</span>
+<span class="btn form_align_right float_l" style="margin-top: 3px; width: 50px;" onclick="return closeDeletePartner();">
+  <span class="inner_btn"><a href="#" onclick="return false;"><?=$dico['common']['no']?></a></span>
+</span>
+<?php
+		break;
+
+
+	case 'delete_custom_partner':
+		if(is_guid($partner)) {
+			if(delete_custom_partner($partner, $_SESSION['ID_SOCIETE']) > 0) {
+				echo 'true';
+			}
+		}
+		break;
+
+
+	case 'update_custom_partner':
+		if( !empty($_POST['name']) && !empty($_POST['email']) && !empty($_POST['www']) ) {
+			$tab_update   = array(
+				'NOM_PORTAIL'   => $_POST['name'],
+				'EMAIL_PORTAIL' => $_POST['email'],
+				'WEB_PORTAIL'   => $_POST['www'],
+				'ID_PAYS'	   => $_SESSION['ID_PAYS'],
+				'ID_LANGUE'	 => $_SESSION['ID_LANGUE']
+			);
+			if(update_custom_partner($_POST['partner'], $_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $tab_update)>0) {
+				echo 'true';
+			}
+		}
+		break;
+
+
+	case 'delete_publication':
+		$url_unpublish = str_replace(
+			array(
+				'%TOUR%',
+				'%USER%', 
+				'%PARTNER%'
+			),
+			array(
+				$tour,
+				$_SESSION['ID_UTILISATEUR'],
+				$_REQUEST['partner']
+			),
+			URL_API_UNPUBLISH
+		);
+		$result = @file_get_contents($url_unpublish);
+		echo $result;
+		break;
+
+
+	case 'open_add_publication':
+		if(!empty($tab_tour)) {
+			// verif acces portail + recup ref diffusion si diffusion
+			$tab_diff = get_user_partner_diff($partner, $_SESSION['ID_SOCIETE'], $tour);
+
+			if(!empty($tab_diff)) {
+				$title = str_replace('#PARTNER#', $tab_diff['NOM_PORTAIL'], $dico['service_diffusion']['title_post_tour']);
+
+				$type	  = (int)$tab_diff['ID_TYPE_PORTAIL'];
+				$is_custom = $type==3 || $type==4;
+				$is_mls	= $type==5;
+				$is_video  = $type==8;
+				$is_social = $type==9;
+
+				$display_url = $tab_diff['ID_TYPE_RESULTAT']==1;
+				
+				$is_google4home = ($partner == ID_GOOGLE4HOME);
+
+				$copy_paste = $type==2 || $is_custom || ($is_mls && empty($tab_diff['SPECIFIC'])) || $is_google4home;
+
+				$is_diff = is_guid($tab_diff['ID_DIFFUSION_PORTAIL']);
+				$integration_js = false;
+
+				$btn_post_label   = $is_mls ? $dico['service_diffusion']['get_mls_url'] : $dico['common']['post'];
+				$btn_post_display = !$is_diff || (!$copy_paste /* &&!$display_link*/); // ne pas afficher si mls et diffusee
+
+				$html_url = '';
+
+				$video_ready = $is_video && 1==$tab_diff['ID_STATUT_DIFFUSION'] && !is_guid($tab_diff['REF_PORTAIL']);
+				// Zonaprop asynchrone
+				$is_pending = 'EAA329DE-B60A-8ACB-458F-3D747CF16650'==$partner && !is_numeric($tab_diff['REF_PORTAIL']);
+
+				if($is_diff) {
+					$ref_proposee = $tab_diff['REF_PORTAIL'];
+					$tab_pattern  = array('#ID#', '#PUB#', '#PORTAL#', '#ID_MLS#', '#REF#', '#USER#');
+
+					if(isset($tab_default_user_code[$partner]) && empty($tab_diff['PREFIXE_PORTAIL'])) {
+						$tab_replace  = array($tour, $tab_diff['ID_DIFFUSION_PORTAIL'], $tab_diff['CODE_PORTAIL'], $tab_diff['REF_PORTAIL'], $tab_diff['REF_PORTAIL'], $tab_default_user_code[$partner]);
+					} else {
+						$tab_replace  = array($tour, $tab_diff['ID_DIFFUSION_PORTAIL'], $tab_diff['CODE_PORTAIL'], $tab_diff['REF_PORTAIL'], $tab_diff['REF_PORTAIL'], $tab_diff['PREFIXE_PORTAIL']);
+					}
+
+					$url_tour  =  str_replace($tab_pattern, $tab_replace, $tab_diff['URL_VIEWER']);
+					if(USER_NCI) $url_tour = str_replace("tour.previsite.com", "viewer.inviewtours.com", $url_tour);
+				} else if($is_mls) { // Plus logique d'utiliser ce champs pour les MLS
+					$ref_proposee = $tab_tour['NUMERO_MLS'];
+				} else if($is_video || $is_social) {
+					$prefix = $tab_diff['PREFIXE_DIFFUSION'];
+					if(!empty($tab_tour['NOM_VISITE'])) $ref_proposee = $prefix.$tab_tour['NOM_VISITE'];
+					else $ref_proposee = $prefix.$tab_tour['REF_VISITE'];
+				} else if(!empty($tab_diff['PREFIXE_DIFFUSION'])) {
+					$ref_proposee = $tab_diff['PREFIXE_DIFFUSION'].$tab_tour['REF_VISITE'];
+				} else {
+					$ref_proposee = $tab_tour['REF_VISITE'];
+				}
+
+				$code = strtolower($tab_diff['CODE_PORTAIL']);
+				if(is_numeric($code[0])) $code = '_'.$code;
+
+				if($is_mls)	   $class_box = ' box_mls';
+				else if($type==6) $class_box = ' realtordotcom';
+				else			  $class_box = ' '.strtolower($code);
+
+				if($copy_paste) {
+					$onclick = "return addPublication('".$partner."', '".$tour."', \$F('ref_partner'), 'openAddPublication');";
+				} else {
+					$onclick = "return addPublication('".$partner."', '".$tour."', \$F('ref_partner'), '');";
+				}
+				
+				
+?>
+<div class="form_add_publication full_width">
+  <h3><?=$title?></h3>
+<?php
+				if($partner == 'EAA329DE-B60A-8ACB-458F-3D747CF16650') {
+					require_once 'pages/show_service_diffusion_form_zonaprop.php';
+				} else if($partner == ID_LEBONCOIN){
+					require_once 'pages/show_service_diffusion_form_leboncoin.php';
+				}else if($partner == ID_KIJIJI){
+					echo "oki";
+					$data = get_kijijilist_form($tour);
+					require_once 'pages/show_service_diffusion_form_kijiji.php';
+				}else if($partner == ID_PINTEREST){
+					if(!$is_diff){
+						$url_pinterest = str_replace(array('#ID#', '#ACTION#'), array($tour, 'get_boards'), URL_DIFFUSION_PINTEREST);
+						$content = file_get_contents($url_pinterest);
+						$data = json_decode($content, true);
+					}
+					require_once 'pages/show_service_diffusion_form_pinterest.php';
+				}else if($partner == ID_VIADEO && $tab_diff['REF_PORTAIL'] == ""){
+					$data = get_viadeolist_form($tour);
+					require_once 'pages/show_service_diffusion_form_viadeo.php';
+				}else if($partner == ID_KEWEGO && $tab_diff['REF_PORTAIL'] == ""){
+					require_once 'pages/show_service_diffusion_form_kewego.php';
+				}else if($partner == ID_TRULIA || $partner == ID_ZILLOW){
+					require_once '../../include/fonction.db.usform.php';
+					require_once 'pages/show_service_diffusion_form_trulia.php';
+				}else if($partner == ID_HOMES){
+					require_once '../../include/fonction.db.usform.php';
+					require_once 'pages/show_service_diffusion_form_homes.php';
+				}else if($is_video) {
+					require_once 'pages/show_service_diffusion_form_video.php';
+				}else if($is_social) {
+					require_once 'pages/show_service_diffusion_form_social.php';
+				} else if($is_mls) {
+					require_once 'pages/show_service_diffusion_form_mls.php';
+				} else if($type==6) {
+					require_once 'pages/show_service_diffusion_form_realtor.php';
+				} else if($type==7) {
+					require_once '../../include/fonction.db.usform.php';
+					require_once 'pages/show_service_diffusion_form_multisyndication.php';
+				} else {
+					require_once 'pages/show_service_diffusion_form_default.php';
+				}
+			}
+		}
+		break;
+
+
+	case 'save_syndication_partners':
+		sleep(2);
+		$tab_diff = get_user_partner_diff($_POST['partner'], $_SESSION['ID_SOCIETE'], $tour);
+		$tab_partners = explode(';', $_POST['list_partners']);
+
+		for($i=0; $i<count($tab_partners); $i++) {
+			if(empty($tab_partners[$i])) unset($tab_partners[$i]);
+		}
+		$tab_option = array(
+			'REF_OPTION'	=> 'DIFFUSION_US',
+			'VALEUR_OPTION' => implode(';', $tab_partners)
+		);
+
+		if(is_guid($tab_diff['ID_DIFFUSION_PORTAIL'])) {
+			set_option_diffusion('1A68C417-C54D-6B60-DA35-1ABA794503D5', $tab_diff['ID_DIFFUSION_PORTAIL'], $tour, $tab_option, true);
+		}
+		break;
+
+
+	case 'save_syndication_data':
+		if($argv[1] == 1) {
+			echo "YES";
+			print_r($_POST);
+			print_r($tab_info);
+			$_SESSION['ID_UTILISATEUR'] = '52C9BF6D-EEC2-EDE7-A496-4B7043185005';			
+		}
+		require_once '../../include/fonction.db.usform.php';
+
+//		$tab_tour	= array();
+		$tab_addr	= array();
+		$tab_agent   = array();
+		$tab_company = array();
+
+		$tab_info = get_user_infos($_SESSION['ID_UTILISATEUR']);
+
+//		$tab_tour['NOMBRE_CHAMBRE']	= fix_null(is_numeric($_POST['nb_br']) ? (int)$_POST['nb_br'] : '');
+//		$tab_tour['NOMBRE_SALLE_BAIN'] = fix_null(is_numeric($_POST['nb_ba']) ? (int)$_POST['nb_ba'] : '');
+
+		$tab_agent[] = "PRENOM_UTILISATEUR=N'".fix_text($_POST['a_first_name'], 100)."'";
+		$tab_agent[] = "NOM_UTILISATEUR=N'".fix_text($_POST['a_last_name'], 100)."'";
+		$tab_agent[] = "EMAIL_UTILISATEUR=N'".fix_text($_POST['a_email'], 100)."'";
+		$tab_agent[] = "TELEPHONE_UTILISATEUR=N'".fix_text($_POST['a_phone'], 100)."'";
+
+		$tab_company[] = "NOM_SOCIETE=N'".fix_text($_POST['c_name'], 100)."'";
+		$tab_company[] = "SITEWEB_SOCIETE=N'".fix_text($_POST['c_website'], 100)."'";
+
+		$tab_adresse[] = "TELEPHONE='".fix_text($_POST['c_phone'], 30)."'";
+		$tab_adresse[] = "ADRESSE=N'".fix_text($_POST['c_address'], 200)."'";
+		$tab_adresse[] = "VILLE=N'".fix_text($_POST['c_city'], 100)."'";
+		$tab_adresse[] = "CODE_POSTAL='".fix_text($_POST['c_zip'], 25)."'";
+
+		set_user_infos($_SESSION['ID_UTILISATEUR'], $_SESSION['ID_SOCIETE'], $tab_info['ID_ADRESSE_VIEWER'], $tab_agent, $tab_company, $tab_adresse, null);
+//		update_tour_data_us($tour, $_SESSION['ID_UTILISATEUR'], $tab_tour);
+
+		update_tour_data_http($tour, array(
+			'bedrooms' => $_POST['nb_br'],
+			'bathromms' => $_POST['nb_ba']
+		));
+		
+		
+		break;
+
+
+	case 'save_realtorcom_data':
+//		$tab_field_tour = array(
+//			array("NAME"=>"REF_VISITE",		"VALUE"=>"'".fix_text($_POST['reference'])."'"),
+//			array("NAME"=>"ADRESSE",		"VALUE"=>"'".fix_text($_POST['tour_street'])."'"),
+//			array("NAME"=>"VILLE",			"VALUE"=>"'".fix_text($_POST['tour_city'])."'"),
+//			array("NAME"=>"CODE_POSTAL",	"VALUE"=>"'".fix_text($_POST['tour_zip'])."'"),
+//			array("NAME"=>"REF_ETAT",		"VALUE"=>"'".fix_text($_POST['tour_state'],3)."'")
+//		);
+//		update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+		
+		
+		update_tour_data_http($tour, array(
+			'ref_listing' => $_POST['reference'],
+			'address' => $_POST['tour_street'],
+			'city' => $_POST['tour_city'],
+			'zip' => $_POST['tour_zip'],
+			'ref_state' => $_POST['tour_state']
+		));
+		
+		
+		break;
+		
+	case 'save_leboncoin_data':
+		if($_POST['reference'] != "" && $_POST['tour_zip'] != "" && $_POST['tour_description'] != ""){
+//			$tab_field_tour = array(
+//				array("NAME"=>"NOM_VISITE",		"VALUE"=>"'".fix_text($_POST['reference'])."'"),
+//				array("NAME"=>"CODE_POSTAL",	"VALUE"=>"'".fix_text($_POST['tour_zip'])."'"),
+//				array("NAME"=>"DESCRIPTION",	"VALUE"=>"'".fix_text($_POST['tour_description'])."'")
+//			);
+//			set_tour_texts($tour, null, array(
+//				'DESCRIPTION' => $_POST['tour_description']
+//			));
+//			update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+			
+
+
+			update_tour_data_http($tour, array(
+				'zip' => $_POST['tour_zip'],
+				'description' => $_POST['tour_description']
+			));
+
+			echo "true";
+		}else{
+			echo $dico['service_diffusion']['syndication_missing_fields'];
+		}
+		break;
+			
+	case 'save_kijiji_data':
+		if($_POST['reference'] != "" && $_POST['tour_price'] != "" && $_POST['tour_description'] != ""){
+//			$tab_field_tour = array(
+//				array("NAME"=>"NOM_VISITE",		"VALUE"=>"'".fix_text($_POST['reference'])."'"),
+//				array("NAME"=>"PRIX_BIEN",		"VALUE"=>"'".fix_text($_POST['tour_price'])."'"),
+//				array("NAME"=>"DESCRIPTION",	"VALUE"=>"'".fix_text($_POST['tour_description'])."'")
+//			);
+//			set_tour_texts($tour, null, array(
+//				'DESCRIPTION' => $_POST['tour_description']
+//			));
+//			update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+
+			update_tour_data_http($tour, array(
+				'price' => $_POST['tour_price'],
+				'description' => $_POST['tour_description']
+			));
+			
+			echo "true";
+		}else{
+			echo $dico['service_diffusion']['syndication_missing_fields'];
+		}
+		break;
+			
+	case 'save_viadeo_data':
+		if($_POST['reference'] != "" && $_POST['tour_description'] != "" && $_POST['form_category'] != "" && $_POST['form_county'] != "" && $_POST['form_country'] != ""){
+//			$tab_field_tour = array(
+//				array("NAME"=>"NOM_VISITE",		"VALUE"=>"'".fix_text($_POST['reference'])."'"),
+//				array("NAME"=>"DESCRIPTION",	"VALUE"=>"'".fix_text($_POST['tour_description'])."'")
+//			);
+//			update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+
+
+			update_tour_data_http($tour, array(
+				'description' => $_POST['tour_description']
+			));
+
+			echo "true";
+		}else{
+			echo $dico['service_diffusion']['syndication_missing_fields'];
+		}
+		break;
+
+	case 'save_partner_code':
+		$code = trim($_POST['code']);
+		$pwd  = trim($_POST['pwd']);
+		$autopub = (int)$_POST['autopub'];
+
+		$type_partner = get_partner_type($partner);
+
+		// zonaprop
+		$valid_code = $partner!='EAA329DE-B60A-8ACB-458F-3D747CF16650' || is_email($code);
+
+		// video & co
+		if($type_partner==8) {
+			$result = insert_partner_user_no_check($partner, $_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $code, $pwd, $autopub);
+		} else if($valid_code) {
+			$result = insert_partner_user($partner, $_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $code, $pwd, $autopub);
+		}
+
+		if($result) {
+			echo 'true';
+		}
+		break;
+
+
+	case 'search_partner':
+		$tab_partners = search_partner(explode(' ', $_POST['portal']), $_SESSION['ID_PAYS'], $_SESSION['ID_SOCIETE']);
+		$nb_partners  = count($tab_partners);
+		if($nb_partners > 0) {
+			for($i=0; $i<$nb_partners; $i++) {
+				$partner_info = mb_strlen($tab_partners[$i]['NOM_PORTAIL']) > 40 ? mb_strcut($tab_partners[$i]['NOM_PORTAIL'], 0, 40).'...' : $tab_partners[$i]['NOM_PORTAIL'];
+				$type = $tab_partners[$i]['ID_TYPE_PORTAIL'];
+				$is_custom = $type==3 || $type==4;
+				$is_video  = $type==8;
+				$quickSave = ($tab_partners[$i]['ID_PORTAIL'] == ID_LEBONCOIN || $tab_partners[$i]['ID_PORTAIL'] == ID_GOOGLE4HOME);//leboncoin || google4home
+
+				if((int)$tab_partners[$i]['ID_TYPE_INSCRIPTION']==0) $onclick = "return quickSavePartnerCode('".$tab_partners[$i]['ID_PORTAIL']."', ".((int)$tab_partners[$i]['ID_AUTOPUBLICATION']).");";
+				else $onclick = "return openJoinPartner('".$tab_partners[$i]['ID_PORTAIL']."');";
+
+				$class_box = '';
+				$code = strtolower($tab_partners[$i]['CODE_PORTAIL']);
+				if(is_numeric($code[0])) $code = '_'.$code;
+
+				if($type==5) $class_box = ' box_mls';
+				else if($type==6) $class_box = ' realtordotcom';
+				else $class_box = ' '.strtolower($code);
+				if(NEW_INTEGRATION)  $class_box .= ' row_spaced '.get_class_row(++$row_count);
+?>
+<div class="box_partners_logo<?=$class_box?>" title="<?=$tab_partners[$i]['NOM_PORTAIL']?>" onclick="<?=$onclick?>">
+  <?=$partner_info?>
+</div>
+<?php
+			}
+		} else if(NEW_INTEGRATION) {
+?>
+<p class="no_results">
+  <?=$dico['service_diffusion']['text_no_partner_found']?>
+</p>
+<?php
+		} else {
+?>
+<b><?=$dico['service_diffusion']['text_no_partner_found']?></b>
+<?php
+		}
+		break;
+
+
+	case 'open_join_partner':
+		if(is_guid($partner)) {
+			$infos_partner = get_partner_registration_type($partner, $_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR']);
+			$need_pwd = (int)$infos_partner['ID_TYPE_INSCRIPTION']==2;
+			$autopub  = $partner!= ID_TWITTER && (int)$infos_partner['ID_AUTOPUBLICATION']>0;
+
+			$checked_new = !empty($infos_partner['ID_AUTOPUBLICATION_USER']) ? ' checked="checked"' : '';
+			$checked_old = '';
+
+			if(NEW_INTEGRATION) {
+?>
+<div class="full_width">
+<h2><?=$dico['service_diffusion']['title_join_partner']?></h2>
+<br />
+<?php
+				if($partner=='A47CFC83-DB74-13CA-82C8-E3D981A0F5BA') {
+					$url_install = 'http://apps.facebook.com/previsitenewsfeed/?u='.$_SESSION['ID_UTILISATEUR'];
+?>
+<div class="notify_box messinfo">
+	<?=htmlspecialchars($dico['service_diffusion']['facebook_wall_registration'], ENT_QUOTES)?>
+</div>
+<div class="navigation_btn">
+ <span class="btn float_r margin4R">
+  <span class="inner_btn"><a href="<?=htmlspecialchars($url_install)?>"><?=$dico['common']['install']?></a></span>
+ </span>
+ <span class="btn float_r" onclick="return closeAlertBox();">
+  <span class="inner_btn"><a href="#"><?=$dico['common']['no']?></a></span>
+ </span>
+ <div class="clear_sep"></div>
+</div>
+<?php
+				} else if($partner == ID_TWITTER) {
+        	$url_register_twitter = str_replace(
+        		array('%USER%', '%COMPANY%', '%TOUR%'),
+        		array(urlencode($_SESSION['ID_UTILISATEUR']), urlencode($_SESSION['ID_SOCIETE']), urlencode($tour)),
+        		URL_TWITTER_REGISTER
+        	);					
+?>
+<div class="notify_box messinfo">
+	<?=htmlspecialchars($dico['service_diffusion']['twitter_registration'], ENT_QUOTES)?>
+</div>
+
+<div class="navigation_btn">
+ <span class="btn float_r margin4R">
+  <span class="inner_btn"><a href="<?=$url_register_twitter?>"><?=$dico['common']['yes']?></a></span>
+ </span>
+ <span class="btn float_r" onclick="return closeAlertBox();">
+  <span class="inner_btn"><a href="#"><?=$dico['common']['no']?></a></span>
+ </span>
+ <div class="clear_sep"></div>
+</div>
+ 
+<?php
+				} else {
+					if($need_pwd) {
+?>
+<div class="row_form">
+ <div class="float_l half"><?=$dico['common']['login']?></div>
+ <div class="float_r half"><?=$dico['common']['password']?></div>
+ <div class="clear_sep"></div>
+</div>
+<div class="row_form">
+ <div class="float_l half">
+  <input type="text" class="input_block input_w_1_2" name="partner_code" id="partner_code" value="<?=htmlspecialchars($infos_partner['PREFIXE_PORTAIL'], ENT_QUOTES)?>" />
+ </div> 
+ <div class="float_r half">
+  <input type="text" class="input_block input_w_1_2" name="partner_pwd" id="partner_pwd" value="<?=htmlspecialchars($infos_partner['PASSWORD_PORTAIL'], ENT_QUOTES)?>" />
+ </div>
+ <div class="clear_sep"></div>
+</div>
+ <input type="hidden" name="user_code_required" id="user_code_required" value="0" />
+<?php
+					} else {
+?>
+<div class="row_form"><?=$dico['service_diffusion']['title_fill_partner_code']?></div>
+<div class="row_form">
+<input type="text" class="input_block input_w_1_1" name="partner_code" id="partner_code" value="<?=htmlspecialchars($infos_partner['PREFIXE_PORTAIL'], ENT_QUOTES)?>" />
+<input type="hidden" name="user_code_required" id="user_code_required" value="1" />
+</div>
+<?php
+					}
+					if($autopub) {
+?>
+<p class="help_text">
+<input type="checkbox" name="autopublish_new" id="autopublish_new" value="1"<?=$checked_new?> /><label class="chk" for="autopublish_new"><?=$dico['service_diffusion']['text_publish_new_listings']?></label><br />
+<input type="checkbox" name="autopublish_old" id="autopublish_old" value="1"<?=$checked_old?> /><label class="chk" for="autopublish_old"><?=$dico['service_diffusion']['text_publish_existing_listings']?></label>
+</p>
+<?php
+					}
+?>
+
+<div class="notify_box messinfo margin4T"><?=$dico['service_diffusion']['text_no_partner_code']?></div>
+
+<div id="join_partner_notification" class="notify_box margin4T"></div>
+
+<div class="btn_navigation">
+
+ <span class="btn float_r margin4T" onclick="return closeAlertBox();">
+  <span class="inner_btn"><a href="#"><?=$dico['common']['cancel']?></a></span>
+ </span>
+ <span class="btn float_r margin4T margin4L" onclick="return savePartnerCode('<?=$partner?>');">
+  <span class="inner_btn"><a href="#"><?=$dico['common']['save']?></a></span>
+ </span>
+ <div class="clear_sep"></div>
+ <input type="hidden" name="autopub_id" id="autopub_id" value="<?=htmlspecialchars($partner, ENT_QUOTES)?>" />
+</div>
+</div>
+<?php
+				}
+			} else {
+				if($need_pwd) {
+?>
+<div>
+  <h3 class="td_c"><?=$dico['service_diffusion']['title_fill_partner_code']?></h3>
+  <div class="row_form">
+	<p class="diff_block_w_1_2 float_l form_align_left"><?=$dico['common']['login']?></p>
+	<p class="diff_block_w_1_2 float_l form_align_right"><?=$dico['common']['password']?></p>
+  </div>
+  <div class="row_form">
+	<input type="text" class="input_block diff_input_w_1_2 float_l form_align_left" name="partner_code" id="partner_code" value="<?=htmlspecialchars($infos_partner['PREFIXE_PORTAIL'], ENT_QUOTES)?>" />
+	<input type="password" class="input_block diff_input_w_1_2 float_l form_align_right" name="partner_pwd" id="partner_pwd" value="<?=htmlspecialchars($infos_partner['PASSWORD_PORTAIL'], ENT_QUOTES)?>" />
+  </div>
+  <div class="notify_box" id="join_partner_notification"></div>
+  <br />
+	<span class="btn float_l" onclick="return savePartnerCode('<?=$partner?>');">
+	  <span class="inner_btn"><a href="#">OK</a></span>
+	</span>
+  <div class="clear_sep">&nbsp;</div>
+  <div class="row_form">
+	<p><?=$dico['service_diffusion']['text_use_default_account']?></p>
+  </div>
+  <input type="hidden" name="user_code_required" id="user_code_required" value="0" />
+</div>
+<?php
+				} else {
+?>
+<div class="form_join_partner">
+  <h3><?=$dico['service_diffusion']['title_fill_partner_code']?></h3>
+  <div class="row_form">
+	<input type="text" class="input_block float_l" name="partner_code" id="partner_code" value="" />
+	<span class="btn float_l" onclick="return savePartnerCode('<?=$partner?>');">
+	  <span class="inner_btn"><a href="#">OK</a></span>
+	</span>
+  </div>
+  <div class="notify_box" id="join_partner_notification"></div>
+  <div class="clear_sep">&nbsp;</div>
+  <div class="row_form">
+	<p><?=$dico['service_diffusion']['text_no_partner_code']?></p>
+  </div>
+  <input type="hidden" name="user_code_required" id="user_code_required" value="1" />
+</div>
+<?php
+				}
+			}
+		}
+		break;
+
+
+	case 'get_diffusion':
+		$tab_portal = get_list_portal($_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $tour);
+		
+		
+		$nb_portal  = count($tab_portal);
+		$tab_pattern = array('#ID#', '#PUB#', '#PORTAL#', '#REF#', '#ID_MLS#', '#USER#');
+		$tab_partner_type = array();
+		if(NEW_INTEGRATION) {
+?>
+
+<div class="full_width" style="padding: 10px 0px;">
+<h2><?=$dico['service_diffusion']['title_diffusion']?></h2>
+<p class="help_text td_l">
+  <?=$dico['service_diffusion']['text_diffusion']?>
+</p>
+</div>
+<?php
+		}
+		if($nb_portal > 0) {
+
+			foreach($tab_portal as $id_portail => $portail) {
+				$url_tour   = '';
+
+				$is_pending  = 0==$portail['STATUT'];
+				$is_pending |= 'EAA329DE-B60A-8ACB-458F-3D747CF16650'==$id_portail && !is_numeric($portail['REF_DIFF']);
+				$is_published = $portail['STATUT'] > 0;
+				$is_error = -3==$portail['STATUT'];
+
+				$exists_row  = $is_pending || $is_published; //
+				$exists_row &= is_guid($portail['ID_DIFF']);
+
+				$is_partner = $portail['TYPE'] == 1;
+				$is_custom  = $portail['TYPE'] == 3 || $portail['TYPE'] == 4;
+				$is_mls	 = $portail['TYPE'] == 5;
+				$is_realtor = $portail['TYPE'] == 6;
+				$is_craig   = $id_portail == ID_CRAIGSLIST;
+				$is_syndic  = $portail['TYPE'] == 7;
+				$is_video   = $portail['TYPE'] == 8;
+				$is_social  = $portail['TYPE'] == 9;
+				$is_facebook = $id_portail=='191F4B45-53AD-2D10-DBE2-E7479443BBE7';
+				$need_CheckData = ($id_portail == ID_LEBONCOIN || $id_portail == ID_KIJIJI || $id_portail == ID_VIADEO);
+
+				$displaymode = (int)$portail['DISPLAYMODE'];
+				$copy_paste  = $displaymode == 2;
+				$display_url = $displaymode == 1;
+
+				$video_not_ready = $is_video && is_guid($portail['REF_DIFF']);
+
+				$mess_block_diffusion = '';
+				if($is_video && !$has_images) $mess_block_diffusion = $dico['service_diffusion']['diffusion_need_image'];
+
+				$diffusion_error_mess = '';
+				if($is_error) {
+					if(!empty($dico['service_diffusion']['error_'.strtolower($portail['ERROR_CODE'])])) {
+						$diffusion_error_mess = $dico['service_diffusion']['error_'.strtolower($portail['ERROR_CODE'])];
+					} else if(!empty($portail['ERROR_MESS'])) {
+						$diffusion_error_mess = $portail['ERROR_MESS'];
+					} else {
+						$diffusion_error_mess = 'unknown error';
+					}
+				}
+
+				// affichage par onglet
+				if(NEW_INTEGRATION) {
+					if(isset($_POST['type']) && empty($_POST['type'])) $_POST['type'] = 'std';
+
+					$display_result  = !isset($_POST['split']);
+					$display_result |= $is_mls && $_POST['type']=='mls';
+					$display_result |= $is_video && $_POST['type']=='vid';
+					$display_result |= $is_social && $_POST['type']=='soc';
+					$display_result |= ($is_syndic||$is_craig||$is_realtor||$is_partner||$is_custom) && $_POST['type']=='std'; //&& $id_portail != ID_FACEBOOK;
+
+					if($is_mls)		 $tab_partner_type['mls'] = !isset($tab_partner_type['mls']) ? 1 : $tab_partner_type['mls']+1;
+					else if($is_video)  $tab_partner_type['vid'] = !isset($tab_partner_type['vid']) ? 1 : $tab_partner_type['vid']+1;
+					else if($is_social) $tab_partner_type['soc'] = !isset($tab_partner_type['soc']) ? 1 : $tab_partner_type['soc']+1;
+					else				$tab_partner_type['std'] = !isset($tab_partner_type['std']) ? 1 : $tab_partner_type['std']+1;
+				}
+
+				$is_mls_auto = $is_mls && !empty($portail['SPECIFIC']);
+
+				$code = strtolower($portail['CODE']);
+
+				if(is_numeric($code[0])) $code = '_'.$code;
+
+				if($exists_row) {
+					$class_btn = ' active';
+
+					if(isset($tab_default_user_code[$id_portail]) && empty($portail['PREFIXE'])) {
+						$tab_replace = array($tour, $portail['ID_DIFF'], $portail['CODE'], $portail['REF_DIFF'], $portail['REF_DIFF'], $tab_default_user_code[$id_portail]);
+					} else {
+						$tab_replace = array($tour, $portail['ID_DIFF'], $portail['CODE'], $portail['REF_DIFF'], $portail['REF_DIFF'], $portail['PREFIXE']);
+					}
+
+					$url_tour	= str_replace($tab_pattern, $tab_replace, $portail['URL']);
+					if(USER_NCI) $url_tour = str_replace("tour.previsite.com", "viewer.inviewtours.com", $url_tour);
+					
+					if($is_published && !empty($portail['URL_ANNONCE'])) {
+						$display_url = true;
+						$url_tour = $portail['URL_ANNONCE'];
+					}
+					
+					// 2012-08-22 : Ajout URL FB
+					if($is_facebook) {
+						$tab_user = get_user_data($_SESSION['ID_UTILISATEUR']);
+						if(!empty($tab_user['FACEBOOK_PAGE_URL']) && is_numeric($portail['PREFIX_DIFF'])) {
+							$display_url = true;
+							$url_tour = $tab_user['FACEBOOK_PAGE_URL'];
+							if(stripos($url_tour, '?')!==false) {
+								$url_tour .= '&sk=app_'.$portail['PREFIX_DIFF'].'&app_data='.$tour;
+							} else {
+								$url_tour .= '?sk=app_'.$portail['PREFIX_DIFF'].'&app_data='.$tour;
+							}
+						}
+					}
+
+
+					if($is_pending) {
+						$mess_dispo = $dico['service_diffusion']['waiting_end_publication'];
+					} else if($portail['TYPE_MAJ']=='T') {
+						$tab_replace = array(datefmt_format($intl['date'], strtotime($portail['DATE_DIFF'])), $portail['HORAIRE_MAJ']);
+						$mess_dispo = str_replace(array('#DATE#', '#NB#'), $tab_replace, $dico['service_diffusion']['text_publish_available_days']);
+					} else if($portail['TYPE_MAJ']=='H' && $portail['DIFF_SINCE'] <=300) {
+						// heure fixe
+						$mess_dispo = str_replace('#H#', $portail['HORAIRE_MAJ'], $dico['service_diffusion']['text_publish_available_time']);
+					} else if((int)$portail['HORAIRE_MAJ'] > (int)$portail['DIFF_SINCE']) {
+						// delai diffusion
+						$remaining  = (int) $portail['HORAIRE_MAJ'];
+						$remaining -= $portail['DIFF_SINCE'];
+						$dd = floor($remaining / 1440);
+						$hh = floor($remaining / 60);
+						$mm = $remaining % 60;
+
+						if($dd > 0) {
+							$remaining = $dd;
+							$unit = $dico['common']['days'];
+						} else if($hh > 0) {
+							$remaining = $hh;
+							if($mm>0) $remaining .= ':'.($mm < 10 ? $mm.'0' : $mm);
+							$unit = $dico['common']['hours'];
+						} else {
+							$remaining = $mm;
+							$unit = $dico['common']['minutes'];
+						}
+
+						$tab_replace = array($remaining, strtolower($unit));
+						$mess_dispo  = str_replace(array('#NB#', '#UNIT#'), $tab_replace, $dico['service_diffusion']['text_publish_available_delay']);
+					} else if($display_url && !$video_not_ready) {
+						$mess_dispo  = '<input type="text" class="input_transparent input_get_url" name="" readonly="readonly" onclick="this.select();" value="'.htmlspecialchars($url_tour, ENT_QUOTES).'" />';
+					} else if($copy_paste) {
+						$mess_dispo  = $dico['service_diffusion']['text_url_copy_paste'].'<br />';
+						$mess_dispo .= '<input type="text" class="input_transparent input_get_url" name="" readonly="readonly" onclick="this.select();" value="'.htmlspecialchars($url_tour, ENT_QUOTES).'" />';
+					} else {
+						if(NEW_INTL) $mess_dispo = str_replace('#DATE#', '<b>'. datefmt_format($intl['date'], strtotime($portail['DATE_DIFF'])).'</b>', $dico['service_diffusion']['text_posted_on']);
+						else		 $mess_dispo = str_replace('#DATE#', '<b>'.date('Y-m-d', strtotime($portail['DATE_DIFF'])).'</b>', $dico['service_diffusion']['text_posted_on']);
+
+						if($is_video) {
+							if(is_guid($portail['REF_DIFF'])) {
+								$mess_dispo .= '<br />'.$dico['service_diffusion']['waiting_video_generation'].'';
+							} else {
+								$mess_dispo .= '<a href="'.$url_tour.'" class="view_tour" target="_blank">('.$dico['common']['view'].')</a>';
+							}
+						}
+					}
+				} else {
+					$class_btn = '';
+					$html  = '';
+					$ref_proposee = $is_video || $is_social ? $tour : $tab_tour['REF_VISITE'];
+					
+					if(!$is_mls && !$is_realtor && !$is_syndic && !$is_video) {
+						if(!empty($portail['PREFIX_DIFF']))  $ref_proposee = $portail['PREFIX_DIFF'].$tab_tour['REF_VISITE'];
+					}
+				}
+
+				if(!empty($mess_block_diffusion)) {
+					$onclick = 'return false;';
+					$mess_dispo = $mess_block_diffusion;
+				} else if($id_portail == ID_CRAIGSLIST) {
+					$onclick = "initCraigslist('".$id_portail."', '".$tour."', '".$tab_tour['REF_VISITE']."', 1);";
+				} else if($copy_paste || $exists_row || $is_realtor || $is_video || $need_CheckData) {
+					// ouverture formulaire
+					if(NEW_INTEGRATION) $onclick = "return openAddPublication('".$id_portail."');";
+					else				$onclick = "openAddPublication('".$id_portail."');";
+				} else {
+					if($is_mls && !$is_mls_auto) {
+						$onclick = "quickAddPublication('".$id_portail."', '".$tour."', '".php_str_to_js($ref_proposee)."', 'openCopyPaste');";
+					} else {
+						$onclick = "quickAddPublication('".$id_portail."', '".$tour."', '".php_str_to_js($ref_proposee)."', '');";
+					}
+				}
+
+				if($is_mls) $class_btn .= " box_mls ".$code;
+				else if($is_realtor) $class_btn .= " realtordotcom";
+				else $class_btn .= " ".$code;
+
+				// nouveau service diffusion par type
+				if(NEW_INTEGRATION) {
+					if($display_result) {
+						$class_name = ++$row_count%2 == 0 ? 'even' : 'odd';
+?>
+<div class="full_width row_partner row_spaced <?=$class_name?>">
+ <a href="#" class="btn_publish float_l<?=$class_btn?>" onclick="<?=$onclick?>"></a>
+ <div class="float_r info_partner td_l">
+	<div class="title_partner" title="<?=htmlspecialchars($portail['NOM'], ENT_QUOTES)?>"><b><?=$portail['NOM']?></b></div>
+<?php 
+	if(!empty($mess_block_diffusion)) {
+		echo '<div class="notify_box messinfo">'.$mess_block_diffusion.'</div>';
+	} else if($exists_row) {
+		echo $mess_dispo;
+	} else if(!empty($diffusion_error_mess)) {
+?>
+		<div class="notify_box messwarn"><?=$diffusion_error_mess?></div>
+<?php
+	} else {
+		echo '<i>'.$dico['service_diffusion']['text_click_to_publish'].'</i>';
+	}
+?>
+
+ </div>
+ <div class="clear_sep"></div>
+</div>
+<?php
+					}
+				// ancien service diffusion
+				} else if((!$is_video || OPTION_DIFFUSION_VIDEO)) {
+?>
+<div class="diffusion_row">
+ <a href="#" class="btn_publish float_l<?=$class_btn?>" onclick="<?=$onclick?>"></a>
+ <div class="info_publish float_l">
+ <div class="title_partner" title="<?=htmlspecialchars($portail['NOM'], ENT_QUOTES)?>"><b><?=$portail['NOM']?></b></div>
+<?php
+	if($exists_row) {
+		echo $mess_dispo;
+	} else if(!empty($portail['ERROR_CODE']) && !empty($dico['service_diffusion']['error_'.strtolower($portail['ERROR_CODE'])]) ) {
+		echo '<div class="messwarn">'.$dico['service_diffusion']['error_'.strtolower($portail['ERROR_CODE'])].'</div>';
+	} else {
+		echo '<i>'.$dico['service_diffusion']['text_click_to_publish'].'</i>';
+	}
+?>
+ </div>
+</div>
+<?php
+				}
+			}
+		}
+
+		if(NEW_INTEGRATION) {
+?>
+<input type="hidden" name="current_type" id="current_type" value="<?=htmlspecialchars($_POST['type'], ENT_QUOTES)?>" />
+<?php
+			foreach($tab_partner_type as $type => $count) {
+?>
+<input type="hidden" name="total_partners_<?=$type?>" id="total_partners_<?=$type?>" value="<?=$count?>" />
+<?php
+			}
+		}
+		break;
+
+
+	case "open_accept_paiement" :
+		$Id_utilisateur = $_SESSION['ID_UTILISATEUR'];
+		$callback = urlencode('http://'.$_SERVER['SERVER_NAME']."/partners/new/show_service.php?service=diffusion&tour=#TOUR#");
+
+		$oncancel = NEW_INTEGRATION ? 'closeAlertBox();' : 'closeLightBox();';
+
+		if(SERVER_DEV) {
+			$tab_picturepath = get_picturepath_infos($tour, $Id_utilisateur, $_POST['reference']);
+			$form_action = 'https://shop.previsite.com/product?product=realtorcom&id='.$Id_utilisateur.'&o='.$tab_picturepath['ID_DIFFUSION_PORTAIL'];
+	//	http://dev.manager.previsite.com/billing_software.php?a=paypal_ipn_debug&service=picturepath&product=E48409CC-8455-4521-9463-311FC7A269F7&tour='.$tour.'&user='.$Id_utilisateur.'&partner='.$partner.'&reference='.$_POST['reference'].'&callback='.$callback;
+			$onclick = "window.location='/partners/new/services.php?tour=".$tour."';window.open('".$form_action."');".$oncancel.";";
+		} else {
+			$tab_picturepath = get_picturepath_infos($tour, $Id_utilisateur, $_POST['reference']);
+			$form_action = 'https://shop.previsite.com/product?product=realtorcom&id='.$Id_utilisateur.'&o='.$tab_picturepath['ID_DIFFUSION_PORTAIL'];
+		//	$form_action = 'http://manager.previsite.com/billing_software.php?a=paypal_ipn&service=picturepath&product=E48409CC-8455-4521-9463-311FC7A269F7&tour='.$tour.'&user='.$Id_utilisateur.'&partner='.$partner.'&reference='.$_POST['reference'].'&callback='.$callback;
+//			$onclick = "window.location='".$form_action."';closeLightBox();";
+			$onclick = "window.location='/partners/new/services.php?tour=".$tour."';window.open('".$form_action."');".$oncancel.";";
+		}
+
+?>
+<div class="float_l">You have to pay $19.95</div>
+
+<span class="btn float_r margin4L" onclick="return <?=$oncancel?>" style="width: 50px;">
+ <span class="inner_btn"><a href="#"><?=$dico['common']['cancel']?></a></span>
+</span>
+<span class="btn float_r margin4L" onclick="<?=$onclick?>" style="width: 50px;">
+ <span class="inner_btn"><a href="#">OK</a></span>
+</span>
+
+<div class="clear_sep">&nbsp;</div>
+<?php
+		break;
+
+
+	case 'open_mls_copy_paste':
+//		$tab_tour = get_tour_data($tour, $_SESSION['ID_UTILISATEUR']);
+
+		if(!empty($tab_tour)) {
+			$tab_diff = get_user_partner_diff($partner, $_SESSION['ID_SOCIETE'], $tour);
+			if(!empty($tab_tour) && !empty($tab_diff)) {
+
+				$tab_pattern  = array('#ID#', '#PUB#', '#PORTAL#', '#ID_MLS#', '#REF#');
+				$tab_replace  = array($tour, $tab_diff['ID_DIFFUSION_PORTAIL'], $tab_diff['CODE_PORTAIL'], $tab_diff['REF_PORTAIL'], $tab_diff['REF_PORTAIL']);
+				$url_tour  =  str_replace($tab_pattern, $tab_replace, $tab_diff['URL_VIEWER']);
+			}
+		}
+
+		$url_tour = get_partner_tour_url($_POST['partner'], $_POST['reference'], $tour);
+		if(USER_NCI) $url_tour = str_replace("tour.previsite.com", "viewer.inviewtours.com", $url_tour);
+?>
+<div class="form_add_publication">
+  <h3>Copy and paste this URL</h3>
+
+<p style="text-align: center;">
+<input type="text" class="input_transparent diff_input_w_3_4 td_c" name="" value="<?=htmlspecialchars($url_tour, ENT_QUOTES)?>" onclick="this.select();"/></p>
+</p>
+
+<span class="btn block_center" onclick="return closeLightBox();">
+ <span class="inner_btn"><a href="#">Close</a></span>
+</span>
+</div>
+<?php
+
+		break;
+	
+	case 'open_send_webmaster_email':
+		$ref = !empty($tab_tour['NOM_VISITE']) ? $tab_tour['NOM_VISITE'] : $tab_tour['REF_VISITE'];
+		$txt = str_replace('#REF_TOUR#', $ref, $dico['service_diffusion']['text_email']);
+		$txt .= "\n\n".$_POST['html'];
+?>
+<div class="full_width">
+<h2><?=$dico['service_diffusion']['btn_webmaster']?></h2>
+<br />
+<div class="row_form"><?=$dico['common']['email']?></div>
+<input type="text" class="input_block input_w_1_1" id="send_webmaster_email" value="" />
+
+<div class="row_form"><?=$dico['common']['message']?></div>
+<textarea class="input_block input_w_1_1" rows="7" cols="40" id="send_webmaster_mess"><?=htmlspecialchars($txt, ENT_QUOTES)?></textarea>
+
+<div class="navigation_btn">
+ <span class="btn float_l block_center margin4L" onclick="return sendEmailIntegration(gb_tour, $F('send_webmaster_ref'), $F('send_webmaster_email'), $F('send_webmaster_mess'));">
+  <span class="inner_btn"><a href="#"><?=$dico['common']['send']?></a></span>
+ </span>
+ <span class="btn float_l block_center" onclick="return closeAlertBox();">
+  <span class="inner_btn"><a href="#"><?=$dico['common']['cancel']?></a></span>
+ </span>
+ <div class="clear_sep"></div>
+</div>
+<input type="hidden" id="send_webmaster_ref" value="<?=htmlspecialchars($ref, ENT_QUOTES)?>" />
+<div class="notify_box" id="notify_integration"></div>
+</div>
+<?php
+
+		break;
+
+
+	case 'send_email_integration':
+		require_once 'phpmailer/class.phpmailer.php';
+		$ref  = $_POST['reference'];
+		$mess = $_POST['message'];
+		$mail = $_POST['email'];
+
+		if(strlen($mess) > 40) {
+			$phpmail = new PHPMailer();
+			$phpmail->IsSMTP();
+			$phpmail->IsHTML(false);
+			$phpmail->Host	 = SMTP_MAIL;
+			$phpmail->From	 = $_SESSION['EMAIL_UTILISATEUR'];
+			$phpmail->Subject  = $dico['diffusion']['subject_email_webmaster'].' '.$ref;
+			$phpmail->FromName = $_SESSION['PRENOM_UTILISATEUR'].' '.$_SESSION['NOM_UTILISATEUR'];
+			$phpmail->WordWrap = 100;
+			$phpmail->Body	 = $mess;
+			$phpmail->AddAddress($mail);
+
+			if($phpmail->Send()) echo "true";
+			else echo "false";
+		} else {
+			echo "false";
+		}
+		break;
+
+	case 'init_craigslist':
+		$title = "Publish on Craigslist";
+		if(NEW_INTEGRATION) {
+?>
+<div class="full_width">
+  <h2><?=$title?></h2>
+  <div id="loading_icon" style="text-align: center;padding: 20px;margin: 5px auto;">
+	<img src="images/ajax_wait_blue.gif">
+  </div>
+</div>
+<?php
+		} else {
+?>
+<div class="form_craigslist">
+  <h3><?=$title?></h3>
+	<div id="loading_icon" style="text-align: center;padding: 20px;margin: 5px auto;">
+		<img src="images/ajax_loader.gif">
+	</div>
+	<div class="clear_sep">&nbsp;</div>
+</div>
+<?php
+		}
+		break;
+
+	case 'update_form_craigslist':
+		$tour = $_REQUEST['tour'];
+		$reference = $_REQUEST['reference'];
+
+		$etat = $_REQUEST['etat'];
+		$ville = $_REQUEST['ville'];
+		$type_user = $_REQUEST['type_user'];
+		$quartier = $_REQUEST['quartier'];
+		$category = $_REQUEST['category'];
+		$step = $_REQUEST['step'];
+
+		$data = get_craigslist_form($tour, $tab_tour['ID_TYPE_TRANSACTION'], $etat, $ville, $quartier, $category, $step);
+
+		$content_states = $data['content_states'];
+		$content_site_zones = $data['content_site_zones'];
+		$content_quartier = $data['content_quartier'];
+		$Nom_etat = $data['Nom_etat'];
+		$Ville = $data['Ville'];
+		$url_post = $data['url_post'];
+
+		$title = "Publish on Craigslist";
+		
+		require_once 'pages/show_service_diffusion_form_craigslist.php';
+
+		break;
+
+
+	case 'manual_diffusion':
+		echo $tour;
+		break;
+
+
+	case 'refresh_zonaprop':
+		$path = explode('|', $_REQUEST['path']);
+		$step = !empty($_REQUEST['path']) ? count($path) : 0;
+		$path = implode(", ", $path);
+
+		$url_wsdl = 'http://qa.zonaprop.com.ar/webservice/realState?wsdl';
+		$ns = 'http://impl.service.g7.ws.inmuebles.dridco.com/';
+		$soapcli = new SoapClient($url_wsdl, array('trace' => 1));
+
+		$auth = array();
+		$auth[] = new SOAPHeader($ns, 'password',  'Pr3v1st3');
+		$auth[] = new SOAPHeader($ns, 'proveedor', '26');
+		$auth[] = new SOAPHeader($ns, 'usuario',   '1000004');
+		$soapcli->__setSoapHeaders($auth);
+
+		$path_xml = PATH_TEMP.'loc_zonaprop.xml';
+
+		if(!is_file($path_xml)) {
+			$res = $soapcli->ConsultarUbicaciones();
+
+			$xml  = '<?xml version="1.0" encoding="utf-8"?>';
+			$xml .= "<zonas>\n";
+
+			foreach($res->zona as $zona) {
+				$xml .= "<zona>\n";
+				$xml .= "\t<id>".htmlspecialchars($zona->id, ENT_QUOTES)."</id>\n";
+				$xml .= "\t<name>".htmlspecialchars($zona->nombre, ENT_QUOTES)."</name>\n";
+				$xml .= "</zona>\n";
+			}
+
+			$xml .= "</zonas>\n";
+			@file_put_contents($path_xml, $xml);
+		}
+
+		$tab_output = array();
+
+		if(($xml = simplexml_load_file($path_xml))!==false) {
+			$nb = count($xml->zona);
+			for($i=0; $i<$nb; $i++) {
+				$loc_name = (string)$xml->zona[$i]->name;
+				if(!empty($loc_name)) {
+					$tab_path = explode(", ", $loc_name);
+					switch($step) {
+						case 0:
+							$tab_output[ $tab_path[0] ] = (int)$xml->zona[$i]->id;
+							break;
+						default:
+							if(strpos($loc_name, $path)!==false && isset($tab_path[$step])) $tab_output[ $tab_path[$step] ] = (int)$xml->zona[$i]->id;
+							break;
+					}
+				}
+			}
+		}
+		foreach($tab_output as $loc_name => $loc_id) {
+			echo '<option value="'.$loc_id.'">'.htmlspecialchars($loc_name, ENT_QUOTES)."</option>\n";
+		}
+		break;
+}
+
+write_bench();
+
+?>

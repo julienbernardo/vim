@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?><User>
+ <userID>9625B886-2975-0D1A-F21E-729A1AD2F6AA</userID>
+	<userCode>20179</userCode>
+	<userFirstName></userFirstName>
+	<userLastName>123WEBIMMO.COM</userLastName>
+	<userPhone>01.45.94.01.29</userPhone>
+	<userEmail>chennevieres@123webimmo.com</userEmail>
+	<userStatus>-1</userStatus>
+	<companyName>123WEBIMMO.COM</companyName>
+	<companyWebSite>123webimmo.com/Chennevières</companyWebSite>
+	<companyAddress></companyAddress>
+	<companyCity>ORMESSON SUR MARNE</companyCity>
+	<companyZip>94490</companyZip>
+	<companyState></companyState>
+	<companyCountry>FR</companyCountry>
+	<companyLatitude>48.785694</companyLatitude>
+	<companyLongitude>2.541046</companyLongitude>
+	<language>FR</language>
+	<photoAgent></photoAgent>
+	<logoCompany></logoCompany>
+	<created>2011-02-09 10:05:01</created>
+	<updated>2012-12-07 10:14:01</updated>
+</User>

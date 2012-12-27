@@ -1,0 +1,247 @@
+<?php
+class SocialAutoPoster_Googleplus extends SocialAutoPoster_Abstract{
+    
+    protected $_defaultOptions = array(
+         'page_id' => ''
+        ,'email' => ''
+        ,'pass' => ''
+        ,'uagent' => 'Mozilla/5.0 (X11; Linux x86_64; rv:7.0.1) Gecko/20100101 Firefox/7.0.1'
+        ,'login_url' => 'https://accounts.google.com/ServiceLogin'
+        ,'logout_url' => 'https://www.google.com/m/logout'
+        ,'post_page' => 'https://plus.google.com/b/$PAGE_ID/$PAGE_ID/posts'
+        //,'post_url' => 'https://plus.google.com/b/$PAGE_ID/_/sharebox/post'
+		,'post_url' => 'https://plus.google.com/_/sharebox/post'
+		,'delete_url' => 'https//plus.google.com/_stream/deleteactivity/'
+        ,'auth_email_field' => 'Email'
+        ,'auth_pass_field' => 'Passwd'
+    );
+
+    protected $_cookies = array();
+    protected $_begin = false;
+    protected $_at = null;
+    
+    protected function _setCookies($response = array()){
+        if(count($response['cookies'])){
+            $this->_cookies = array_merge($this->_cookies,$response['cookies']);
+        }
+    }
+    
+    protected function _getCookies(){
+        $cookies = "";
+        foreach($this->_cookies as $key => $value){
+            $cookies .= $key."=".$value."; ";
+        }
+        return $cookies;
+    }
+    
+    protected function _quoteMessage($message = ''){
+        $message = addslashes($message);
+        $message = strip_tags($message);
+        $message = preg_replace("#\t#si",' ',$message);
+        $message = preg_replace("#\n|\r#si",'\n',$message);
+        $message = preg_replace('#(\\\n)+#si','\n',$message);
+        return trim($message);
+    }
+    
+    protected function _getAtToken($code = ''){
+        if(!$this->_at){
+            if(preg_match('#AObGSA.*:\d+#', $code, $match) && isset($match[0]) && $match[0]){
+                $this->_at = $match[0];
+            }else{
+                $this->_addError('Access token parsing error');
+            }
+        }
+        return $this->_at;
+    }
+    
+    protected function _getPage($url,$post = null){
+        $options = array(
+             CURLOPT_USERAGENT => $this->_getOption('uagent')
+            ,CURLOPT_URL => $url
+            ,CURLOPT_COOKIE => $this->_getCookies()
+            ,CURLOPT_RETURNTRANSFER => TRUE
+            ,CURLOPT_FOLLOWLOCATION => TRUE
+            ,CURLOPT_SSL_VERIFYPEER => FALSE
+        );
+        if($post){
+            $options[CURLOPT_POST] = TRUE;
+            $options[CURLOPT_POSTFIELDS] = $post;
+        }
+        $response = $this->_sendRequest($options);
+        $this->_setCookies($response);
+        return $response;
+    }
+
+    protected function _getLoginData(){
+        $response = $this->_getPage($this->_getOption('login_url'));
+        $this->_setCookies($response);
+        $buf = html_entity_decode($response['body']);
+        $buf = utf8_decode($buf);
+        $buf = str_replace( '&amp;', '&', $buf ); 
+        $buf = str_replace( '&', '&amp;', $buf ); 
+        $toreturn = '';
+        $doc = new DOMDocument;
+        $doc->loadHTML($buf);
+        $inputs = $doc->getElementsByTagName('input');
+        $auth_email_field = $this->_getOption('auth_email_field');
+        $auth_pass_field = $this->_getOption('auth_pass_field');
+        foreach ($inputs as $input) {
+            switch ($input->getAttribute('name')) {
+                case $auth_email_field:
+                $toreturn .= $auth_email_field.'=' . urlencode($this->_getOption('email')) . '&';
+                break;
+                case $auth_pass_field:
+                $toreturn .= $auth_pass_field.'=' . urlencode($this->_getOption('pass')) . '&';
+                break;
+                default:
+                $toreturn .= $input->getAttribute('name') . '=' . urlencode($input->getAttribute('value')) . '&';
+            }
+        }
+        $toreturn = rtrim($toreturn, "&");
+        return array($toreturn, $doc->getElementsByTagName('form')->item(0)->getAttribute('action'));
+    }
+    
+    protected function _login(){
+        $this->_cookies = array();
+        $loginData = $this->_getLoginData();
+        $response = $this->_getPage($loginData[1],$loginData[0]);
+        if(!$response['status'] || !isset($this->_cookies['SSID'])){
+            $this->_addError('Authorization Error');
+            return false;
+        }
+        return true;
+    }
+    
+    protected function _logout(){
+        $this->_getPage($this->_getOption('logout_url'));
+    }
+    
+    public function begin($page_id = null){
+        if($this->_login()){
+            if($page_id){
+                $this->_setOption('page_id',$page_id);
+            }
+            $page_id = $this->_getOption('page_id'); 
+            if(!$page_id){
+                $this->_addError('Page ID is empty');
+                return false;
+            } 
+            $post_page = $this->_getOption('post_page');
+            $post_page = str_replace('$PAGE_ID',$page_id,$post_page);
+            $response = $this->_getPage($post_page); 
+            if($this->_getAtToken($response['body'])){
+                $this->_begin = true;
+            }
+        }
+    }
+    
+    public function end(){
+        $this->_logout();
+    }
+    
+    public function postToWall($message = ''){   
+        if($this->isHaveErrors()){
+            $this->_logout();
+            return false;
+        }
+        $message = $this->_quoteMessage($message);
+        if(!$message){
+            $this->_addError('Message is empty');
+            $this->_logout();
+            return false;
+        }
+        $page_id = $this->_getOption('page_id'); 
+        if(!$page_id){
+            $this->_logout();
+            return false;
+        } 
+        if($this->_begin){
+            $at = $this->_getAtToken();
+			if($at){
+				$post = array(
+					'source' => 'frameless',
+					'at' => $at,
+					'f.req' => '["'.$message.'","oz:'.$page_id.'.'.(time()).'.0",null,null,null,null,"[]",null,null,true,[],false,null,null,[],null,false,null,null,null,null,null,null,null,null,null,null,false,false,false,null,null,null,null,null,null,[],[[[null,null,1]],null]]',
+					//'f.req' => '["'.$message.'","oz:'.$page_id.'.'.(time()).'.0",null,null,null,null,"[]",null,null,true,[],false,null,null,[],null,false,null,null,null,null,null,null,null,null,null,null,false,false,false,null,null,null,null,null,null,[],[[[null,null,1]],null]]',
+					//'f.req' => '["message","oz:116865015305473125354.13a69e3b49b.0",null,null,null,null,"[\"[null,null,null,\\\"Called to Darkness by *michalivan on deviantART\\\",null,null,null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,\\\"cover for Pathfinder Tales: Called to Darkness ([link]) \\\\u00a9 Paizo Publishing, LLC\\\\u00ae\\\",null,null,[null,\\\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\\\",null,\\\"text/html\\\",\\\"document\\\"],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[[null,\\\"//s2.googleusercontent.com/s2/favicons?domain=michalivan.deviantart.com\\\",null,null],[null,\\\"//s2.googleusercontent.com/s2/favicons?domain=michalivan.deviantart.com\\\",null,null]],null,null,null,null,null,[[null,\\\"\\\",\\\"http://google.com/profiles/media/provider\\\",\\\"\\\"]]]\",\"[null,null,null,null,null,[null,\\\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\\\"],null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,null,null,null,[null,\\\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\\\",null,\\\"image/jpeg\\\",\\\"photo\\\",null,null,null,null,null,null,null,1009,791],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[[null,\\\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\\\",null,null],[null,\\\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\\\",null,null]],null,null,null,null,null,[[null,\\\"images\\\",\\\"http://google.com/profiles/media/provider\\\",\\\"\\\"]]]\"]",null,null,true,[],false,null,null,[],null,false,null,null,null,null,null,null,null,null,null,null,false,false,false,null,null,null,null,[[35,1,0],"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344",null,null,{"29646191":["http://michalivan.deviantart.com/art/Called-to-Darkness-331656344","http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg","Called to Darkness by *michalivan on deviantART","cover for Pathfinder Tales: Called to Darkness ([link]) \u00a9 Paizo Publishing, LLC\u00ae",null,["//images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg&container=focus&gadget=a&rewriteMime=image/*&refresh=31536000&resize_h=150&resize_w=150&no_expand=1",150,150,null,null,null,null,null,[3,"https://images2-focus-opensocial.googleusercontent.com/gadgets/proxy?url=http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg&container=focus&gadget=https://plus.google.com&rewriteMime=image/*&resize_h=800&resize_w=800&no_expand=1"]],"//s2.googleusercontent.com/s2/favicons?domain=michalivan.deviantart.com",[]]}],null,[],[[[null,null,1]],null]]',
+					'test2' => '[[35,1,0],"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344",null,null,{"29646191":["http://michalivan.deviantart.com/art/Called-to-Darkness-331656344","http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg","Called to Darkness by *michalivan on deviantART","cover for Pathfinder Tales: Called to Darkness ([link]) u00a9 Paizo Publishing, LLCu00ae",null,["//images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg&container=focus&gadget=a&rewriteMime=image/*&refresh=31536000&resize_h=150&resize_w=150&no_expand=1",150,150,null,null,null,null,null,[3,"https://images2-focus-opensocial.googleusercontent.com/gadgets/proxy?url=http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg&container=focus&gadget=https://plus.google.com&rewriteMime=image/*&resize_h=800&resize_w=800&no_expand=1"]],"//s2.googleusercontent.com/s2/favicons?domain=michalivan.deviantart.com",[]]}]',
+				);
+				//$link_infos = json_decode( '["[null,null,null,\"Called to Darkness by *michalivan on deviantART\",null,null,null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,\"cover for Pathfinder Tales: Called to Darkness ([link]) \\u00a9 Paizo Publishing, LLC\\u00ae\",null,null,[null,\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\",null,\"text/html\",\"document\"],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[[null,\"//s2.googleusercontent.com/s2/favicons?domain=michalivan.deviantart.com\",null,null],[null,\"//s2.googleusercontent.com/s2/favicons?domain=michalivan.deviantart.com\",null,null]],null,null,null,null,null,[[null,\"\",\"http://google.com/profiles/media/provider\",\"\"]]]","[null,null,null,null,null,[null,\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\"],null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,null,null,null,[null,\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\",null,\"image/jpeg\",\"photo\",null,null,null,null,null,null,null,1009,791],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[[null,\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\",null,null],[null,\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\",null,null]],null,null,null,null,null,[[null,\"images\",\"http://google.com/profiles/media/provider\",\"\"]]]"]');
+				//print_r($json);exit;
+				//$json = json_decode($json[1]);
+				$link_infos = json_decode( '["[null,null,null,\"Called to Darkness by *michalivan on deviantART\",null,null,null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,\"cover for Pathfinder Tales: Called to Darkness ([link]) \\u00a9 Paizo Publishing, LLC\\u00ae\",null,null,[null,\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\",null,\"text/html\",\"document\"],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[],null,null,null,null,null,[[null,\"\",\"http://google.com/profiles/media/provider\",\"\"]]]","[null,null,null,null,null,[null,\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\"],null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,null,null,null,[null,\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\",null,\"image/jpeg\",\"photo\",null,null,null,null,null,null,null,1009,791],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[[null,\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\",null,null]],null,null,null,null,null,[[null,\"images\",\"http://google.com/profiles/media/provider\",\"\"]]]"]');
+
+				$link_infos[0] = json_decode($link_infos[0], true);
+				$link_infos[0][3] = 'link_name '.date('Y-m-d H:i:s');
+				$link_infos[0][21] = 'link_subtitle';
+				$link_infos[0][24][1] = 'http://fc04.deviantart.net/fs71/f/2012/290/0/f/0f1edafab11a998891e956b862fd8e31-d5i27ig.jpg';
+				$link_infos[0] = json_encode($link_infos[0]);
+
+				$link_infos[1] = json_decode($link_infos[1], true);
+				$link_infos[1][5][1] = 'http://media.previsite.com/agency/max_120x120/78114C56-2594-74DB-5129-BD57BD0C95AC.jpg';
+				$link_infos[1][24][1] = '';
+				$link_infos[1][24][12] = 120;
+				$link_infos[1][24][13] = 120;
+				$link_infos[1][41][0][1] = $link_infos[1][5][1];
+				//unset($link_infos[1][41]);
+				$link_infos[1] = json_encode($link_infos[1]);
+
+				$link_infos = json_encode($link_infos);
+				$json = json_decode($post['f.req']);
+				$json[6] = $link_infos;
+				//$json[34] = $post['test2'];
+				$post['f.req'] = json_encode($json);
+				$post_url = $this->_getOption('post_url');
+				$post_url = str_replace('$PAGE_ID',$page_id,$post_url);
+				$post_url .= "/?spam=20&_reqid=".(time() % 1e6)."&rt=j";
+				$response = $this->_getPage($post_url,$post);
+				if(!$response['status']){
+					$this->_addError('Posting Error');
+				}else if(preg_match('/,"('.$page_id.'\/posts\/[^"]+)",/iU', $response['body'], $postId) > 0){
+					$postId = $postId[1];
+					print_r($response);
+					echo $postId;
+					return true;
+				}else{
+					$this->_addError('Parsing Error');
+				}
+				$this->_logout();
+				return false;
+			}
+        }
+    }
+    
+    public function deletePostToWall($postId){   
+        if($this->isHaveErrors()){
+            $this->_logout();
+            return false;
+        }
+        $page_id = $this->_getOption('page_id'); 
+        if(!$page_id){
+            $this->_logout();
+            return false;
+        } 
+        if($this->_begin){
+            $at = $this->_getAtToken();
+            if($at){
+                $post = array(
+					'itemId' => $postId,
+                    'at' => $at,
+                );
+                $post_url = $this->_getOption('delete_url');
+				$post_url .= "/?hl=en&ozv=es_oz_20121015.18_p0&avw=pr%3Apr&_reqid=".(time() % 1e6)."&rt=j";
+                $response = $this->_getPage($post_url, $post);
+				print_r($post);
+				print_r($response);
+                if(!$response['status']){
+                    $this->_addError('Delete Error');
+                    $this->_logout();
+                    return false;
+                }
+                return true;
+            }
+        }
+    }
+    
+}
+?>

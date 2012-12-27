@@ -1,0 +1,85 @@
+<?php
+
+require_once(PATH_INCLUDE.'fonction.ftp.php');
+
+//php /var/www/gateway.previsite.net/export/century21france.php 2011-04-29\ 13:01:50 false
+function century21france($scriptName, $workPath, $config, $debug = false){
+	$century21france_ftp_connection = 'ftp://previsite:45T_rt478@mdm.naxos-fr.net';
+
+	$century21france_url_tour = 'http://tour.c21.previsite.com/p/c21fr/#REF#';
+	$century21france_url_youtube = 'http://www.youtube.com/watch?v=#REF#';
+	$century21france_url_streaming = 'http://m.previsite.com/c21/#REF#';
+	$century21france_url_video = 'http://images.previsite.net/getfile.asp?id=#ID#&ext=#EXT#';
+	$century21france_upload_file = true;
+
+	$debug |= ($_REQUEST['test'] != "");
+
+	$main_portail = 'E97D8F0F-A5DD-C9A7-55B6-A6635E330C50'; 
+	$youtube_portail = array('59C4948B-DB6D-FDAF-E15D-CD67B8347126','1876B6F8-6894-1335-44C5-D984D5C8E04E');
+
+	$return= array('DONE' => 0, 'FAILED' => 0, 'TOTAL' => 0, 'WAITING' => 0);
+	$is_full = "true";
+
+	$export = new PrevisiteExport($config['DNS']);
+	$file = $workPath.date('Y-m-d H:i:s').'-c21'.($is_full ? "_full" : "").'.csv';
+	$count = array('total'=>0, 'mobile'=>0, 'youtube'=>0);
+	$last_checkpoint = 0;
+	do{
+		$tours = $export->getPartnerTours($config['PARTNERS'], $config['OPT_DETAILS']);	
+		$return['TOTAL'] += count($tours);
+		if($debug && $return['TOTAL'] > 100) $return['TOTAL'] = 100;
+		for($i=0; $i < $return['TOTAL']; $i++){
+			$r = $tours[$i];
+			century21france_checkPercent( $count['total'], 60000, $last_checkpoint, $scriptName);
+			$ref = "";
+			$url_youtube = "";
+			$url_mobile = "";
+			if(count($r['DIFFS']) > 0){
+				if($r['DIFFS'][$main_portail] && $r['DIFFS'][$main_portail] > 0){
+					$ref = $r['DIFFS'][$main_portail]['REF_PORTAIL'];
+				}
+				for($k=0;$k < count($youtube_portail);$k++){
+					if(is_array($r['DIFFS'][$youtube_portail[$k]]) && $r['DIFFS'][$youtube_portail[$k]]['ID_STATUT_DIFFUSION'] == 1){
+						$url_youtube = str_replace('#REF#', $r['DIFFS'][$youtube_portail[$k]]['REF_PORTAIL'], $century21france_url_youtube);
+						$count['youtube']++;
+						break;
+					}
+				}
+			}
+			if($ref == ""){ 
+				$return['WAITING']++;
+				$return['WAITING_DONE']++;
+				continue;
+			}
+			if($r['VIDEO_AVAILABLE'] === true){
+				$url_mobile = str_replace('#REF#', $ref, $century21france_url_streaming);
+				$count['mobile']++;
+			}
+
+			file_put_contents($file, $ref."|".str_replace('#REF#',$ref, $century21france_url_tour)."|".$url_youtube."|".$url_mobile."\n", FILE_APPEND);
+			$return['DONE']++;
+			$count['total']++;
+		}
+		if($debug) break;
+	}while($export->next_step === true);
+	import_log('[EXPORT][UPLOAD] - '.($is_full ? "FULL " : "").$count['total'].' tours / '.$count['youtube'].' youtube / '.$count['mobile'].' mobile found', $scriptName);
+	if($debug){
+		echo file_get_contents($file);
+	}else if($count['total'] > 0){
+		if($century21france_upload_file){
+			if(!ftp_add_file(basename($file), $file, $century21france_ftp_connection)){
+				import_log('[ERROR] upload failed.', $scriptName);
+			}else @unlink($file); 
+		}else import_log('[EXPORT] file:'.$file, $scriptName);
+		import_log('[EXPORT] END', $scriptName);
+	}else import_log('[ERROR] No tours to upload', $scriptName);
+	return $return;
+}
+
+function century21france_checkPercent( $pos, $total, &$last_checkpoint, $scriptName){
+	if($last_checkpoint+($total/5) < $pos){
+		import_log(round($pos/$total*100).'% done', $scriptName);
+		$last_checkpoint = $pos;
+	}
+}
+?>

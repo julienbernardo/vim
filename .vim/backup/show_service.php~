@@ -1,0 +1,1483 @@
+<?php
+
+$service_name = isset($_REQUEST['service']) ? $_REQUEST['service'] : $_POST['service'];
+
+
+
+$url_qrcode = $url_qrcode_full = $global['url_tour'].'.qr?full=1';
+$url_mstag = $url_mstag_full = $global['url_tour'].'.mstag?full=1';
+$url_reload = USE_SHOP ? str_replace(array('%PRODUCT%', '%USER%'), array('smsus', $_SESSION['ID_UTILISATEUR']), URL_SHOP) : 'reload.php';
+
+$main_title = "A service";
+$infobulle_title = "infobulle title";
+$infobulle_text = "infobulle texte";
+
+/* security */
+if( $service_name=='mobile' && (!OPTION_MOBILE || PUB_MOBILE) ||
+	$service_name=='mobile_history' && (!OPTION_MOBILE || PUB_MOBILE) ||
+	$service_name=='sound' && !OPTION_SOUND   ||
+	$service_name=='diffusion' && !OPTION_DIFFUSION   ||
+	$service_name=='list_partner' && !OPTION_DIFFUSION   ||
+	$service_name=='leads' && !OPTION_LEADS) $service_name = '';
+
+$is_tts = $tab_tour['TYPE_SON']=='TTS';
+$is_recorder = $tab_tour['TYPE_SON']=='REC';
+$is_pending = $tab_tour['TYPE_SON']=='WAIT';
+$mp3_exists = $is_tts || $is_recorder;
+
+///////////////////////////////////////////////////////////////////////////////////////////
+// /!\ ne pas modifier par service l'ordre des case ni remettre les break commentes  /!\ //
+///////////////////////////////////////////////////////////////////////////////////////////
+if(!empty($ajax_request)) {
+	// requetes ajax
+	switch($service_name.'__'.$ajax_request) {
+		// service download
+		case 'download__launch_download':
+			$url_exe = $_POST['url'];
+			$url_zip = str_replace('=windows', '=max', $url_exe);
+
+			$content1 = @file_get_contents($url_exe);
+			$content2 = @file_get_contents($url_zip);
+
+			if(strlen($content1) > 100000 && strlen($content2) > 100000) echo 'true';
+			else echo 'false';
+			break;
+
+		// service stats
+		case 'stats__upload_chart':
+			if(!empty($GLOBALS["HTTP_RAW_POST_DATA"])) {
+				if(($im_src = imagecreatefromstring($GLOBALS["HTTP_RAW_POST_DATA"]))!==false) {
+					$im_w = imagesx($im_src);
+					$im_h = imagesy($im_src);
+					$limit_w = $im_w - 1;
+					$limit_h = $im_h - 1;
+
+					// crop left
+					while($limit_w>0 && (strtoupper(dechex(imagecolorat($im_src, $limit_w, 2)))!= 'E5EFF9' || strtoupper(dechex(imagecolorat($im_src, $limit_w-2, 1)))!= 'E5EFF9')) {
+						$limit_w--;
+					}
+					// crop bottom
+					while($limit_h>0 && (strtoupper(dechex(imagecolorat($im_src, 1, $limit_h)))!= 'E5EFF9' || strtoupper(dechex(imagecolorat($im_src, 1, $limit_h-1)))!= 'E5EFF9')) {
+						$limit_h--;
+					}
+
+					$im_dst = imagecreatetruecolor($limit_w, $limit_h);
+					imagecopyresampled($im_dst, $im_src, 0, 0, 0, 0, $limit_w, $limit_h, $limit_w, $limit_h);
+
+					imagejpeg($im_dst, PATH_TEMP.$tour.'.jpg', 100);
+					$_SESSION['CHART_IMAGE_CONTENT'] = file_get_contents(PATH_TEMP.$tour.'.jpg');
+					imagedestroy($im_src);
+					imagedestroy($im_dst);
+					@unlink(PATH_TEMP.$tour.'.jpg');
+				}
+			}
+			break;
+
+		case 'stats__display_stats':
+			switch($_POST['p']) {
+				case 'm':
+					$tab_pattern = array('#P#', '#N#');
+					$tab_replace = array('m', 6);
+					$params_dico = '';
+					break;
+
+				case 'w':
+					$tab_pattern = array('#P#', '#N#');
+					$tab_replace = array('w', 3);
+					$params_dico = '&text_this_week='.urlencode($dico['service_stats']['this_week']).'&text_last_week='.urlencode($dico['service_stats']['last_week']).'&text_weeks_ago='.urlencode($dico['service_stats']['weeks_ago']);
+					break;
+				default:
+					$tab_pattern = array('#P#', '#N#');
+					$tab_replace = array('d', 7);
+					$params_dico = '';
+					break;
+			}
+			$params_dico .= '&text_please_wait='.urlencode($dico['common']['please_wait']);
+			$tab_pattern[] = '#TOUR#';
+			$tab_pattern[] = '#TYPE#';
+			$tab_replace[] = $tour;
+			if($_POST['type']=='hbar') $tab_replace[] = 'hbar';
+			else $tab_replace[] = 'line';
+
+			$url_swf_data  = str_replace($tab_pattern, $tab_replace, URL_DATA_STATS).$params_dico;
+			
+			$swf_w = (int)$_POST['swf_w'];
+			$swf_h = (int)$_POST['swf_h'];
+			if(!is_numeric($swf_w) || !is_numeric($swf_h)) {
+				$swf_w = 510;
+				$swf_h = 180;
+			}
+
+?>
+<object id="stats_<?=$_POST['type']?>" type="application/x-shockwave-flash" style="margin: 0px auto; width: <?=$swf_w?>px; height: <?=$swf_h?>px; display: block;" data="<?=URL_SWF_STATS?>">
+ <param name="movie" value="<?=URL_SWF_STATS?>"">
+ <param name="allowfullscreen" value="true">
+ <param name="allowScriptAccess" value="always">
+ <param name="quality" value="high">
+ <param name="wmode" value="transparent">
+ <param name="flashvars" value="data-file=<?=urlencode($url_swf_data)?>&loading=<?=urlencode($dico['common']['loading'])?>">
+</object>
+<?php
+			break;
+
+
+		// service email
+		case 'email__send_email':
+			// http://dev.www.previsite.net/partners/new/show_service.php?tour=7BD6E19B-91C4-6AE3-7504-72950F2BCB7B&ajax_req=send_email&service=email
+
+			$url = $global['url_tour'];
+			$template = (int)$_REQUEST['tpl'];
+			$html_email = '';
+
+			$emailto   = $_POST['emailto'];
+			$emailfrom = $_POST['emailfrom'];
+			$subject   = $_POST['subject'];
+			$message   = $_POST['message'];
+
+			if(false && SERVER_DEV && NEW_INTEGRATION && $template>=1 && $template<=3) {
+				require_once 'HTML/Template/IT.php';
+				$tab_user = get_user_infos($_SESSION['ID_UTILISATEUR']);
+				$tab_images = get_image_list_light($tour);
+				
+				if(!isset($_SESSION['OPTIONS']['LOGOEQUALHOUSING'])) {
+					$_SESSION['OPTIONS']['LOGOEQUALHOUSING'] = get_other_option($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_UTILISATEUR'], $_SESSION['PARTNER'], 'OPTION_DIFFUSION', 'LOGOEQUALHOUSING');
+				}
+
+				if($template==3) $size_logo = 'crop_100x140';
+				else			 $size_logo = 'crop_60x80';
+
+				if($template==2) {
+					$size_main_img = 'crop_598x337,display_play';
+					$size_thumb = 'crop_190x76';
+				} else {
+					$size_main_img = 'crop_394x221,display_play';
+					$size_thumb = 'crop_195x77';
+				}
+
+				if(is_guid($_SESSION['OPTIONS']['IDLOGOUSER'])) {
+					$ext = empty($_SESSION['OPTIONS']['IDLOGOUSEREXT']) ? 'jpg' : $_SESSION['OPTIONS']['IDLOGOUSEREXT'];
+					$url_logo = str_replace($tab_pattern_media, array($_SESSION['OPTIONS']['IDLOGOUSER'], 'user', $ext, $size_logo), URL_MEDIA);
+				} else {
+					$url_logo = '';
+				}
+
+				if((int)$tab_tour['ID_TEMPLATE']==21) {
+					require_once '../../include/fonction.db.usform.php';
+					$tab_tour_adv = get_tour_details_us($tour);
+				} else {
+					require_once '../../include/fonction.db.euform.php';
+					$tab_tour_adv = get_tour_details_eu($tour);
+				}
+
+				if($template==3)	  $tpl_file = 'tpl-3.html';
+				else if($template==2) $tpl_file = 'tpl-2.html';
+				else				  $tpl_file = 'tpl-1.html';
+
+				$tpl = new HTML_Template_IT('templates/postcards/');
+				$tpl->loadTemplatefile($tpl_file, true, true);
+
+				$tab_embed_storage   = array();
+				if(!empty($url_logo) && $tpl->setCurrentBlock('PHOTO_AGENT')) {
+					$tpl->setVariable('url_photo_agent', 'cid:'.strtolower(str_replace('-', '', $_SESSION['OPTIONS']['IDLOGOUSER'])));
+					$tab_embed_storage[] = array('CID' => strtolower(str_replace('-', '', $_SESSION['OPTIONS']['IDLOGOUSER'])), 'SRC' => $url_logo, 'MIME' => 'image/jpg');
+				}
+
+				$tpl->setVariable('email_title', $subject);
+				$tpl->setVariable('agent_name', trim($tab_user['PRENOM_UTILISATEUR'].' '.$tab_user['NOM_UTILISATEUR']));
+				$tpl->setVariable('company_name', $tab_user['NOM_SOCIETE']);
+				$tpl->setVariable('company_phone', $tab_user['TELEPHONE_SOCIETE']);
+
+				if(!empty($_SESSION['OPTIONS']['LOGOEQUALHOUSING']) && $tpl->setCurrentBlock('LOGO_EQUALHOUSING')) {
+					$tpl->setVariable('img_equalhousing', 'cid:equalhousing_jpg');
+				}
+
+				//url_first_image
+				$url_image = str_replace($tab_pattern_media, array($tab_images[0], 'thumb', 'jpg', $size_main_img), URL_MEDIA);
+
+				$tpl->setVariable('url_main_image', 'cid:'.strtolower(str_replace('-', '', $tab_images[0])));
+
+				$tab_embed_storage[] = array('CID' => strtolower(str_replace('-', '', $tab_images[0])), 'SRC' => $url_image, 'MIME' => 'image/jpg');
+
+				$tpl->setVariable('url_tour', $global['url_tour']);
+
+				//url others
+				for($i=1; $i<=8; $i++) {
+					if(isset($tab_images[$i]) && $tpl->setCurrentBlock('THUMB_'.$i)) {
+						$url_image = str_replace($tab_pattern_media, array($tab_images[$i], 'thumb', 'jpg', $size_thumb), URL_MEDIA);
+						$url_start_image = $global['url_tour'];
+						if(strpos($url_start_image, '?') !== false) $url_start_image .= '&image='.$tab_images[$i];
+						else										$url_start_image .= '?image='.$tab_images[$i];
+
+						$tpl->setVariable('url_thumb'.$i, 'cid:'.strtolower(str_replace('-', '', $tab_images[$i])));
+
+						$tab_embed_storage[] = array('CID' => strtolower(str_replace('-', '', $tab_images[$i])), 'SRC' => $url_image, 'MIME' => 'image/jpg');
+
+						$tpl->setVariable('link_thumb'.$i, $url_start_image);
+					}
+				}
+
+				if(isset($tab_images[$i])) $url_more = strpos($global['url_tour'], '?')!==false ? $global['url_tour'].'&image='.$tab_images[$i] : $global['url_tour'].'?image='.$tab_images[$i];
+				else					   $url_more = $global['url_tour'];
+				$tpl->setVariable('url_more_images', $url_more);
+
+				if(!empty($tab_tour['NOM_VISITE'])) $tpl->setVariable('property_name', $tab_tour['NOM_VISITE']);
+				else								$tpl->setVariable('property_name', $tab_tour['REF_VISITE']);
+				
+				if(mb_strlen($tab_tour['DESCRIPTION']) > 500) $tab_tour['DESCRIPTION'] = mb_strcut($tab_tour['DESCRIPTION'], 0, 500);
+
+				if(strlen($tab_tour['DESCRIPTION'])>0 && $tpl->setCurrentBlock('PROPERTY_DESCRIPTION')) {
+					$tpl->setVariable('property_desc', $tab_tour['DESCRIPTION']);
+				}
+				$tab_addr = array();
+
+				if(!empty($tab_tour['ADRESSE']))	 $tab_addr[] = $tab_tour['ADRESSE'];
+				if(!empty($tab_tour['CODE_POSTAL'])) $tab_addr[] = $tab_tour['CODE_POSTAL'];
+				if(!empty($tab_tour['VILLE']))	   $tab_addr[] = $tab_tour['VILLE'];
+
+				if(count($tab_addr)>0 && $tpl->setCurrentBlock('TITLE_PROPERTY_ADDRESS')) {
+					$tpl->setVariable('property_address', implode(' ', $tab_addr));
+				}
+				$tpl->setVariable('viewer_color', '#'.str_replace('#', '', $_SESSION['OPTIONS']['VIEWERBGCOLOR']));
+				
+				if($tpl->setCurrentBlock('PROPERTY_SUMMARY')) {
+					if(!empty($tab_tour_adv['NOMBRE_CHAMBRE']) && $tpl->setCurrentBlock('TITLE_BEDROOMS')) {
+						$tpl->setVariable('label_bedrooms', 'Be.');
+						$tpl->setVariable('nb_bedrooms', $tab_tour_adv['NOMBRE_CHAMBRE']);
+					}
+
+					if(!empty($tab_tour_adv['NOMBRE_SALLE_BAIN']) && $tpl->setCurrentBlock('TITLE_BATHROOMS')) {
+						$tpl->setVariable('label_bathrooms', 'Ba.');
+						$tpl->setVariable('nb_bathrooms', $tab_tour_adv['NOMBRE_SALLE_BAIN']);
+					}
+
+					$area_unit = '';
+					$area_field_unit = '';
+					if(isset($tab_tour_adv['SURFACE_HABITABLE'])) {
+						if(empty($_SESSION['LIST_AREA_UNIT'])) $_SESSION['LIST_AREA_UNIT'] = get_area_unit_list();
+						$tab_units = $_SESSION['LIST_AREA_UNIT'];
+						$nb_units  = count($tab_units);
+						for($i=0; (empty($area_unit)||empty($area_field_unit)) && $i<$nb_units; $i++) {
+							if($tab_tour_adv['ID_UNITE_SURFACE_HABITABLE']==$tab_units[$i]['ID_UNITE_SURFACE']) $area_unit = $tab_units[$i]['NOM_UNITE_SURFACE'];
+							if($tab_tour_adv['ID_UNITE_SURFACE_TERRAIN']==$tab_units[$i]['ID_UNITE_SURFACE']) $area_field_unit = $tab_units[$i]['NOM_UNITE_SURFACE'];
+						}
+						$area = $tab_tour_adv['SURFACE_HABITABLE'];
+					} else {
+						$area = $tab_tour_adv['ESPACE_UTILE'];
+						$area_unit = 'sqft';
+					}
+
+					if(!empty($area) && $tpl->setCurrentBlock('TITLE_AREA')) {
+						$tpl->setVariable('surface_area', $area);
+						$tpl->setVariable('surface_unit', $area_unit);
+					}
+				}
+
+				if(!empty($tab_tour['PRIX_BIEN'])) {
+					if(empty($_SESSION['LIST_CURRENCY'])) $_SESSION['LIST_CURRENCY'] = get_currency_list();
+					$tab_currency = $_SESSION['LIST_CURRENCY'];
+					$symbole = '';
+
+					for($i=0; empty($symbole) && $i<count($tab_currency); $i++) {
+						$symbole = $tab_currency[$i]['REF_DEVISE']==$tab_tour['REF_DEVISE'] ? $tab_tour['SYMBOLEBRUT_DEVISE'] : '';
+					}
+
+					$price = display_int_price($intl, $tab_tour['PRIX_BIEN'], $tab_tour['REF_DEVISE'], $symbole);
+					$tpl->setVariable('property_price', $price);
+				}
+
+				// details sous forme de grille
+				$tab_details = array();
+
+				if(empty($_SESSION['LIST_TYPE_BIEN'])) $_SESSION['LIST_TYPE_BIEN'] = get_type_bien_list($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_LANGUE']);
+				$tab_biens = $_SESSION['LIST_TYPE_BIEN'];
+				$nb = count($tab_biens);
+				$label_bien = '';
+				for($i=0; empty($label_bien) && $i<$nb; $i++) {
+					if($tab_tour_adv['ID_TYPE_BIEN']==$tab_biens[$i]['ID_TYPE_BIEN']) {
+						$label_bien = $tab_biens[$i]['NOM_TYPE_BIEN'];
+					}
+				}
+
+				// champs format textes
+				if(!empty($label_bien)) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_type_bien'], 'VALUE' => $label_bien);
+				if(!empty($tab_tour_adv['NOMBRE_PIECE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_nb_rooms'], 'VALUE' => $tab_tour_adv['NOMBRE_PIECE']);
+				if(!empty($tab_tour_adv['ESPACE_UTILE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_sqft'], 'VALUE' => $tab_tour_adv['ESPACE_UTILE']);
+				if(!empty($tab_tour_adv['SURFACE_HABITABLE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_space'], 'VALUE' => $tab_tour_adv['SURFACE_HABITABLE'].$area_unit);
+				if(!empty($tab_tour_adv['SURFACE_TERRAIN'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_area_field'], 'VALUE' => $tab_tour_adv['SURFACE_TERRAIN'].$area_field_unit);
+				if(!empty($tab_tour_adv['TAILLE_LOT_ACRES'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_lot_size'], 'VALUE' => $tab_tour_adv['TAILLE_LOT_ACRES']);
+				if(!empty($tab_tour_adv['NOMBRE_CHAMBRE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_nb_br'], 'VALUE' => $tab_tour_adv['NOMBRE_CHAMBRE']);
+				if(!empty($tab_tour_adv['NOMBRE_SALLE_BAIN'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_nb_ba'], 'VALUE' => $tab_tour_adv['NOMBRE_SALLE_BAIN']);
+				if(!empty($tab_tour_adv['NOMBRE_DEMI_SALLE_BAIN'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_nb_hba'], 'VALUE' => $tab_tour_adv['NOMBRE_DEMI_SALLE_BAIN']);
+				if(!empty($tab_tour_adv['ANNEE_CONSTRUCTION'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_year_built'], 'VALUE' => $tab_tour_adv['ANNEE_CONSTRUCTION']);
+				if(!empty($price)) $tab_details[] = array('LABEL' => $dico['edit_tour']['field_price'], 'VALUE' => $price);
+
+				// champs format checkbox
+				$html_yes = '<img src="cid:yes_jpg" alt="" border="0" />';
+				if(!empty($tab_tour_adv['ID_BIEN_AMENAGE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['furnished'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_IMMEUBLE_RECENT'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['recent'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_TRAVAUX'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['need_work'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_DIGICODE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['digicode'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_INTERPHONE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['interphone'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_ASCENSEUR'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['elevator'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_GARDIEN'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['guard'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_CAVE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['cave'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_INTERNET_HAUT_DEBIT'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['internet_hd'], 'VALUE' => $html_yes);
+				if(!empty($tab_tour_adv['ID_EXCLUSIVITE'])) $tab_details[] = array('LABEL' => $dico['edit_tour']['exclusive'], 'VALUE' => $html_yes);
+
+				$nb = count($tab_details);
+				if($nb>1) {
+					if($tpl->setCurrentBlock('BLOCK_DETAIL_LEFT')) {
+						for($i=0; $i<$nb; $i+=2) {
+							$tpl->setVariable('detail_label', $tab_details[$i]['LABEL']);
+							$tpl->setVariable('detail_value', $tab_details[$i]['VALUE']);
+							$tpl->parseCurrentBlock();
+						}
+					}
+
+					if($tpl->setCurrentBlock('BLOCK_DETAIL_RIGHT')) {
+						for($i=1; $i<$nb; $i+=2) {
+							$tpl->setVariable('detail_label', $tab_details[$i]['LABEL']);
+							$tpl->setVariable('detail_value', $tab_details[$i]['VALUE']);
+							$tpl->parseCurrentBlock();
+						}
+					}
+				}
+
+				$html_email = $tpl->get();
+
+				$tab_embed   = array();
+				$tab_embed[] = array('CID' => 'spacer_gif',	   'SRC' => 'spacer.gif',	   'MIME' => 'image/gif');
+				if(strpos($html_email, 'cid:previsite_jpg')!==false)    $tab_embed[] = array('CID' => 'previsite_jpg',	'SRC' => 'previsite.jpg',	'MIME' => 'image/jpg');
+				if(strpos($html_email, 'cid:equalhousing_jpg')!==false) $tab_embed[] = array('CID' => 'equalhousing_jpg', 'SRC' => 'equalhousing.jpg', 'MIME' => 'image/jpg');
+				if(strpos($html_email, 'cid:yes_jpg')!==false)          $tab_embed[] = array('CID' => 'yes_jpg',		  'SRC' => 'yes.jpg',		  'MIME' => 'image/jpg');
+				if(strpos($html_email, 'cid:top_jpg')!==false)          $tab_embed[] = array('CID' => 'top_jpg',		  'SRC' => 'top.jpg',		  'MIME' => 'image/jpg');
+				if(strpos($html_email, 'cid:top_full_jpg')!==false)     $tab_embed[] = array('CID' => 'top_full_jpg',	 'SRC' => 'top_full.jpg',	 'MIME' => 'image/jpg');
+				if(strpos($html_email, 'cid:top_half_png')!==false)     $tab_embed[] = array('CID' => 'top_half_png',	 'SRC' => 'top_half.png',	 'MIME' => 'image/png');
+				if(strpos($html_email, 'cid:top_third_png')!==false)    $tab_embed[] = array('CID' => 'top_third_png',	'SRC' => 'top_third.png',	'MIME' => 'image/png');
+				if(strpos($html_email, 'cid:btn_more_jpg')!==false)     $tab_embed[] = array('CID' => 'btn_more_jpg',	 'SRC' => 'btn_more.jpg',	 'MIME' => 'image/jpg');
+				if(strpos($html_email, 'cid:bottom_jpg')!==false)       $tab_embed[] = array('CID' => 'bottom_jpg',	   'SRC' => 'bottom.jpg',	   'MIME' => 'image/jpg');
+				if(strpos($html_email, 'cid:bottom_third_jpg')!==false) $tab_embed[] = array('CID' => 'bottom_third_jpg', 'SRC' => 'bottom_third.jpg', 'MIME' => 'image/jpg');
+			}
+
+			if(preg_match(REGEX_EMAIL, $emailfrom) && preg_match(REGEX_EMAIL, $emailto)) {
+				require_once 'phpmailer/class.phpmailer.php';
+
+				$content = @file_get_contents(PATH_EMAIL_TPL.'email.html');
+				if(strpos($message, $url) === false) {
+					$tab_pattern = array('#MESSAGE#', '#SUBJECT#', '#URL#');
+					$tab_replace = array($message, $subject, $url);
+					$content	 = str_replace($tab_pattern, $tab_replace, $content);
+				} else {
+					$start_div   = '<div style="text-align:center;padding:1em;background-color:#fff;color:#1f364e;font-weight:normal;"><a style="text-decoration:underline;color:#1f364e;" href="'.$url.'">';
+					$tab_pattern = array('#MESSAGE#', '#SUBJECT#', $url);
+					$tab_replace = array(str_replace($url, $start_div.$url.'</a></div>', $message), $subject, $url);
+					$content	 = str_replace($tab_pattern, $tab_replace, $content);
+					$content	 = str_replace('<div style="text-align:center;padding:1em;background-color:#fff;color:#1f364e;font-weight:normal;"><a style="text-decoration:underline;color:#1f364e;" href="#URL#">#URL#</a></div>', '', $content);
+				}
+
+				$phpmail = new PHPMailer();
+				$phpmail->IsSMTP();
+				$phpmail->IsHTML(true);
+				$phpmail->Host	  = SMTP_PREVISITEMAIL;
+				$phpmail->From	  = $emailfrom;
+				$phpmail->FromName  = trim($_SESSION['NOM_UTILISATEUR'].' '.$_SESSION['PRENOM_UTILISATEUR']);
+				$phpmail->Subject   = $subject;
+
+				if(!empty($tab_embed)) {
+					foreach($tab_embed as $embed) {
+						$phpmail->AddEmbeddedImage('images/postcard/'.$embed['SRC'], $embed['CID'], $embed['SRC'], 'base64', $embed['MIME']);
+					}
+					foreach($tab_embed_storage as $embed) {
+						$tmp = PATH_TEMP.basename($embed['CID'].'.jpg');
+						if(strpos($html_email, $embed['CID']) !== false) {
+							@file_put_contents($tmp, @file_get_contents($embed['SRC']));
+							$phpmail->AddEmbeddedImage($tmp, $embed['CID'], basename($tmp), 'base64', $embed['MIME']);
+						}
+					}
+				}
+
+				if(!empty($html_email)) $phpmail->Body = $html_email;
+				else					$phpmail->Body = $content;
+
+				$phpmail->AddAddress($emailto);
+
+				if($phpmail->Send()) {
+					$tab_leads = array();
+					$tab_leads['REF_LEAD'] = "'EMAIL_SOFTWARE'";
+					$tab_leads['EMAIL_SOURCE'] = "'".fix_text($emailfrom,100)."'";
+					$tab_leads['EMAIL_DESTINATION'] = "'".fix_text($emailto,100)."'";
+					$tab_leads['COMMENTAIRE'] = "N'".fix_text($subject,2000)."'";
+					insert_lead($_SESSION['ID_UTILISATEUR'], $tour, $tab_leads);
+					echo 'true';
+				}
+			} else {
+				echo 'false';
+			}
+			if(!empty($tab_embed_storage)) {
+				foreach($tab_embed_storage as $embed) {
+					$tmp = PATH_TEMP.$embed['CID'].'.jpg';
+					if(is_file($tmp)) {
+						unlink($tmp);
+					}
+				}
+			}
+			usleep(50000);
+			break;
+
+
+		case 'mobile__show_qrcode':
+?>
+<div>
+ <a href="#" class="float_r alertbox_close_link" onclick="return closeAlertBox();">x</a>
+ <div class="clear_sep"></div>
+</div>
+<div class="div_qrcode_full td_c">
+ <img src="<?=$url_qrcode_full?>" class="flashcode_img_full" alt="" />
+</div>
+<div>
+<?php
+			if(SERVER_DEV) {
+?>
+<div class="navigation_btn">
+  <span class="btn float_l" onclick="window.print();">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['print']?></a></span>
+  </span>
+  <span class="btn float_r" onclick="return closeAlertBox();">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['cancel']?></a></span>
+  </span>
+ <div class="clear_sep"></div>
+</div>
+</div>
+
+<?php
+			}
+			break;
+
+
+		case 'mobile__show_mstag':
+?>
+<div>
+ <a href="#" class="float_r alertbox_close_link" onclick="return closeAlertBox();">x</a>
+ <div class="clear_sep"></div>
+</div>
+<div class="div_qrcode_full td_c">
+ <img src="<?=$url_mstag_full?>" class="flashcode_img_full" alt="" />
+</div>
+<div>
+<?php
+			if(SERVER_DEV) {
+?>
+<div class="navigation_btn">
+  <span class="btn float_l" onclick="window.print();">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['print']?></a></span>
+  </span>
+  <span class="btn float_r" onclick="return closeAlertBox();">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['cancel']?></a></span>
+  </span>
+ <div class="clear_sep"></div>
+</div>
+</div>
+
+<?php
+			}
+			break;
+
+
+		// service mobile
+		case 'mobile__preview_video':
+			$tab_video = get_video_tour($tour, $_SESSION['OPTIONS']['PROFILVIDEO']);
+			$url_video = str_replace(array('%ID%', '%EXT%'), array($tab_video['ID_VIDEO'], 'mp4'), URL_VIDEO);
+			
+			$flashvars  = 'file='.urlencode($url_video);
+			$flashvars .= '&stretching=exactfit';
+			$flashvars .= '&controlbar=none';
+			$flashvars .= '&autostart=true';
+			$flashvars .= '&height=164';
+			$flashvars .= '&provider=video';
+?>
+<object id="flv_player" type="application/x-shockwave-flash" data="<?=URL_FLV_PLAYER?>" style="width:246px; height:164px; display: block; margin: 0px auto;">
+ <param name="movie" value="<?=URL_FLV_PLAYER?>" />
+ <param name="allowfullscreen" value="true" />
+ <param name="allowscriptaccess" value="true" />
+ <param name="wmode" value="transparent" />
+ <param name="flashvars" value="<?=$flashvars?>" />
+</object>
+<?php
+			break;
+
+		case 'mobile__download_video':
+			$tab_video = get_video_tour($tour, $_SESSION['OPTIONS']['PROFILVIDEO']);
+			$url_video = str_replace(array('%ID%', '%EXT%'), array($tab_video['ID_VIDEO'], 'mp4'), URL_VIDEO);
+
+			$data = @file_get_contents($url_video);
+			if(!empty($data)) {
+				$download_name = !empty($tab_tour['NOM_VISITE']) ? $tab_tour['NOM_VISITE'] : $tab_tour['REF_VISITE'];
+				$download_name = preg_replace('/[^0-9a-z-_]+/i', '-', $download_name);
+				if(USER_IL) {
+					header('Content-Type: video/mpg');
+					$download_name .= '.mpg';
+				} else {
+					header('Content-Type: video/mp4');
+					$download_name .= '.mp4';
+				}
+				header('Content-Length: '.mb_strlen($data));
+				header('Content-Disposition: attachment; filename="'.$download_name.'"');
+				echo $data;
+			}
+			break;
+
+		case 'mobile__update_remaining_credits':
+			if($tab_credits['ACCESS']) {
+				$output = 'true#'.str_replace(array('%CREDITS%', '%LINK_SHOP%'), array('<strong>'.$tab_credits['CREDITS'].'</strong>', $url_reload), $dico['service_mobile']['text_send_sms_credit_left']);
+			} else {
+				$output = 'false#'.str_replace('%LINK_SHOP%', $url_reload, $dico['service_mobile']['text_send_sms_credit_none']);
+			}
+			echo $output;
+			break;
+
+		case 'sound__check_generation_status':
+			echo $is_tts ? 'true' : 'false';
+			break;
+
+		case 'sound__generate_voice':
+			$voice = strtolower($_POST['voice']);
+			$text  = $_POST['text'];
+			$lang  = '';
+			$is_background = !empty($_POST['bg']);
+
+			$need_update  = $text != $tab_tour['DESCRIPTION_VIDEO'];
+			$need_update |= $voice != strtolower($tab_tour['REF_VOICE']);
+
+			if($need_update) {
+
+				// recup langue de la voix
+				foreach($tab_voices as $language => $voices) {
+					if(empty($lang) && strpos(strtolower(implode(' ', $voices)), $voice)!==false) $lang = $language;
+				}
+
+				$url_tts = str_replace(
+					array('%TOUR%', '%DESC%', '%LANG%', '%VOICE%'),
+					array($tour, urlencode($text), urlencode($lang), urlencode($voice)),
+					URL_GENERATE_TTS
+				);
+
+				if($is_background) {
+
+					$tab_field_tour = array(
+						array("NAME"=>"REF_VOICE", "VALUE"=>"'".fix_text($voice)."'"),
+//						array("NAME"=>"DESCRIPTION_VIDEO", "VALUE"=>"N'".fix_text($text, 4000)."'"),
+						array("NAME"=>"TYPE_SON", "VALUE"=>"'WAIT'")
+					);
+					update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+
+					$tab_tour_texts = array('DESCRIPTION_VIDEO' => $text);
+					set_tour_texts($tour, null, $tab_tour_texts);
+
+
+					$cmd = 'wget -o /dev/null --spider --background --quiet "'.$url_tts.'"';
+					exec($cmd);
+					usleep(250000);
+				} else {
+					echo file_get_contents($url_tts);
+				}
+			} else {
+				echo 'true';
+			}
+			break;
+
+
+		case 'sound__open_update_confirmation_form':
+			if(false&&NEW_INTEGRATION) {
+?>
+<h2><?=$dico['service_record']['mess_confirm_generation']?></h2>
+<div class="navigation_btn">
+  <span class="btn float_r" style="width: 50px;" onclick="return abortGenerationTTS();">
+	<span class="inner_btn"><a href="#" onclick="return abortGenerationTTS();"><?=$dico['common']['no']?></a></span>
+  </span>
+  <span class="btn float_r" style="width: 50px;" onclick="return confirmGenerationTTS();">
+	<span class="inner_btn"><a href="#" onclick="return confirmGenerationTTS();"><?=$dico['common']['yes']?></a></span>
+  </span>
+  <div class="clear_sep">&nbsp;</div>
+</div>
+<?php
+			} else {
+?>
+<div class="confirm_delete_sound">
+  <p style="float: left; width: 200px; margin: 0px; padding: 0px;"><?=$dico['service_record']['mess_confirm_generation']?></p>
+  <span class="btn" style="float: left; width: 50px; margin: 2px 5px 0px 0px;" onclick="return confirmGenerationTTS();">
+	<span class="inner_btn"><a href="#" onclick="return confirmGenerationTTS();"><?=$dico['common']['yes']?></a></span>
+  </span>
+  <span class="btn" style="float: left; width: 50px; margin: 2px 5px 0px 0px;" onclick="return abortGenerationTTS();">
+	<span class="inner_btn"><a href="#" onclick="return abortGenerationTTS();"><?=$dico['common']['no']?></a></span>
+  </span>
+  <div class="clear_sep">&nbsp;</div>
+</div>
+<?php
+			}
+			break;
+		case 'sound__check_existing_sound':
+			if($mp3_exists) echo 'true';
+			else echo 'false';
+			break;
+
+
+		case 'sound__delete_tts_voice':
+			$url_delete = get_storage_path('delfile', $tour, 'mp3');
+			$mp3_exists = false;
+			$res		= @file_get_contents($url_delete);
+
+			$tab_field_tour = array(
+				array("NAME"=>"REF_VOICE",		 "VALUE"=>"NULL"),
+//				array("NAME"=>"DESCRIPTION_VIDEO", "VALUE"=>"NULL"),
+				array("NAME"=>"TYPE_SON",		  "VALUE"=>"NULL")
+			);
+			update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+
+			$tab_tour_texts = array('DESCRIPTION_VIDEO' => '');
+			set_tour_texts($tour, null, $tab_tour_texts);
+
+			//break; no break : goto next case
+		case 'sound__display_tts_player':
+			$id_mp3 = $tour;
+			//break; no break : goto next case
+		case 'sound__display_mp3_player':
+			$music	  = $_REQUEST['music'];
+			$flashvars  = 'param_bt_champs_play='.urlencode($dico['common']['player_play']);
+			$flashvars .= '&param_bt_champs_stop='.urlencode($dico['common']['player_stop']);
+
+			if($ajax_request=='display_mp3_player' && is_guid($music)) {
+				//$flashvars .= '&param_MP3url='.urlencode(str_replace('#ID#', $music, URL_MP3));
+				$flashvars .= '&param_MP3url='.urlencode(str_replace('%ID%', $music, URL_MUSIC));
+				$flashvars .= '&param_fc_trash=deleteBackgroundMusic';
+			} else if($ajax_request!='display_mp3_player') {
+
+				if(TEMPLATE_CUSH) $function_generation = 'displaySoundCushwakeDisclaimer';
+				else $function_generation = 'checkExistingSound';
+
+				if($mp3_exists && is_guid($id_mp3)) {
+					$flashvars .= '&param_MP3url='.urlencode(str_replace('#ID#', $id_mp3, URL_MP3).'?rand='.rand(1000, 9999));
+					$flashvars .= '&param_fc_trash=deleteTTS&param_fc_trad='.$function_generation.'&param_bt_champs_translate='.urlencode(strtolower($dico['common']['save']));
+					$flashvars .= '&param_bt_champs_translate_wait='.urlencode($dico['common']['please_wait']);
+				} else if($ajax_request != 'display_mp3_player') {
+					$flashvars .= '&param_fc_trad='.$function_generation.'&param_bt_champs_translate='.urlencode($dico['common']['generate']);
+					$flashvars .= '&param_bt_champs_translate_wait='.urlencode($dico['common']['please_wait']);
+				}
+			}
+
+			$last = @filemtime('../../swf/'.basename(URL_SOUND_PLAYER));
+			$url_swf = URL_SOUND_PLAYER.'?'.$last;
+
+?>
+<object id="mp3player_music" type="application/x-shockwave-flash" style="width:450px; height:40px; display: block; margin: 0px auto;" data="<?=$url_swf?>">
+ <param name="movie" value="<?=$url_swf?>" />
+ <param name="allowfullscreen" value="true" />
+ <param name="allowScriptAccess" value="always" />
+ <param name="quality" value="high" />
+ <param name="wmode" value="transparent" />
+ <param name="flashvars" value="<?=$flashvars?>" />
+</object>
+<?php
+			break;
+
+
+		case 'sound__display_recorder_update':
+			$tab_field_tour = array(
+				array("NAME"=>"REF_VOICE","VALUE"=>"NULL"),
+//				array("NAME"=>"DESCRIPTION_VIDEO","VALUE"=>"NULL")
+			);
+
+			if($_POST['todo']=='delete') {
+				$url_delete = get_storage_path('delfile', $tour, 'mp3');
+				$res		= @file_get_contents($url_delete);
+				$mp3_exists = false;
+				$tab_field_tour[] = array("NAME"=>"TYPE_SON","VALUE"=>"NULL");
+			} else {
+				sleep(5);
+				// recorder
+				$tab_field_tour[] = array("NAME"=>"TYPE_SON","VALUE"=>"'REC'");
+			}
+
+			update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+
+			$tab_tour_texts = array('DESCRIPTION_VIDEO' => null);
+			set_tour_texts($tour, null, $tab_tour_texts);
+
+//			set_tour_data_complement($tour, $_SESSION['ID_DISTRIBUTEUR'], $tab_data);
+			//break; no break : goto next case
+		case 'sound__display_recorder':
+//			if($mp3_exists) {
+//				if(!isset($tab_tour['CPT'])) $tab_tour['CPT'] = get_tour_data_complement($tour,$_SESSION['ID_UTILISATEUR']);
+//			}
+
+			$flashvars  = 'param_statustext=alerte&param_fc_trash=deleteRecordedSound';
+			$flashvars .= '&param_bt_champs_play='.urlencode($dico['common']['player_play']);
+			$flashvars .= '&param_bt_champs_rec='.urlencode($dico['common']['player_record']);
+			$flashvars .= '&param_bt_champs_stop='.urlencode($dico['common']['player_stop']);
+			$flashvars .= '&param_bt_champs_rec_wait='.urlencode($dico['common']['please_wait']);
+			$flashvars .= '&param_domainURL='.urlencode(URL_RED5);
+			$flashvars .= '&param_fileUrl='.urlencode(date('YmdHis').'_'.$tour);
+			$flashvars .= '&param_fc_stopstream=endRecording';
+			$flashvars .= '&param_mc_alerte_champs='.urlencode($dico['service_record']['mess_confirm_generation']);
+			$flashvars .= '&param_mc_alerte_bt_yes='.urlencode($dico['common']['yes']);
+			$flashvars .= '&param_mc_alerte_bt_no='.urlencode($dico['common']['no']);
+
+			if($mp3_exists && $is_recorder) {
+				$flashvars .= '&param_MP3url='.urlencode(str_replace('#ID#', $tour, URL_MP3).'?rand='.rand(1000, 9999));
+			}
+
+			$last = @filemtime('../../swf/'.basename(URL_SOUND_RECORDER));
+			$url_swf = URL_SOUND_RECORDER.'?'.$last;
+?>
+<object id="mp3player_music" type="application/x-shockwave-flash" style="width:460px; height:140px; display: block; margin: 0px auto;" data="<?=$url_swf?>">
+ <param name="movie" value="<?=$url_swf?>" />
+ <param name="allowfullscreen" value="true" />
+ <param name="allowScriptAccess" value="always" />
+ <param name="quality" value="high" />
+ <param name="wmode" value="transparent" />
+ <param name="flashvars" value="<?=$flashvars?>"/>
+</object>
+<?php
+			break;
+
+
+		case 'sound__refresh_music_list_update':
+			$id_musique = $_POST['music'];
+			$tab_field_tour = array();
+			if(is_guid($id_musique)) {
+				$tab_field_tour[] = array("NAME"=>"ID_MUSIQUE_VIDEO","VALUE"=>"'".$id_musique."'");
+			} else {
+				$tab_field_tour[] = array("NAME"=>"ID_MUSIQUE_VIDEO","VALUE"=>"NULL");
+			}
+			update_tour_data($_SESSION['ID_UTILISATEUR'],$tour,$tab_field_tour);
+			$tab_tour['ID_MUSIQUE_VIDEO'] = $id_musique;
+			//break; no break : goto next case
+
+		case 'sound__refresh_music_list':
+			if(empty($_SESSION['LIST_MUSIC'])) $_SESSION['LIST_MUSIC'] = get_list_music($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_UTILISATEUR']);
+			$tab_music = $_SESSION['LIST_MUSIC'];
+
+			$nb_music  = count($tab_music);
+
+			$width_container = 600 * ceil((float)$nb_music/12);
+
+			if(NEW_INTEGRATION) {
+				$default = is_guid($tab_tour['ID_MUSIQUE_VIDEO']) ? $tab_tour['ID_MUSIQUE_VIDEO'] : $_SESSION['OPTIONS']['DEFAULTBGMUSIC'];
+?>
+<div id="music_list_container" style="width: <?=$width_container?>px;">
+  <div class="music_list_page float_l">
+<?php
+				for($i=0; $i<$nb_music; $i++) {
+					if($i>0 && $i%12==0) {
+?>
+  </div>
+  <div class="music_list_page float_l">
+<?php
+					}
+
+					$class_link = $tab_music[$i]['ID_MUSIQUE_VIDEO'] == $default ? ' music_voice_selected' : '';
+					$nb_rows = $i/3;
+					$class_link .= $nb_rows%2 == 1 ? ' even' : ' odd';
+					$class_link .= ' '.strtolower($tab_music[$i]['TYPE_MUSIQUE_VIDEO']);
+
+?>
+	<a href="#" onclick="return selectBackgroundMusic('<?=$tab_music[$i]['ID_MUSIQUE_VIDEO']?>')" class="float_l row_spaced link_music margin2H<?=$class_link?>" title="<?=$tab_music[$i]['NOM_MUSIQUE_VIDEO']?>"><?=$tab_music[$i]['NOM_MUSIQUE_VIDEO']?></a>
+<?php
+				}
+?>
+  </div>
+  <div class="clear_sep">&nbsp;</div>
+</div>
+<?php
+
+
+
+			} else {
+
+
+
+				for($i=0; $i<$nb_music; $i++) {
+					$class_link = $tab_music[$i]['ID_MUSIQUE_VIDEO'] == $tab_tour['ID_MUSIQUE_VIDEO'] ? 'link_music_voice_selected' : 'link_music_voice';
+?>
+	<a href="#" onclick="return selectBackgroundMusic('<?=$tab_music[$i]['ID_MUSIQUE_VIDEO']?>')" class="float_l row_spaced margin2H <?=$class_link?>" title="<?=$tab_music[$i]['NOM_MUSIQUE_VIDEO']?>"><?=$tab_music[$i]['NOM_MUSIQUE_VIDEO']?></a>
+<?php
+				}
+?>
+<div class="clear_sep">&nbsp;</div>
+<?php
+			}
+			break;
+
+
+		case 'sound__refresh_voice_list':
+			if(empty($_SESSION['LIST_LANGUAGES'])) $_SESSION['LIST_LANGUAGES'] = get_language_list();
+			$tab_lang = $_SESSION['LIST_LANGUAGES'];
+			$nb_lang  = count($tab_lang);
+			
+			if(NEW_INTEGRATION) {
+				$total_voices = 0;
+				foreach($tab_voices as $lang => $voices) {
+					$nb_voices = count($voices);
+					for($i=0; $i<$nb_voices; $i++) {
+
+						// voix default pour nouvelle annonce
+						$selected  = AUTOTTS && !$mp3_exists && strtolower($default_voice)==strtolower($voices[$i]);
+						$selected |= strtolower($tab_tour['REF_VOICE']) == strtolower($voices[$i]);
+
+						$class_link = $selected ? ' music_voice_selected' : '';
+						$language = '';
+						for($j=0; empty($language) && $j<$nb_lang; $j++) {
+							if(strtoupper($lang) == $tab_lang[$j]['ID_LANGUE']) {
+								$language = '&nbsp;('.$tab_lang[$j]['NOM_LANGUE'].')';
+							}
+						}
+
+						$nb_rows = $total_voices/3;
+						$class_link .= $nb_rows%2 == 1 ? ' even' : ' odd';
+						$class_link .= $tab_voices_sex[ $lang ][$i]=='M' ? ' male' : ' female';
+
+						if($total_voices%3==2)	  $class_link .=  ' float_r ';
+						else if($total_voices%3==1) $class_link .=  ' float_l margin2H';
+						else						$class_link .=  ' float_l margin4L';
+						
+						$voice_name = $voices[$i];
+						if(USER_CA && 'margaux'===strtolower($voice_name)) {
+							$voice_name = 'Karine';
+						}
+
+						$total_voices++;
+?>
+  <a href="#" onclick="return selectVoice('<?=$voices[$i]?>')" class="link_voice row_spaced <?=$class_link?>" title="<?=$voices[$i]?>"><?=$voice_name.$language?></a>
+<?php
+					}
+				}
+?>
+  <div class="clear_sep">&nbsp;</div>
+<?php
+
+
+			} else {
+				foreach($tab_voices as $lang => $voices) {
+					$nb_voices = count($voices);
+					for($i=0; $i<$nb_voices; $i++) {
+						$class_link = strtolower($tab_tour['REF_VOICE']) == strtolower($voices[$i]) ? 'link_music_voice_selected' : 'link_music_voice';
+						$language = '';
+						for($j=0; empty($language) && $j<$nb_lang; $j++) {
+							if(strtoupper($lang) == $tab_lang[$j]['ID_LANGUE']) {
+								$language = '&nbsp;('.$tab_lang[$j]['NOM_LANGUE'].')';
+							}
+						}
+
+?>
+<a href="#" onclick="return selectVoice('<?=$voices[$i]?>')" class="<?=$class_link?>" title="<?=$voices[$i]?>"><?=$voices[$i].$language?></a>
+<?php
+					}
+				}
+?>
+<div class="clear_sep">&nbsp;</div>
+<?php
+
+			}
+
+
+
+			break;
+
+
+		default:
+			break;
+	}
+	write_bench();
+	// reponse ajax
+	die();
+}
+
+$output	= $_GET['output'];
+
+
+if($service_name=='leads') {
+	$main_title = "Lead capture";
+	$infobulle_title = "Lead capture";
+	$infobulle_text = "See who has expressed interest in this tour";
+
+	if(NEW_INTEGRATION) $global['html_css'][] = 'service_leads.2010';
+	else				$global['html_css'][] = "<link href=\"".PATH_CSS."service_leads.css?".@filemtime(PATH_CSS.'service_leads.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+
+	$tab_leads = get_tour_leads($tour, $_SESSION['ID_UTILISATEUR']);
+	$nb_tour_leads = count($tab_leads['LEADS']);
+	$nb_all_leads  = count($tab_leads['TOURS']);
+
+	$now = mktime();
+	$next_month = mktime() + 2592000;
+
+	$csv = $dico['common']['date']."\tRef\tService\tContact\r\n";
+
+	for($i=0; $i < $nb_tour_leads; $i++) {
+
+		if(NEW_INTL) {
+			$tab_leads['LEADS'][$i]['DATE'] = datefmt_format($intl['datetime'], strtotime( $tab_leads['LEADS'][$i]['DATE']));
+		} else {
+			$tab_leads['LEADS'][$i]['DATE'] = substr($tab_leads['LEADS'][$i]['DATE'], 0, 16);
+		}
+
+		if($tab_leads['LEADS'][$i]['REF_LEAD']=='EMAIL_FRIEND') {
+			$tab_leads['LEADS'][$i]['CONTACT'] = $tab_leads['LEADS'][$i]['EMAIL_DST'];
+		} else if($tab_leads['LEADS'][$i]['REF_LEAD']=='EMAIL_MYSELF') {
+			$tab_leads['LEADS'][$i]['CONTACT'] = $tab_leads['LEADS'][$i]['EMAIL_DST'];
+		} else if($tab_leads['LEADS'][$i]['REF_LEAD']=='EMAIL_AGENT') {
+			$tab_leads['LEADS'][$i]['CONTACT'] = 'from '.$tab_leads['LEADS'][$i]['EMAIL_SRC'];
+		} else if($tab_leads['LEADS'][$i]['REF_LEAD'] == 'SEND_SMS') {
+			$tab_leads['LEADS'][$i]['CONTACT'] = trim($tab_leads['LEADS'][$i]['NOM_INTERNAUTE'].' '.$tab_leads['LEADS'][$i]['PRENOM_INTERNAUTE']);
+			$tab_leads['LEADS'][$i]['CONTACT'] = trim($tab_leads['LEADS'][$i]['CONTACT'].' '.$tab_leads['LEADS'][$i]['TEL']);
+		} else if($tab_leads['LEADS'][$i]['REF_LEAD'] == 'EMAIL_RESTRICTION') {
+			$tab_leads['LEADS'][$i]['CONTACT'] = trim($tab_leads['LEADS'][$i]['NOM_INTERNAUTE']);
+			$tab_leads['LEADS'][$i]['CONTACT'] = trim($tab_leads['LEADS'][$i]['CONTACT'].' '.$tab_leads['LEADS'][$i]['EMAIL_SRC']);
+			$tab_leads['LEADS'][$i]['CONTACT'] = trim($tab_leads['LEADS'][$i]['CONTACT'].' '.$tab_leads['LEADS'][$i]['TEL']);
+		}
+
+		$csv .= $tab_leads['LEADS'][$i]['DATE']."\t";
+		$csv .= $tab_tour['REF_VISITE']."\t";
+		$csv .= $dico['service_leads'][strtolower($tab_leads['LEADS'][$i]['REF_LEAD'])]."\t";
+		$csv .= $tab_leads['LEADS'][$i]['CONTACT']."\r\n";
+
+		$md5 = md5(rand(1,9).$tab_leads['LEADS'][$i]['DATE'].$tab_leads['LEADS'][$i]['REF_LEAD']);
+		$tab_leads['LEADS'][$i]['MD5'] = $md5;
+
+		if(!isset($_COOKIE['lead'.$md5]) && count($_COOKIE) < 20) {
+			setcookie('lead'.$md5, $now, $next_month, '/', $_SERVER['SERVER_NAME']);
+		}
+	}
+
+	$csv .= "\r\n\r\n";
+	$csv .= $dico['common']['date']."\tRef\tService\tContact\r\n";
+
+	for($i=0; $i<$nb_all_leads; $i++) {
+		$md5 = md5(rand(1,9).$tab_leads['TOURS'][$i]['DATE'].$tab_leads['TOURS'][$i]['REF_LEAD']);
+		$tab_leads['TOURS'][$i]['MD5'] = $md5;
+
+		if(NEW_INTL) {
+			$tab_leads['TOURS'][$i]['DATE'] = datefmt_format($intl['datetime'], strtotime( $tab_leads['TOURS'][$i]['DATE']));
+		} else {
+			$tab_leads['TOURS'][$i]['DATE'] = substr($tab_leads['TOURS'][$i]['DATE'], 0, 16);
+		}
+
+		if($tab_leads['TOURS'][$i]['REF_LEAD']=='EMAIL_FRIEND') {
+			$tab_leads['TOURS'][$i]['CONTACT'] = $tab_leads['TOURS'][$i]['EMAIL_DST'];
+		} else if($tab_leads['TOURS'][$i]['REF_LEAD']=='EMAIL_MYSELF') {
+			$tab_leads['TOURS'][$i]['CONTACT'] = $tab_leads['TOURS'][$i]['EMAIL_DST'];
+		} else if($tab_leads['TOURS'][$i]['REF_LEAD']=='EMAIL_AGENT') {
+			$tab_leads['TOURS'][$i]['CONTACT'] = 'from '.$tab_leads['TOURS'][$i]['EMAIL_SRC'];
+		} else if($tab_leads['TOURS'][$i]['REF_LEAD'] == 'SEND_SMS') {
+			$tab_leads['TOURS'][$i]['CONTACT'] = trim($tab_leads['TOURS'][$i]['NOM_INTERNAUTE'].' '.$tab_leads['TOURS'][$i]['PRENOM_INTERNAUTE']);
+			$tab_leads['TOURS'][$i]['CONTACT'] = trim($tab_leads['TOURS'][$i]['CONTACT'].' '.$tab_leads['TOURS'][$i]['TEL']);
+		} else {
+		}
+		
+		$csv .= substr($tab_leads['TOURS'][$i]['DATE'], 0, 16)."\t";
+		$csv .= $tab_leads['TOURS'][$i]['REF_VISITE']."\t";
+		$csv .= $dico['service_leads'][strtolower($tab_leads['TOURS'][$i]['REF_LEAD'])]."\t";
+		$csv .= $tab_leads['TOURS'][$i]['CONTACT']."\r\n";
+	}
+
+	if($output=='xls') {
+		header('Content-Type: application/x-msexcel; charset=utf-8');
+		header('Content-disposition: attachement; filename="'.preg_replace('/[^a-z0-9-_]+/i', '', $tab_tour['REF_VISITE']).'_leads_'.date('Y-m-d').'.xls"');
+		echo $csv;
+		exit;
+	}
+} else if($service_name=='mobile_history') {
+	$url_get_history = str_replace('#ID#', $tour, URL_SMS_HISTORY);
+	$tab_history = array();
+
+	if(NEW_INTEGRATION) $global['html_css'][] = 'service_sound';
+	else				$global['html_css'][] = "<link href=\"".PATH_CSS."service_sound.css?".@filemtime(PATH_CSS.'service_sound.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+
+	if(($handle = fopen($url_get_history, 'r')) !== false) {
+		while (($data = fgetcsv($handle, 0, ";")) !== false) {
+			if(!empty($data[1])) {
+				$tab_history[] = $data;
+				if(NEW_INTL) {
+					$tab_history[count($tab_history)-1][2] = datefmt_format($intl['datetime'], strtotime($tab_history[count($tab_history)-1][2]));
+				} else {
+					$tab_history[count($tab_history)-1][2] = substr($tab_history[count($tab_history)-1][2], 0, 16);
+				}
+			}
+		}
+		fclose($handle);
+	}
+
+	$nb_history = count($tab_history);
+	if($output=='xls') {
+		$csv = $dico['common']['date']."\t".$dico['common']['to']."\r\n";
+		for($i=0; $i<$nb_history; $i++) {
+			$csv .= $tab_history[$i][2]."\t".$tab_history[$i][1]."\r\n";
+		}
+		header('Content-Type: application/x-msexcel; charset=utf-8');
+		header('Content-disposition: attachement; filename="'.preg_replace('/[^a-z0-9-_]+/i', '', $tab_tour['REF_VISITE']).'_mobile_'.date('Y-m-d').'.xls"');
+		echo $csv;
+		exit;
+	}
+
+	$infobulle_title = $dico['service_mobile']['infobulle_title_history'];
+	$infobulle_text  = $dico['service_mobile']['infobulle_text_history'];
+	$main_title	  = $dico['service_mobile']['infobulle_title_history'];
+} else if($service_name=='mobile') {
+	$global['html_css'][] = 'service_mobile';
+	$global['html_js'][] = 'service_mobile';
+
+	$tab_video = get_video_tour($tour, $_SESSION['OPTIONS']['PROFILVIDEO']);
+
+	if(is_guid($tab_video['ID_VIDEO'])) {
+		$prefix = guid_to_shortcode($tab_video['ID_VIDEO']);
+	} else {
+		$prefix = substr($tour, 0, 8);
+	}
+
+	$url_mobile_tour = str_replace('%ID%', $prefix, URL_MOBILETOUR);
+	
+	$tab_country_phone = get_country_list_phone();
+	$nb_country_phone  = count($tab_country_phone);
+
+	$infobulle_title = $dico['services']['sms_link'];
+	$infobulle_text  = nl2br($dico['service_mobile']['infobulle_text']);
+	$main_title	  = $dico['services']['sms_link'];
+
+	$default_indicatif = 0;
+	$default_country   = '';
+	for($i=0; empty($default_indicatif) &&  empty($default_country) && $i<$nb_country_phone ;$i++) {
+		if($tab_country_phone[$i]['ID_PAYS'] == $_SESSION['ID_PAYS']) {
+			$default_indicatif = '+'.$tab_country_phone[$i]['INDICATIF'];
+			$default_country   = $tab_country_phone[$i]['ID_PAYS'];
+		}
+	}
+
+
+	$tab_country_phones = array(
+		'US' => array('917 338 4619', 'US Only'),
+		'FR' => array('61330', 'France uniquement')
+	);
+	
+	if(empty($_SESSION['COUNTRY_LIST'])) $_SESSION['COUNTRY_LIST'] = get_country_list();
+	$tab_country = $_SESSION['COUNTRY_LIST'];
+	$nb = count($tab_country);
+
+	$html_country_list = array();
+	foreach($tab_country_phones as $key=>$val) {
+		$title = '';
+		$i=0;
+		while(empty($title) && $i<$nb) {
+			if($tab_country[$i]['ID_PAYS']==$key) $title = $tab_country[$i]['NOM_PAYS'];
+			$i++;
+		}
+		$html_country_list[] = '<a href="#" rel="'.$key.'" class="list_country_link flag_'.strtolower($key).'" onclick="return selectCountry(this.rel);">'.$title.'</a>';
+	}
+	$html_country_list = implode("\n", $html_country_list);
+
+
+	$unlimited = (int)$tab_credits['CREDITS']<=0 && strtotime($tab_credits['LIMIT']) >= mktime();
+
+	$video_exists  = !empty($tab_tour['VIDEO']);
+
+	if($unlimited) {
+		if(NEW_INTL) {
+			$date_credits = datefmt_format($intl['date'], strtotime($tab_credits['LIMIT']));
+		} else {
+			$date_credits = date('Y-m-d', strtotime($tab_credits['LIMIT']));
+		}
+		$phrase_credits = str_replace('#DATE#', '<strong>'.$date_credits.'</strong>', $dico['service_mobile']['text_send_sms_credit_unlimited']);
+		$var_js_credits = 'false';
+	} else if($tab_credits['ACCESS']){
+		$phrase_credits = str_replace('#CREDITS#', '<strong>'.$tab_credits['CREDITS'].'</strong>', $dico['service_mobile']['text_send_sms_credit_left']);
+		$phrase_credits = str_replace(array('%CREDITS%', '%LINK_SHOP%'), array('<strong>'.$tab_credits['CREDITS'].'</strong>', $url_reload), $phrase_credits);
+		$var_js_credits = 'true';
+	} else {
+		$var_js_credits = 'false';
+		$phrase_credits = str_replace('%LINK_SHOP%', $url_reload, $dico['service_mobile']['text_send_sms_credit_none']);
+	}
+
+	if(!$tab_credits['ACCESS']) {
+		$btn_select_country = 'return false;';
+		$btn_send_onclick = 'return false;';
+		$btn_send_class = ' btn_deactivated';
+		$btn_row_send_class = ' opa50';
+	} else {
+		$btn_select_country = 'return openSelectIndicatif();';
+		$btn_send_onclick = 'return sendMobile();';
+		$btn_send_class = '';
+		$btn_row_send_class = '';
+	}
+
+	$tab_pattern = array('#START_LINK#', '#END_LINK#');
+	$tab_replace = array('<a href="#" class="link_create_video" onclick="return genereVideo();">', '</a>');
+	$mess_generate = str_replace($tab_pattern, $tab_replace, $dico['service_mobile']['generate_video']);
+
+//	$mess_generate = '';
+
+	if(!$video_exists) {
+		$start_js_function = 'setTimeout(genereVideo, 1000);';
+		$mess_notification = $dico['service_mobile']['generate_video_sending_request'];
+	} else /*if($video_date > $tab_tour['DATE_MODIFICATION_VISITE'])*/ {
+		$start_js_function = 'setTimeout(seeVid, 1000);';
+		$mess_notification = $mess_generate;
+
+//		$tab_pattern = array('#START_LINK#', '#END_LINK#');
+//		$tab_replace = array('<a href="#" class="link_create_video" onclick="return genereVideo();">', '</a>');
+// 		$mess_notification = str_replace($tab_pattern, $tab_replace, $dico['service_mobile']['generate_video']);
+	}
+
+
+} else if($service_name=='sound') {
+	if(NEW_INTEGRATION) {
+		$global['html_css'][] = 'service_sound.2010';
+		$global['html_js'][] = 'service_sound';
+	} else {
+		$global['html_css'][] = "<link href=\"".PATH_CSS."service_sound.css?".@filemtime(PATH_CSS.'service_sound.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+		$global['html_js'][] = "<script language=\"javascript\" type=\"text/javascript\" src=\"".PATH_JS."service_sound.js?".@filemtime(PATH_JS.'service_sound.js')."\"></script>";
+	}
+
+	$infobulle_title = $dico['service_record']['infobulle_title'];
+	$infobulle_text  = $dico['service_record']['infobulle_text'];
+	$main_title	  = $dico['service_record']['main_title'];
+
+	$sound_tts  = $mp3_exists && $is_tts;
+	$sound_tts |= $is_pending;
+	$sound_tts |= !$mp3_exists && AUTOTTS;
+
+	$text_tts = !empty($tab_tour['DESCRIPTION_VIDEO']) ? $tab_tour['DESCRIPTION_VIDEO'] : $tab_tour['DESCRIPTION'];
+
+	$class_link_rec = $class_link_tts = $style_div_rec = $style_div_tts = '';
+
+	if($sound_tts) {
+		$class_link_tts = ' class="active"';
+		$style_div_rec  = ' style="display: none;"';
+		if(NEW_INTEGRATION&&$is_pending) {
+			$javascript_onstart = 'startCheckGeneration';
+			$display_tts_generate = 'display: block;';
+		} else {
+			$javascript_onstart = 'displayTTS';
+			$display_tts_generate = 'display: none;';
+		}
+	} else {
+		$class_link_rec = ' class="active"';
+		$style_div_tts = ' style="display: none;"';
+		$javascript_onstart = 'displayRecorder';
+	}
+
+} else if($service_name=='stats') {
+	$infobulle_title = $dico['services']['stats_link'];
+	$infobulle_text  = $dico['services']['stats_text'];
+	$main_title	  = $dico['services']['stats_link'];
+	
+	if(NEW_INTEGRATION) {
+		$global['html_js'][] = 'service_stats.2010';
+		$global['html_css'][] = 'service_stats.2010';
+	} else {
+		$global['html_js'][] = "<script language=\"javascript\" type=\"text/javascript\" src=\"".PATH_JS."service_stats.js?".@filemtime(PATH_JS.'service_stats.js')."\"></script>";
+		$global['html_css'][] = "<link href=\"".PATH_CSS."service_stats.css?".@filemtime(PATH_CSS.'service_stats.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+	}
+
+	if($output=='xls') {
+		$tab_pattern = array('#TYPE#', '#TOUR#', '#P#', '#N#');
+		$tab_replace = array($_GET['type'], $tour, $_GET['p'], $_GET['n']);
+
+		$url_csv  = str_replace($tab_pattern, $tab_replace, URL_DATA_STATS);
+		$url_csv .= '&output=xls&text_referer='.urlencode($dico['common']['referers']);
+		$url_csv .= '&text_hits='.urlencode($dico['common']['views']);
+		$url_csv .= '&text_date='.urlencode($dico['common']['date']);
+		$url_csv .= '&text_this_week='.urlencode($dico['service_stats']['this_week']);
+		$url_csv .= '&text_last_week='.urlencode($dico['service_stats']['last_week']);
+		$url_csv .= '&text_weeks_ago='.urlencode($dico['service_stats']['weeks_ago']);
+		$url_csv .= '&lang='.urlencode($_SESSION['ID_LANGUE']);
+		$url_csv .= '&timezone='.urlencode($_SESSION['TIMEZONE']);
+
+		header('Content-Type: application/x-msexcel; charset=utf-8');
+		if($_GET['type']=='hbar') {
+			header('Content-disposition: attachement; filename="'.preg_replace('/[^a-z0-9-_]+/i', '', $tab_tour['REF_VISITE']).'_statsreferers_'.date('Y-m-d').'.xls"');
+		} else {
+			header('Content-disposition: attachement; filename="'.preg_replace('/[^a-z0-9-_]+/i', '', $tab_tour['REF_VISITE']).'__statshits__'.date('Y-m-d').'.xls"');
+		}
+		echo @file_get_contents($url_csv);
+		exit;
+	}
+	
+
+	$tab_pattern = array('#P#', '#N#', '#TOUR#',);
+	$tab_replace = array('d', 7, $tour);
+
+
+} else if($service_name=='email_history') {
+	$tab_history = get_email_history($tour);
+	$nb_history  = count($tab_history);
+
+	if(NEW_INTEGRATION) {
+		$global['html_css'][] = 'service_email';
+		$global['html_js'][] = 'service_email';		
+	} else {
+		$global['html_css'][] = "<link href=\"".PATH_CSS."service_email.css?".@filemtime(PATH_CSS.'service_email.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+		$global['html_js'][] = "<script language=\"javascript\" type=\"text/javascript\" src=\"".PATH_JS."service_email.js?".@filemtime(PATH_JS.'service_email.js')."\"></script>";
+	}
+
+	$infobulle_title = $dico['services']['email_link'];
+	$infobulle_text  = $dico['services']['email_text'];
+	$main_title	  = $dico['services']['email_link'];
+
+	for($i=0; $i<$nb_history; $i++) {
+		if(NEW_INTL) {
+			$tab_history[$i]['DATE_LEAD'] = datefmt_format($intl['datetime'], strtotime($tab_history[$i]['DATE_LEAD']));
+		} else {
+			$tab_history[$i]['DATE_LEAD'] = substr($tab_history[$i]['DATE_LEAD'], 0, 16);
+		}
+	}
+
+	if($output=='xls') {
+		$csv = $dico['common']['date']."\tSubject\t".$dico['common']['to']."\r\n";
+
+		for($i=0; $i<$nb_history; $i++) {
+			list($subject, $mess) = explode('#', $tab_history[$i]['COMMENTAIRE']);
+			$csv .= $tab_history[$i]['DATE_LEAD']."\t".$subject."\t".$tab_history[$i]['EMAIL_DESTINATION']."\r\n";
+		}
+		header('Content-Type: application/x-msexcel; charset=utf-8');
+		header('Content-disposition: attachement; filename="'.preg_replace('/[^a-z0-9-_]+/i', '', $tab_tour['REF_VISITE']).'_email_'.date('Y-m-d').'.xls"');
+		echo $csv;
+		exit;
+	}
+} else if($service_name=='email') {
+	// todo : history
+	$tab_user = get_user_infos($_SESSION['ID_UTILISATEUR']);
+
+	if(NEW_INTEGRATION) {
+		$global['html_css'][] = 'service_email';
+		$global['html_js'][] = 'service_email';
+	} else {
+		$global['html_css'][] = "<link href=\"".PATH_CSS."service_email.css?".@filemtime(PATH_CSS.'service_email.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+		$global['html_js'][] = "<script language=\"javascript\" type=\"text/javascript\" src=\"".PATH_JS."service_email.js?".@filemtime(PATH_JS.'service_email.js')."\"></script>";
+	}
+
+	$email_from	= $tab_user['EMAIL_UTILISATEUR'];
+	if(!empty($tab_tour['NOM_VISITE']))  $email_subject = $tab_tour['NOM_VISITE'];
+	else								 $email_subject = str_replace(array('#REF#', '#ADDRESS#'), $tab_tour['REF_VISITE'], $dico['mail']['subject_default']);
+	$email_message = str_replace('#URL#', $global['url_tour'], $dico['mail']['message_default']);
+
+	$infobulle_title = $dico['services']['email_link'];
+	$infobulle_text  = $dico['services']['email_text'];
+	$main_title	  = $dico['services']['email_link'];
+} else if($service_name=='download') {
+	$infobulle_title = $dico['service_download']['title_download'];
+	$infobulle_text  = $dico['services']['download_text'];
+	$main_title	  = $dico['service_download']['title_download'];
+
+	if(!empty($_SESSION['OPTIONS']['URLDOWNLOAD'])) {
+		$pattern = array('#ID#', '#EXT#');
+		$replace = array($tour, $global['browser']['PLATFORM']=="WINDOWS" ? "exe" : "zip");
+		$url_download = str_replace($pattern, $replace, $_SESSION['OPTIONS']['URLDOWNLOAD']);
+	} else {
+		if(VIEWER_FLASH) {
+			$url_download = 'http://'.get_host_from_url($global['url_tour']).'/partners/new/flash_download.php?id='.$tour;
+		} else {
+			$url_download = $global['url_tour'].$global['params_download'];
+		}
+	}
+
+	if(strpos($url_download, '?') !== false) {
+		$url_download_exe = $url_download.'&format=windows';
+		$url_download_zip = $url_download.'&format=mac';
+	} else {
+		$url_download_exe = $url_download.'?format=windows';
+		$url_download_zip = $url_download.'?format=mac';
+	}
+
+	$to_generate = false;
+	$date_zip = @file_get_contents(get_storage_path('date', $tour, 'zip'));
+
+	$to_generate = empty($date_zip) || $date_zip < $tab_tour['DATE_MODIFICATION_VISITE'];
+
+	if(!$to_generate) {
+		$date_exe = @file_get_contents(get_storage_path('date', $tour, 'exe'));
+		$to_generate = empty($date_exe) || $date_exe < $tab_tour['DATE_MODIFICATION_VISITE'];
+	}
+
+	if($to_generate) {
+		$span_classname   = 'btn_deactivated';
+		$span_exe_onclick = $span_zip_onclick = 'return false;';
+		$link_exe_href	= $link_zip_href	= '#';
+		$label_btn = $dico['common']['please_wait'];
+		$size_zip = $size_exe = '';
+	} else {
+		$span_classname   = 'btn';
+		$span_exe_onclick = "window.location.href = '".$url_download_exe."';";
+		$span_zip_onclick = "window.location.href = '".$url_download_zip."';";
+		$link_exe_href	= $url_download_exe;
+		$link_zip_href	= $url_download_zip;
+		$label_btn = '';
+
+		$size_zip = @file_get_contents(get_storage_path('size', $tour, 'zip'));
+		$size_exe = @file_get_contents(get_storage_path('size', $tour, 'exe'));
+
+		$size_unit = $_SESSION['ID_LANGUE'] == 'FR' ? 'Mo' : 'Mb';
+
+		$size_zip  = round($size_zip/1048576, 3).'&nbsp;'.$size_unit;
+		$size_exe  = round($size_exe/1048576, 3).'&nbsp;'.$size_unit;
+	}
+
+} else if($service_name=='brochure') {
+	if(NEW_INTEGRATION) $global['html_css'][] = 'service_brochure';
+	else				$global['html_css'][] = "<link href=\"".PATH_CSS."service_brochure.css?".@filemtime(PATH_CSS.'service_brochure.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+	$infobulle_title = $dico['service_brochure']['infobulle_title_brochure'];
+	$infobulle_text  = $dico['service_brochure']['infobulle_text_brochure'];
+	$main_title	  = $dico['service_brochure']['infobulle_title_brochure'];
+
+//	$url_pdf_a4_l = $url_pdf_a4_p = $url_pdf_us_l = $url_pdf_us_p = 'http://'.$domain_name.'/public/get_pdf.php?id='.$tour;
+	if(MODE_BUNDLE) {
+		$url_pdf_a4_l = $url_pdf_a4_p = $url_pdf_us_l = $url_pdf_us_p = 'http://api.previsite.com/flyer/?p='.$_SESSION['PARTNER'].'&r='.$_SESSION['REFERENCE'];
+	} else {
+		$url_pdf_a4_l = $url_pdf_a4_p = $url_pdf_us_l = $url_pdf_us_p = 'http://api.previsite.com/flyer/?t='.$tour;
+	}
+
+	$url_pdf_us_l .= '&tpl=1&format=us';
+	$url_pdf_us_p .= '&tpl=2&format=us';
+	$url_pdf_a4_l .= '&tpl=1';
+	$url_pdf_a4_p .= '&tpl=2';
+} else if($service_name=='diffusion') {
+	$tab_portal = get_list_portal($_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $tour);
+
+	$tab_partner_type['std'] = 0;
+	$tab_partner_type['mls'] = 0;
+	$tab_partner_type['vid'] = 0;
+	$tab_partner_type['soc'] = 0;
+
+	foreach($tab_portal as $id_portail => $portail) {
+		$is_mls	 = $portail['TYPE'] == 5;
+		$is_video   = $portail['TYPE'] == 8;
+		$is_social  = $portail['TYPE'] == 9;
+		$is_std	 = !$is_mls && !$is_video && !$is_social;
+
+		if($is_mls) $tab_partner_type['mls']++;
+		else if($is_video) $tab_partner_type['vid']++;
+		else if($is_social) $tab_partner_type['soc']++;
+		else if($is_std) $tab_partner_type['std']++;
+	}
+
+	$starting_type = '';
+	$order_tab = array('std', 'mls', 'vid', 'soc');
+	for($i=0; empty($starting_type) && $i<count($order_tab); $i++) {
+		if($tab_partner_type[ $order_tab[$i] ] > 0) $starting_type = $order_tab[$i];
+	}
+	if(empty($starting_type)) $starting_type = 'www';
+
+	if(!empty($_SESSION['OPTIONS']['DEFAULTPARTNER'])) {
+		$tab_partner = explode(';', $_SESSION['OPTIONS']['DEFAULTPARTNER']);
+		$nb_partner  = count($tab_partner);
+		for($i=0; $i<$nb_partner; $i++) {
+			// insertion auto si pas relie
+			if(is_guid($tab_partner[$i]) && !isset($tab_portal[ $tab_partner[$i] ]) ) {
+				$autopub_type = (int) get_partner_autopublication_type($tab_partner[$i]);
+				if($autopub_type == 2) $autopub = 1;
+				else				   $autopub = 0;
+				$pwd_partner = null;
+				insert_partner_user($tab_partner[$i], $_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $_SESSION['ID_UTILISATEUR'], $pwd_partner, $autopub);
+			}
+		}
+	}
+
+	// autopublication
+	if(empty($_SESSION['AUTOPUBLICATION'][ $tour ])) {
+		$_SESSION['AUTOPUBLICATION'][ $tour ] = tour_autopublish(URL_API_PUBLISH, $tour, $_SESSION['ID_SOCIETE'], $_SESSION['ID_UTILISATEUR'], $tab_tour['REF_VISITE']);
+	}
+
+
+	if(!NEW_INTEGRATION) {
+		if(empty($tab_portal)) {
+			header('Location: show_service.php?service=list_partner&tour='.$tour);
+			exit;
+		}
+		$global['html_css'][] = "<link href=\"".PATH_CSS."service_diffusion.css?".@filemtime(PATH_CSS.'service_diffusion.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+	} else {
+	
+		if(empty($tab_portal)) {
+			$js_start = 'openPublishMyWebsite';
+		} else {
+			$js_start = 'getDiffusions';
+		}
+		$global['html_css'][] = 'service_diffusion.2010';
+	}
+	
+	if(NEW_INTEGRATION) {
+		$global['html_js'][] = 'service_diffusion';
+		$global['html_js_ext'][] = URL_PSTATIC.'zeroclipboard/1.0.4/ZeroClipboard.js';
+	} else {
+		$global['html_js'][] = "<script language=\"javascript\" type=\"text/javascript\" src=\"".PATH_JS."service_diffusion.js?".@filemtime(PATH_JS.'/service_diffusion.js')."\"></script>";
+		$global['html_js'][] = "<script language=\"javascript\" type=\"text/javascript\" src=\"".URL_PSTATIC."zeroclipboard/1.0.4/ZeroClipboard.js\"></script>";
+	}
+
+
+	$infobulle_title = $dico['service_diffusion']['infobulle_title_diffusion'];
+	$infobulle_text  = nl2br($dico['service_diffusion']['infobulle_text_diffusion']);
+	$main_title	  = $dico['service_diffusion']['infobulle_title_diffusion'];
+} else if($service_name=='list_partner') {
+	$infobulle_title = $dico['service_diffusion']['infobulle_title_diffusion'];
+	$infobulle_text  = nl2br($dico['service_diffusion']['infobulle_text_diffusion']);
+	$main_title	  = $dico['service_diffusion']['infobulle_title_diffusion'];
+	$global['html_css'][] = "<link href=\"".PATH_CSS."service_diffusion.css?".@filemtime(PATH_CSS.'service_diffusion.css')."\" rel=\"stylesheet\" type=\"text/css\" />\n";
+	$global['html_js'][] = "<script language=\"javascript\" type=\"text/javascript\" src=\"".PATH_JS."service_diffusion.js?".@filemtime(PATH_JS.'/service_diffusion.js')."\"></script>";
+
+	$partner = $_GET['partner'];
+	if(is_guid($partner)) {
+		$tab_custom_partner = get_custom_portal_infos($partner, $_SESSION['ID_SOCIETE']);
+	}
+
+	// edition portail custom
+	if(!empty($tab_custom_partner)) {
+		$style_div_add  = '';
+		$class_link_add = 'add_website hide_link hide_link_off';
+
+		$style_div_search = '';
+	} else {
+		$style_div_add  = ' style="display: none;"';
+		$class_link_add = 'add_website hide_link';
+
+		$style_div_search = '';
+	}
+
+	if(empty($tab_custom_partner['SITEWEB_PORTAIL'])) {
+		$tab_custom_partner['SITEWEB_PORTAIL'] = 'http://';
+	}
+
+	if($_SESSION['ID_DISTRIBUTEUR'] == '5C48256D-CE05-46E1-A954-C4049EECB230' || $_SESSION['ID_DISTRIBUTEUR'] == 'B885F0B4-F547-4C6B-813F-0A02729DE239') {
+		$tab_suggested_partners = array(
+#			'1A68C417-C54D-6B60-DA35-1ABA794503D5' // Multi-syndication
+		);
+	} else if($_SESSION['ID_PAYS']=='US') {
+		$tab_suggested_partners = array(
+			'1A68C417-C54D-6B60-DA35-1ABA794503D5', // Multi-syndication
+			'F98D6CFA-E7E4-9F63-0249-C16C38A8C477' // Realtor.com
+		);
+		// 'DDD1B1DD-C1BB-874B-322E-27465D5F2276' // Zillow
+		// '87EBE945-2751-16E5-D971-4459E3410ECC' // Trulia
+		// '13ADC429-65B7-BEDC-90AE-58C98444D12A' // Oodle
+		// '731988AC-C5EE-1588-BD84-7F5ACC8A9B6E' // Yahoo
+		// '1B0B30F7-6589-47BD-9067-26D66AF064A0' // MRIS
+	} else if($_SESSION['ID_PAYS']=='CA') {
+		$tab_suggested_partners = array(
+			'1A68C417-C54D-6B60-DA35-1ABA794503D5', // Multi-syndication
+		);
+		// 'DDD1B1DD-C1BB-874B-322E-27465D5F2276' // Zillow
+		// '87EBE945-2751-16E5-D971-4459E3410ECC' // Trulia
+		// '13ADC429-65B7-BEDC-90AE-58C98444D12A' // Oodle
+		// '731988AC-C5EE-1588-BD84-7F5ACC8A9B6E' // Yahoo
+		// '1B0B30F7-6589-47BD-9067-26D66AF064A0' // MRIS
+	} else {
+		$tab_suggested_partners = array(
+			'4BDD31C9-4B8D-48AB-B347-82132A02A779',
+			'1FC99CF5-61D1-1BAC-74C1-AEA6D1D0CC6A',
+			'8C6872BB-3F15-065D-F294-3492B2E1DBF9'
+		);
+	}
+
+	$tab_suggest = get_suggested_partner($tab_suggested_partners, $_SESSION['ID_SOCIETE']);
+	$nb_suggest  = count($tab_suggest);
+} else {
+	header('Location: services.php?tour='.$tour);
+	exit;
+}
+
+
+?>

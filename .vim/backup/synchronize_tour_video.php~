@@ -1,0 +1,395 @@
+<?php
+
+require_once 'HTTP/Request.php';
+require_once 'DB.php';
+require_once '../include/global.php';
+require_once '../include/fonctions.php';
+require_once 'previsite/GetDsn.php';
+
+function duration_between($start, $end){
+	$return = "";
+	if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $start, $date_start) > 0 
+	&& preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $end, $date_end) > 0 ){
+		$duration =	mktime($date_end[4],$date_end[5],$date_end[6],$date_end[2],$date_end[3],$date_end[1]) - mktime($date_start[4],$date_start[5],$date_start[6],$date_start[2],$date_start[3],$date_start[1]);
+		$return = convert_duration_for_print($duration, " ");
+	}
+	return $return;
+}
+
+function convert_duration_for_print($duration, $separator = ""){
+	$return =  ($duration%60)."s";
+	$duration = floor($duration/60);
+	if($duration > 0){
+		$return =  ($duration%60)."m".$separator.$return;
+		$duration = floor($duration/60);			
+		if($duration > 0){
+			$return =  ($duration%24)."h".$separator.$return;				
+			$duration = floor($duration/24);
+			if($duration > 0){
+				$return =  $duration."d".$separator.$return;
+			}
+		}
+	}
+	return $return;
+}
+
+$getDsn = new GetDsn();
+
+$id				= $_REQUEST['id'];
+$user			= $_REQUEST['user'];
+$todo			= $_REQUEST['todo'];
+$portals		= $_REQUEST['portals'];
+$codePartner 	= $_REQUEST['code'];
+$ref			= $_REQUEST['ref'];
+$showId			= $_REQUEST['show_id'] == 'true';
+
+if($todo == "synchro"){
+	$output = "false";
+	if(is_guid($id)){
+		$dsn = $getDsn->byTourID($id);
+		if($dsn != ""){
+			$db = DB::connect($dsn);
+			if(PEAR::isError($db)) die("Database connection failed");
+			$portals = explode(";", $portals);
+			print_r($portals);
+			$no_error = true;
+			for( $i=0; $i< count($portals); $i++){
+				if($portals[$i] == "") continue;
+				$ref = $id;
+				$sql = "SELECT NOM_PORTAIL FROM PORTAIL WHERE ID_PORTAIL=?";
+				$tmp = $db->query($sql, array($portals[$i]));
+				if($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)) $nom_portail = $row['NOM_PORTAIL'];
+
+				$diffusion_infos = array();
+				$sql = "SELECT ID_DIFFUSION_PORTAIL,REF_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_VISITE=? AND ID_STATUT_DIFFUSION > 0 AND ID_PORTAIL=?";
+				$tmp = $db->query($sql, array($id, $portals[$i]));
+				if($row=$tmp->fetchRow(DB_FETCHMODE_ASSOC)) {
+					$sql = "SELECT REF_OPTION, VALEUR_OPTION FROM DIFFUSION_PORTAIL_OPTION WHERE ID_DIFFUSION_PORTAIL=?";
+					$ref = $row['REF_PORTAIL'];
+					$tmp = $db->query($sql, array($row['ID_DIFFUSION_PORTAIL']));
+					while($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)) {
+						$diffusion_infos[strtoupper($row['REF_OPTION'])] = $row['VALEUR_OPTION'];
+					}
+				}
+				//http://api.previsite.com/publication/software_publish.php?tour=8606BFC8-DA65-92A7-7C34-37ADF43AF902&user=E52F1368-0401-4BF2-E564-62053AA103D2&ref=725610&title=Maison+%C3%A0+vendre+%C3%A0+RENUNG+%2840270%29+-+6+pi%C3%A8ces+-+145m%C2%B2&partner=EC1714EB-83BA-E2E1-143C-3B7F5DC20339&mode=auto&new=&no_tts=false&rediffuse=false:not_considered_luxury
+				$params = array(
+					'tour' => $id,
+					'user' => $user,
+					'ref' => $ref,
+					'title' => $diffusion_infos['TITLE'],
+					'partner' => $portals[$i],
+					'mode' => 'auto',
+					'new' => '',
+					'no_tts' => $diffusion_infos['NO_TTS'],
+					'rediffuse' => $diffusion_infos['REDIFFUSE'],
+				);
+				foreach($params as $k=>$v){
+					$url .= "&".$k."=".urlencode($v);
+				}
+				$url = URL_PUBLISH."?".substr( $url, 1);
+				$result = file_get_contents($url);
+				if($result != "true"){
+					$no_error = false;
+					$output = ($nom_portail	!= "" ? $nom_portail : $portals[$i]).": Failed";
+				}
+				if($no_error){
+					$sql = "SELECT ID_VIDEO FROM VIDEO WHERE ID_VISITE=? ORDER BY DATE_MODIFICATION_VIDEO DESC";
+					$tmp = $db->query($sql, array($id));
+					if($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)) {
+						$url = "http://video.previsite.net/cron.php?todo=top&id=".$row['ID_VIDEO'];
+						$no_error = file_get_contents($url) == "true";
+					}
+				}
+			}
+		}
+	}
+	die($no_error ? "true" : "false");
+}
+
+if($codePartner != ""){
+	$db = DB::connect(DSN_MANAGER);
+	if(PEAR::isError($db)) die("Database connection failed");
+	$sql = "SELECT ID_PORTAIL FROM PORTAIL WHERE CODE_PORTAIL=?";
+
+	$tmp = $db->query($sql, array($codePartner));
+	if($row=$tmp->fetchRow(DB_FETCHMODE_ASSOC)) {
+		$partnerID = $row['ID_PORTAIL'];
+	}
+	$db->disconnect();
+}
+
+$dsn = $getDsn->byPartner($partnerID);
+if($dsn != "" && $ref != ""){
+	$need_synchro = false;
+	$db = DB::connect($dsn);
+	if(PEAR::isError($db)) die("Database connection failed");
+	$sql = "SELECT VISITE.ID_VISITE, ID_UTILISATEUR, DATE_MODIFICATION_VISITE, NOM_VISITE, ID_STATUT_DIFFUSION FROM DIFFUSION_PORTAIL INNER JOIN VISITE ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE LEFT JOIN VISITE_TEXTE VT ON Visite.ID_VISITE=VT.ID_VISITE AND Visite.ID_LANGUE COLLATE French_CI_AS=VT.ID_LANGUE COLLATE French_CI_AS  WHERE ID_PORTAIL=? AND REF_PORTAIL=?";
+
+	$tmp = $db->query($sql, array($partnerID, $ref));
+	if($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)){
+		$tour = $row;
+		if($tour['ID_STATUT_DIFFUSION'] > -1){
+			$status = "Ok";
+			$sql = "SELECT TOP 1 ID_VIDEO, DATE_MODIFICATION_VIDEO, ID_STATUT_VIDEO FROM VIDEO WHERE ID_VISITE=? ORDER BY DATE_MODIFICATION_VIDEO DESC";
+			$tmp = $db->query($sql, array($row['ID_VISITE']));
+			if($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)){
+				if($tour['ID_STATUT_VIDEO'] == 0){
+					//$row['ID_VIDEO'] = 'D416A8CC-D219-5A4E-A7A5-0002A960F54A';
+					$url = "http://video.previsite.net/cron.php?todo=check&id=".$row['ID_VIDEO'];
+					if(file_get_contents($url) == "true"){
+						$status = "Pending";
+					}
+				}
+				$tour = array_merge( $tour, $row);
+			}
+
+			if($tour['DATE_MODIFICATION_VIDEO'] == "" || (preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $tour['DATE_MODIFICATION_VIDEO']) > 0 && $tour['DATE_MODIFICATION_VISITE'] > $tour['DATE_MODIFICATION_VIDEO'] )){
+				$need_synchro = true;
+				$status = "Outdated";
+			}
+		}else{
+			$status = "Removed";
+		}
+		$sql = "SELECT PORTAIL.ID_PORTAIL, NOM_PORTAIL, URL_VIEWER FROM PORTAIL INNER JOIN CLIENT_PORTAIL ON CLIENT_PORTAIL.ID_PORTAIL=PORTAIL.ID_PORTAIL AND ID_UTILISATEUR=? AND ID_TYPE_PORTAIL=8 AND ID_STATUT_PORTAIL > 0 ORDER BY NOM_PORTAIL";
+		$tmp = $db->query($sql, array($tour['ID_UTILISATEUR']));
+		while($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)){
+			$portals[] = $row;
+		}
+		for($i=0; $i < count($portals); $i++){
+			$sql = "SELECT ID_DIFFUSION_PORTAIL, ID_STATUT_DIFFUSION, DATE_DIFFUSION, REF_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=?";
+			$tmp = $db->query($sql, array($portals[$i]['ID_PORTAIL'], $tour['ID_VISITE']));
+			if($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)){
+				$portals[$i] = array_merge( $portals[$i], $row);
+				switch($portals[$i]['ID_STATUT_DIFFUSION']){
+				case 1:
+					if(preg_match('/(YOUTUBE|DAILYMOTION)/i', $portals[$i]['NOM_PORTAIL'], $nom_portail) > 0){
+						$nom_portail = strtoupper($nom_portail[1]);
+						$sql = "SELECT URL_VIDEO_DIFFUSION, TYPE_VIDEO, ID_DISTRIBUTEUR FROM VIDEO_DIFFUSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO AND ID_STATUT_DIFFUSION > 0 AND SITE_DIFFUSION=? AND ID_VISITE=? ORDER BY DATE_MODIFICATION_DIFFUSION DESC";
+						$tmp = $db->query($sql, array($nom_portail, $tour['ID_VISITE']));
+						if($row = $tmp->fetchRow(DB_FETCHMODE_ASSOC)){
+							$tab_getID = array(
+								'YOUTUBE' 		=> 	'/.*\?v=(.+)/i',
+								'DAILYMOTION'	=>	'/.*\/video\/([A-Z0-9]+)/i',
+								'VIEWTHISHOME'	=>	'/.*viewthishome\.com.*\?video=(.*)/i',
+								'KEWEGO'		=>	'/([^\/]+)\.html$/i',
+								'YAHOO'			=>	'/([^\/]+)$/i',
+								'WATTV'			=>	'/([^\/]+)$/i',
+								'METACAFE'		=>	'/([^\/]+)$/i'
+							);
+							if(preg_match($tab_getID[$nom_portail], $row['URL_VIDEO_DIFFUSION'], $result) > 0 && $result[1] != $portals[$i]['REF_PORTAIL']){
+								$portals[$i]['REF_PORTAIL'] = $result[1];
+								$client = &new HTTP_Request(URL_NOTIFICATION_VIDEO);
+								$client->setMethod(HTTP_REQUEST_METHOD_POST);
+								$params = array(
+									"id" => $tour['ID_VISITE'],
+									"site" => $nom_portail,
+									"url" => $row['URL_VIDEO_DIFFUSION'],
+									"code" => '0',
+									"type" => $row['TYPE_VIDEO'],
+									"distrib" => $row['ID_DISTRIBUTEUR'],	
+									"ref" => $result[1],
+								);
+								foreach($params as $k=>$v){
+									$client->addPostData($k, $v);
+								}
+								$client->sendRequest();
+							}	
+						}
+					}
+					$portals[$i]['URL_VIEWER'] = str_replace('#REF#', $portals[$i]['REF_PORTAIL'], $portals[$i]['URL_VIEWER']);
+					$portals[$i]['URL_VIEWER'] = '<a href="'.$portals[$i]['URL_VIEWER'].'" target="_blank" >'.$portals[$i]['URL_VIEWER'].'</a>';	
+					break;
+				case -2:
+					$portals[$i]['URL_VIEWER'] = "delete failed";
+					break;
+				case -1:
+					$portals[$i]['URL_VIEWER'] = ($tour['ID_STATUT_DIFFUSION'] < 0 ? "removed" : "failed");
+					break;
+				default:
+					$portals[$i]['URL_VIEWER'] = "in progress";
+				}
+				$portals[$i]['URL_VIEWER'] = $portals[$i]['DATE_DIFFUSION']." (".$portals[$i]['URL_VIEWER'].")";
+			}else{
+				$portals[$i]['URL_VIEWER'] = "not found";
+			}
+		}
+	}
+}
+
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title></title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<script type="text/javascript" src="/publication/scripts/jquery-1.4.2.min.js"></script>
+<script type="text/javascript" src="/publication/scripts/jquery-ui-1.8.18.min.js"></script>
+<script type="text/javascript" src="/publication/scripts/jquery.json-2.3.min.js"></script>
+<style type="text/css">
+body {
+	margin: 0;
+	padding: 0;
+	font-family: Arial, Helvetica, sans-serif;
+	background-color: #fff;
+	color: #555;
+	text-decoration: none;
+	word-spacing: normal;
+	text-align: left;
+	letter-spacing: 0;
+	line-height: 1.4em;
+	font-size: 12px;
+}
+
+#container {
+	margin: 0 auto 2.5em auto;
+	width: 858px;
+}
+
+#header {
+	float:left;
+	width:100%;
+}
+
+#logo {
+	float: left;
+}
+
+#textToSpeech{
+	width:500px;
+	height:300px;
+	float:left;
+	margin:30px 0 0 100px;
+}
+
+#footer{
+	float:left;
+	width:100%;
+	text-align:center;
+}
+
+img{
+	border:0;
+}
+
+select, input, textarea{
+	border:1px solid #808080;
+	background-color:white;
+}
+.disabled input{
+	color:#888888;
+	border-color:#888888;
+	background-color:#DDDDDD;
+}
+
+div.row{ width:500px;margin-bottom:10px;}
+div.row span{ padding-top:2px;}
+div.row input.field{ width:300px;float:right;}
+div.right {text-align:right;}
+div.subtitle { text-align:center;margin-top:20px;font-weight:bold;}
+
+td.right{ text-align:right;padding-right:10px;vertical-align:top;}
+.bold{ font-weight:bold;}
+
+#result, #wait{
+	margin-top:50px;
+}
+
+#result hr{ border:0px;border-top:1px solid gray;}
+
+#result div.label{ margin-top:10px;font-weight:bold;}
+#result div.desc{ }
+
+div.wait{ text-align:center;width:100%;}
+div.hidden{ display:none;}
+</style>
+<script type="text/javascript">
+
+	function doIt(){
+		var params = {};
+		params['todo'] = 'synchro';
+		params['id'] = $('#id').val();
+		params['user'] = $('#user').val();
+		params['portals'] = $('#portals').val();
+		$('#result').html('');
+		
+		$('#result').addClass('hidden');
+		$('#wait').removeClass('hidden');
+		
+		$.post('/publication/synchronize_tour_video.php', params,
+			function(data){
+				if(data == "true"){
+					document.location.reload();
+				}else{
+					$('#result').html(data);
+					$('#wait').addClass('hidden');
+					$('#result').removeClass('hidden');
+				}
+			}
+		);
+		
+	}
+</script>
+</head>
+<body>
+	<div id="container">
+		<div id="header">
+			<div id="logo"><a href="#"><img src="/publication/images/logo.gif" alt="Previsite" /></a></div>
+		</div>
+		<div id="textToSpeech">
+			<div class="row bold">
+<?php
+if(!is_guid($tour['ID_VISITE'])){
+?>
+				Listing not found...
+<?php
+}else{
+?>
+				<table>
+<?php
+	if($showId){
+?>
+					<tr><td class="right">ID:</td><td class="bold"><?=$tour['ID_VISITE'];?></td></tr>
+<?php
+	}
+?>
+					<tr><td class="right">Listing:</td><td class="bold"><?=$ref;?></td></tr>
+					<tr><td class="right">Title:</td><td class="bold"><?=$tour['NOM_VISITE'];?></td></tr>
+					<tr><td class="right">Updated at: </td><td class="bold"><?=$tour['DATE_MODIFICATION_VISITE'];?></td></tr>
+					<tr><td class="right">Status: </td><td class="bold"><?=$status;?></td></tr>
+					<tr><td colspan="2" align="center"><br /></td></tr>
+<?php
+	$portals_param = "";
+	for($i=0;$i < count($portals);$i++){
+		$portals_param .= $portals[$i]['ID_PORTAIL'].";";
+?>
+	<tr><td class="right"><?=$portals[$i]['NOM_PORTAIL'];?></td><td class="bold"><?=$portals[$i]['URL_VIEWER'];?></td></tr>
+<?
+	}
+?>
+					<tr><td colspan="2" align="center"><br /><br /></td></tr>
+<?php
+	if($need_synchro){
+?>
+					<input type="hidden" id="id" value="<?=$tour['ID_VISITE'];?>" />
+					<input type="hidden" id="user" value="<?=$tour['ID_UTILISATEUR'];?>" />
+					<input type="hidden" id="portals" value="<?=$portals_param;?>" />
+					<tr><td colspan="2" align="center" <?=(!$need_synchro ? 'class="disabled"' : '');?> ><input type="button" value="Synchronize" class="button" onclick="doIt();"/></td></tr>
+<?php
+	}else{
+?>
+					<tr><td colspan="2" align="center" class="disabled" ><input type="button" value="Synchronize" class="button" onclick="return false;" disabled/></td></tr>
+<?php
+	}
+?>	
+				</table>
+			</div>
+			<div id="result"></div>
+			<div id="wait" class="wait hidden"><img src="images/ajax_wait.gif" alt="" /></div>
+<?php
+}
+?>
+		</div>
+		
+		</div>
+	</div>
+</body>
+</html>

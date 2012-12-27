@@ -1,0 +1,878 @@
+<?php
+
+/* code includes */
+require_once('DB.php');
+require_once('HTTP/Request.php');
+require_once('previsite/GetDsn.php');
+require_once('../include/fonctions.php');
+require_once('../include/fonction.diffusion.db.php');
+//require_once('./include/fonction.stupeflix.php');
+require_once('../include/global.php');
+require_once('../include/storage.php');
+require_once('./phptube/phpdailymotion.php');
+require_once('./phptube/phpdailymotionapi.php');
+require_once('./phptube/phpyoutube.php');
+require_once('./phptube/phpyoutubeapi.php');
+require_once('./phptube/phpviewthishome.php');
+require_once('./phptube/phpkewego.php');
+require_once('./phptube/phpyahoo.php');
+require_once('./phptube/phpwattv.php');
+require_once('./phptube/phpvimeo.php');
+require_once('./phptube/phpmetacafe.php');
+require_once('phpmailer/class.phpmailer.php');
+
+// dev.api.previsite.com/diffusion/
+
+define('PATH_TMP_DIFFUSION', PATH_TMP."diffusion/");
+$file_logs = PATH_TMP_DIFFUSION."query.txt";
+define('PATH_DICO', "./dico/");
+if(!file_exists(PATH_TMP_DIFFUSION)){ mkdir(PATH_TMP_DIFFUSION);}
+
+$todo			= $_REQUEST['todo'];
+$id 			= $_REQUEST['id'];
+$tour 			= $_REQUEST['tour'];
+$distrib		= $_REQUEST['distrib'];
+$site 			= strtoupper($_REQUEST['site']); 
+$login  		= $_REQUEST['login'];
+$pwd		  	= $_REQUEST['password'];
+$type			= strtoupper($_REQUEST['type']);
+$type_reference = preg_replace('/_CORP$/i', '', $type);
+$notification 	= ($_REQUEST['notification'] != "" ? $_REQUEST['notification'] : 'http://api.previsite.com/publication/notification.php');
+$title			= $_REQUEST['title'];
+$force			= ($_REQUEST['force'] == 'true');
+$mode			= $_REQUEST['mode'];
+$auto			= (strtolower($_REQUEST['mode']) == 'auto' || $_REQUEST['login'] == 'century21france');
+$tags			= $_REQUEST['tags'];
+$ref			= $_REQUEST['ref'];
+$url			= $_REQUEST['url'];
+$responseInJson	= ($_REQUEST['json'] == "true");
+
+$debug			= ($_REQUEST['debug'] == "true");
+$no_notification = ($_REQUEST['no_notification'] == "true");
+$no_playlist	= ($_REQUEST['no_playlist'] == "true");
+
+$need_response  = false;
+$update_db		= true;
+
+$tab_getID = array(
+	'YOUTUBE' 		=> 	'/.*\?v=(.+)/i',
+	'DAILYMOTION'	=>	'/.*\/video\/([A-Z0-9]+)/i',
+	'VIEWTHISHOME'	=>	'/.*viewthishome\.com.*\?video=(.*)/i',
+	'KEWEGO'		=>	'/([^\/]+)\.html$/i',
+	'YAHOO'			=>	'/([^\/]+)$/i',
+	'WATTV'			=>	'/([^\/]+)$/i',
+	'METACAFE'		=>	'/([^\/]+)$/i'
+);
+
+$videos_options['DIFFUSION_EXT'] = "mp4";
+$videos_options['TAGS'][strtoupper($type_reference)] = explode(";",$tags);
+if($type =="AUTO"){
+	$videos_options['CATEGORY'] = array('YOUTUBE'=>"Autos", "DAILYMOTION"=>"auto");
+}
+$tags_default = array(
+	'FR' => array('immobilier', 'annonce', 'previsite'),
+	'LIMANGO' => array("limango"),
+);
+
+$tab_error = array( 
+	-4 => 'TOUR DELETED',
+	-3 => 'VIDEO DELETE ERROR',
+	-2 => 'SCRIPT NOT FINISH',
+	-1 => 'VIDEO DELETED',
+	0 => 'OK',
+	1 => 'MISSING ID',
+	2 => 'VIDEO NOT FOUND',
+	3 => 'DOWNLOAD VIDEO',
+	4 => 'UPLOAD VIDEO',
+	5 => 'SITE UNSUPPORTED',
+	6 => 'MISSING LOGIN INFORMATION',
+	7 => 'URL VIDEO NOT FOUND',
+	8 => 'GENERATION FAILED',
+	9 => 'DIFFUSION NOT FOUND',
+	10=> 'VIDEO NOT READY',
+	11=> 'DATABASE NOT FOUND',
+	12=> 'NO TITLE VIDEO',
+	13=> 'ACTION NOT AVAILABLE',
+	14=> 'TOUR INFOS NOT FOUND',
+	15=> 'DIFFUSION IN PROGRESS',
+	16=> 'DIFFUSION LOGIN UPDATE FAILED',
+	17=> 'VIDEO DUPLICATE',
+);
+
+$code_error = -2;
+$description_error = "";
+$idVideo = "";
+$db_data['pool']['videocron'] = array('STATUS'=>'normal','NAME'=>'videocron','DSN'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.10/PREVISITE_VIDEO?unicode=yes', 'DSN_DEGRADED'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.10/PREVISITE_SOFTWARE?unicode=yes');
+$db_data['name'] = "video";
+$dsn = "";
+$getDsn = new GetDsn();
+
+if(is_guid($tour)){ $dsn = $getDsn->byTourID($tour);}
+if($dsn == "" && is_guid($distrib)){ $dsn = $getDsn->byDistrib($distrib);}
+$need_response = (preg_match('/^(check|diffusion|delete|edit|fix)$/i', $todo) > 0);
+if($dsn != ""){
+	$db_data['pool'][$db_data['name']]['DSN'] = $dsn;
+	
+	$tab_video = get_video_infos_for_diffusion($id ,$tour, $type, $site, $login, $ref, ($todo == "delete"), $url);
+	if($todo == "fix"){
+		$site = $tab_video['SITE_DIFFUSION'];
+		$tour = $tab_video['ID_VISITE'];
+		$type = $tab_video['TYPE_VIDEO'];
+		$login = $tab_video['LOGIN_DIFFUSION'];
+		$pwd = $tab_video['PASSWORD_DIFFUSION'];
+	}
+
+	//print_r($tab_video);
+	$id = $tab_video['ID_VIDEO'];
+	if(is_guid($id) && is_guid($tab_video['ID_VISITE'])){
+		$url_get_partner = str_replace( array('#SITE#', '#TYPE#'), array( $site, $tab_video['TYPE_VIDEO']), URL_DIFFUSION_VIDEO_GET_PARTNER);
+		//echo $url_get_partner;
+		$partner = file_get_contents($url_get_partner);
+		$url_infos_tour = str_replace('#TOUR#', $tab_video['ID_VISITE'], URL_GET_TOUR_INFOS).(is_guid($partner) ? "?partner=".$partner : "");
+		//echo $url_infos_tour;
+		$response = @file_get_contents($url_infos_tour);
+		
+		if($response != ""){
+			$tab_infos = json_decode($response, true);
+			if(count($tab_infos['USER']['PARTNER_INFO']) > 0 && $tab_infos['USER']['PARTNER_INFO']['PREFIXE_PORTAIL'] != ""){
+				if(update_login_diffusion($id, $site, $login, $tab_infos['USER']['PARTNER_INFO']['PREFIXE_PORTAIL'], $tab_infos['USER']['PARTNER_INFO']['PASSWORD_PORTAIL'])){
+					$login = $tab_infos['USER']['PARTNER_INFO']['PREFIXE_PORTAIL'];
+					$pwd = $tab_infos['USER']['PARTNER_INFO']['PASSWORD_PORTAIL'];
+				}else{
+					$code_error = 16;
+				}
+			}
+			if($code_error == -2){
+				$tab_video = array_merge($tab_video, $tab_infos['USER'], $tab_infos['TOUR']);
+				if(preg_match('/^(check|check_diffusion|edit|fix)$/i', $todo) > 0 || update_video_diffusion($id, $site, $login, $pwd) || $force){
+					$edit_mode = (preg_match('/^(edit|fix)$/i', $todo) > 0 );
+					switch($todo){
+						case "check":
+							$need_response = true;
+							if($tab_video['ID_STATUT_DIFFUSION'] > -1 || $force){
+								$description_error = $tab_video['URL_VIDEO_DIFFUSION'];
+								if(preg_match( $tab_getID[$site], $tab_video['URL_VIDEO_DIFFUSION'], $result) > 0){
+									$idVideo = $result[1];
+									if(is_guid($tab_video['ID_VIDEO'])){
+										switch($site){
+											case 'YOUTUBE':
+												$class = "PHPYouTube";
+												if(!$auto || true){ $class = "PHPYouTubeAPI";}
+												$phptube = new $class( $login, $pwd);
+												$result = $phptube->checkVideo($idVideo);
+												if($result === true){ $code_error =  0;}
+												else{ 
+													$code_error = ($result == "duplicate" ? 17 : 10);
+													$description_error = $result;
+												}
+												break;
+											case 'DAILYMOTION':
+												if(!$auto || true){ $class = "PHPDailyMotionAPI";}
+												$phptube = new $class($login, $pwd, $debug); 
+												$result = $phptube->checkVideo($idVideo);
+												if($result === true){ $code_error =  0;}
+												else{
+													$code_error = 10;
+													$description_error = $result;
+												}
+												break;
+											case 'VIEWTHISHOME':			
+											case 'KEWEGO':
+											case 'YAHOO':
+											case 'WATTV':
+											case 'METACAFE':
+												$classes = array( 'DAILYMOTION'=>'PHPDailymotion', 'KEWEGO'=>'PHPKewego', 'VIEWTHISHOME'=>'PHPViewThisHome', 'YAHOO'=>'PHPYahoo', 'WATTV' => 'PHPWattv', 'METACAFE' => 'PHPMetacafe');
+												$phptube = new $classes[$site]( $login, $pwd, $debug);							
+												$result = $phptube->checkVideo($idVideo);
+												if($result === true){ $code_error =  0;}
+												else{
+													$code_error = 10;
+													$description_error = $result;
+												}
+												break;
+											default:
+												$code_error = 5;
+												$description_error = "Website ".$site." unsupported";
+												break;
+										}
+									}else{ $code_error = 2;}
+								}else{ $code_error = 7;}
+							}else{ $code_error = -1;}
+							break;
+
+						case "delete":
+							$need_response = true;
+							if($type == ""){ 
+								$type = $tab_video['TYPE_VIDEO'];
+								$type_reference = preg_replace('/_CORP$/i', '', $type);
+							}
+							if($tab_video['ID_STATUT_DIFFUSION'] > -1 || $tab_video['RESULT_CODE_DIFFUSION'] == '-3' || $force){
+								if($login != "" && $pwd != ""){
+									if(preg_match($tab_getID[$site], $tab_video['URL_VIDEO_DIFFUSION'], $result) > 0){
+										$idVideo = $result[1];
+										$url_video = $tab_video['URL_VIDEO_DIFFUSION'];
+										switch($site){
+											case 'YOUTUBE':
+												$class = "PHPYouTube";
+												if(!$auto || true){ $class = "PHPYouTubeAPI";}
+												$phptube = new $class($login, $pwd, $debug);
+												$result = $phptube->deleteVideo($idVideo);
+												if($result == false && preg_match('/Video not found/i', $phptube->error) == 0){
+													$code_error = -3;
+													$description_error = $phptube->error;
+												}else{
+													$code_error = -1;
+													$description_error = "";
+												}
+												break;
+											case 'DAILYMOTION':
+												$class = "PHPDailyMotion";
+												if(!$auto || true){ $class = "PHPDailyMotionAPI";}
+												$phptube = new $class( $login, $pwd, $debug); 
+												$result = $phptube->deleteVideo($idVideo);
+												if($result == false){
+													$code_error = -3;
+													$description_error = $phptube->error;
+												}else{
+													$code_error = -1;
+													$description_error = "";
+												}
+												break;
+											case 'VIEWTHISHOME':			
+											case 'KEWEGO':
+											case 'YAHOO':
+											case 'WATTV':
+											case 'METACAFE':
+												$classes = array( 'DAILYMOTION'=>'PHPDailymotion', 'KEWEGO'=>'PHPKewego', 'VIEWTHISHOME'=>'PHPViewThisHome', 'YAHOO'=>'PHPYahoo', 'WATTV' => 'PHPWattv', 'METACAFE' => 'PHPMetacafe');
+												$phptube = new $classes[$site]($login, $pwd, $debug);
+												$result = $phptube->deleteVideo($idVideo);
+												if($result == false){
+													$code_error = -3;
+													$description_error = $phptube->error;
+												}else{
+													$code_error = -1;
+													$description_error = "";
+												}
+												break;
+											default:
+												$code_error = 5;
+												$description_error = "Website ".$site." unsupported";
+												break;
+										}
+									}else{ $code_error = 7;}
+								}else{ $code_error = 6;}
+							}else{ $code_error = -1;}
+							break;
+
+						case "fix":
+							if(preg_match('/^(YOUTUBE)$/i', $site) ==0){
+								$code_error = 13;
+								break;
+							}
+						case "edit":
+							$need_response = true;
+							//echo (preg_match('/^(YOUTUBE|DAILYMOTION)$/', $site) == 0 ? "true":"false")." || ".(!is_guid($tab_video['ID_VIDEO']) ? "true":"false")." || ".($tab_video['ID_STATUT_DIFFUSION'] < 1 ? "true":"false")." || ".($tab_video['RESULT_CODE_DIFFUSION'] != "0" ? "true":"false")." || ".($tab_video["URL_VIDEO_DIFFUSION"] == "" ? "true":"false");
+							if(preg_match('/^(YOUTUBE|DAILYMOTION)$/', $site) == 0 || !is_guid($tab_video['ID_VIDEO']) || $tab_video['ID_STATUT_DIFFUSION'] < 1 || $tab_video['RESULT_CODE_DIFFUSION'] != "0" || $tab_video["URL_VIDEO_DIFFUSION"] == ""){ 
+								$code_error = 13;
+								break;
+							}
+						case "diffusion":
+							$need_response = true;
+							if($login != "" && $pwd != ""){
+								if($type == ""){ 
+									$type = $tab_video['TYPE_VIDEO'];
+									$type_reference = preg_replace('/_CORP$/i', '', $type);
+								}
+								//print_r($tab_video);
+								if($tab_video['ID_STATUT_VISITE'] < 0){
+									$code_error = "-4";
+								}else if(!$force && $tab_video['RESULT_CODE_DIFFUSION'] == "0" && $tab_video["URL_VIDEO_DIFFUSION"] != "" && !$edit_mode){
+									$code_error = "0";
+									$description_error = $tab_video['URL_VIDEO_DIFFUSION'];
+								}else{
+									$check_before_delete = (!$force && $tab_video['RESULT_CODE_DIFFUSION'] == "-3");
+									$path_file = PATH_TMP_DIFFUSION.$id.".".$videos_options['DIFFUSION_EXT'];
+									$i = 0;
+									while(file_exists($path_file)){ $path_file = PATH_TMP_DIFFUSION.$id."-".($i++).".".$videos_options['DIFFUSION_EXT'];}
+					/*					if($type == "VIDEOTOUR"){
+										$exist = file_get_contents(str_replace('#EXT#',$videos_options['DIFFUSION_EXT'],str_replace('#ID#',$id,URL_CHECKFILE_VIDEOTOUR)));
+										$url_getfile = str_replace('#EXT#',$videos_options['DIFFUSION_EXT'],str_replace('#ID#',$id,URL_GETFILE_VIDEOTOUR));
+									}else{
+										$url_checkfile = get_storage_path('exist',$id,$videos_options['DIFFUSION_EXT'])						
+										$url_checkfile = preg_replace('/storage[0-9].previsite.net/i', 'media.previsite.com', $url_checkfile);
+										$exist = file_get_contents($url_checkfile);
+					*/
+										$replace = array(
+											'search'=> array('#ID#', '#EXT#'),
+											'replace'=> array($tab_video['ID_VIDEO'], $videos_options['DIFFUSION_EXT'])
+										);
+										$url_getfile = str_replace($replace['search'], $replace['replace'], URL_GET_VIDEO)."?r=".rand();
+					//					}
+									if(preg_match('/(youtube|480p)/i', $tab_video['PROFIL_AVAILABLE']) > 0){
+										$tab_infos = json_decode($response, true);
+										$tab_video = array_merge($tab_video, $tab_infos['USER'], $tab_infos['TOUR']);
+										if(!$edit_mode){
+											$result = file_get_contents($url_getfile);
+											file_put_contents($path_file,$result,FILE_APPEND);
+										}
+										if($edit_mode || (file_exists($path_file) && filesize($path_file) > 0)){	
+											$video_title = $title;
+											if($video_title == ""){
+												if($tab_video['TITLE_DIFFUSION'] != ""){ $video_title = $tab_video['TITLE_DIFFUSION'];}
+											 	else if($tab_video['NOM_VISITE'] != ""){ $video_title = $tab_video['NOM_VISITE'];}
+											}
+											if(($video_title != "" && $auto) || !$auto){
+					 							if($video_title == ""){ $video_title = $tab_video['REF_VIDEO'];}
+					 							$video_description = "";
+												if($tab_video['NO_URL'] != "1"){
+													if($tab_video['NO_SHORT_URL'] !="1" && is_guid($tab_video['ID_DIFFUSION_PORTAIL'])){
+														if($tab_video['URL_EXPORT_LISTING'] != ''){
+															$video_description .= str_replace('#PUB#', $tab_video['ID_DIFFUSION_PORTAIL'], $tab_video['URL_EXPORT_LISTING']);
+														}else{
+															$video_description .= str_replace('#PUB#', $tab_video['ID_DIFFUSION_PORTAIL'], URL_AD_PORTAIL);
+														}
+													}else if($tab_video['URL_ANNONCE'] != ""){ 
+														$video_description .= $tab_video['URL_ANNONCE'];
+													} else if(!($tab_video['FORCE_TOUR_URL_DISTRIB'] > 0 || $tab_video['FORCE_TOUR_URL_USER'] > 0) && is_guid($tab_video['ID_VISITE'])){ 
+														$video_description .= "http://tour.previsite.com/".$tab_video['ID_VISITE'];
+													}
+												}	
+												$video_description .= ($video_description != "" ? "\n\n" : "").$tab_video['DESCRIPTION'];
+												if(preg_match('/\&([^ ]+);/i', $video_description) > 0){
+													$video_description = html_entity_decode($video_description, ENT_COMPAT, "UTF-8");
+												}
+												if($video_description == ""){
+													$video_description = $tab_video['REF_VIDEO'];
+													if($tab_video['TYPE_BIEN']!='' || $tab_video['NB_BEDROOM'] != "" || $tab_video['NB_BATHROOM'] != "" || $tab_video['PRIX_BIEN'] != "" || $tab_video['VILLE_BIEN'] != "" || $tab_video['REF_ETAT_POSTAL'] != "" || $tab_video['CODE_POSTAL'] != ""){
+														if($tab_video['TYPE_BIEN'] != ""){ $video_description .= ($video_description != "" ? " - " : "").$tab_video['TYPE_BIEN'];}
+														if($tab_video['NB_BEDROOM'] != ""){ $video_description .= ($video_description != "" ? ", " : "").$tab_video['NB_BEDROOM']." Bedrooms";}
+														if($tab_video['NB_BATHROOM'] != ""){ $video_description .= ($tab_video['NB_BEDROOM'] != "" ? " / " : "" ).$tab_video['NB_BATHROOM']." Bathrooms";}
+														if($tab_video['PRIX_BIEN'] != ""){ $video_description .= ($video_description != "" ? " - " : "" ).$tab_video['SYMBOLE_DEVISE'].number_format($tab_video['PRIX_BIEN'], 0, '.', ',');}
+														if($tab_video['VILLE_BIEN'] != "" || $tab_video['REF_ETAT_POSTAL'] != "" || $tab_video['CODE_POSTAL'] != ""){ 
+															$city = $tab_video['VILLE_BIEN'];
+															$city .= ($city != "" ? ", " : "" ).$tab_video['REF_ETAT_POSTAL']." ".$tab_video['CODE_POSTAL'];
+															$video_description .= ($video_description != "" ? " - " : "").$city;
+														}
+													}else if($video_title != $tab_video['REF_VIDEO']){
+														$video_description = $video_title." ".$tab_video['REF_VIDEO'];
+													}
+												}
+												$title = $video_title;
+												if($tab_video['NO_URL'] != "1" && ($tab_video['FORCE_TOUR_URL_DISTRIB'] > 0 || $tab_video['FORCE_TOUR_URL_USER'] > 0)){
+													$video_description .= "\n\nhttp://tour.previsite.com/".$tab_video['ID_VISITE'];
+												}
+
+												//echo $video_description;exit;
+												$video_tags = get_tags($tab_video, $type_reference);
+												if(count($videos_options['TAGS'][strtoupper($type_reference)]) > 0){ 
+													foreach($videos_options['TAGS'][strtoupper($type_reference)] as $v){ 
+														if(trim($v) != ""){ $video_tags[] = trim($v);}
+													}
+												}
+
+												$tab_video['ID_LANGUE'] = strtoupper($tab_video['ID_LANGUE']);
+												if(!is_array($tags_default[$tab_video['ID_LANGUE']])){ $tab_video['ID_LANGUE'] = "EN";}
+												if(count($tags_default[$tab_video['ID_LANGUE']]) > 0){ 
+													foreach($tags_default[$tab_video['ID_LANGUE']] as $v){ $video_tags[] = $v;}
+												}
+												//print_r($video_tags);exit;
+												for($i=0; $i < count($video_tags); $i++){ $video_tags[$i] = str_ireplace( 'ö', 'o', $video_tags[$i]);}
+										
+												$category = $videos_options['CATEGORY'][$site];
+												
+												$video_playlist = array();
+												if(count($tab_video['PARTNER_INFO']['PLAYLIST']) > 0){
+													foreach($tab_video['PARTNER_INFO']['PLAYLIST'] as $playlist){
+														$in_playlist = true;
+														if(is_array($playlist['FILTRE_PLAYLIST']) && count($playlist['FILTRE_PLAYLIST']) > 0){
+															foreach($playlist['FILTRE_PLAYLIST'] as $field=>$value){
+																if(is_array($value)){
+																	if(!in_array( $tab_video[$field], $value)){
+																		$in_playlist = false;
+																		break;
+																	}
+																}else if(preg_match('/^([^#]+)#(MIN|MAX)$/i', $field, $operator) > 0){
+																	if($operator[2] == "MAX" && $tab_video[$operator[1]] > $value){
+																		$in_playlist = false;
+																		break;
+																	}else if($operator[2] == "MIN" && $tab_video[$operator[1]] < $value){
+																		$in_playlist = false;
+																		break;
+																	}
+																}else if($tab_video[$field] != $value){ 
+																	$in_playlist = false; 
+																	break;
+																}
+															}
+														}
+														if($in_playlist){ $video_playlist[] = $playlist['NOM_PLAYLIST'];}
+													}
+												}else{ $video_playlist = $video_tags;}
+												$code_error = "-3";
+												$description_error = "Diffuse before delete old video";
+												switch($site){
+												case 'YOUTUBE':
+														$tmp = array();
+														$len = 0;
+														for($i=0;$i<count($video_tags);$i++){
+															$video_tags[$i] = trim($video_tags[$i]);
+															$video_tags[$i] = preg_replace('/["]/i','',$video_tags[$i]);
+															if(/*preg_match('/ /i', $video_tags[$i]) == 0 &&*/ strlen($video_tags[$i]) < 31 && strlen($video_tags[$i]) > 2 && ($len+strlen($video_tags[$i])+1) < 490){ 
+																$len +=strlen($video_tags[$i])+1;
+			 													$tmp[] = $video_tags[$i];
+															}
+														}
+														$video_tags_final = implode( ',', $tmp);
+														$video_title = str_replace('&#36;','$',$video_title);
+														while(strlen($video_title) > 100){ 
+															$video_title = substr( $video_title, 0, strrpos($video_title," "));
+														}
+														$video_description = strip_tags($video_description);
+														$video_description = str_replace(array("<",">"), array("",""), $video_description);
+														//echo $video_title;exit;
+														$class = "PHPYouTube";
+														if(!$auto || true) $class = "PHPYouTubeAPI";
+															$phptube = new $class( $login, $pwd, $debug);
+														if(preg_match( $tab_getID[$site], $tab_video['URL_VIDEO_DIFFUSION'], $result) > 0) $idVideo = $result[1];
+														if($check_before_delete && $idVideo != ""){
+															$result = $phptube->deleteVideo($idVideo);
+															if($result == false && preg_match('/Video not found/i', $phptube->error) == 0){
+																$code_error = -3;
+																$description_error = $phptube->error;
+																break;
+															}
+														}
+														if($edit_mode){
+															if($todo == "edit"){
+																$result = $phptube->edit($idVideo, $video_title, $video_tags_final, $video_description, $category);
+																if($result !== true){
+																	$phptube->error = $result;
+																	$result = false;
+																}
+															}else{
+																$result = $phptube->findOriginalVideo($idVideo, $video_title, $video_description);
+																if($result === true){
+																	if($phptube->videoId != $idVideo){
+																		$result_deleted = $phptube->deleteVideo($idVideo);
+																		if($result_deleted == false && preg_match('/Video not found/i', $phptube->error) == 0){
+																			$description_error = $phptube->error;
+																		}
+																	}
+																}else{
+																	$phptube->error = "FIX: ".$result;
+																	$result = false;
+																}
+															}
+														}else{
+															$result = $phptube->uploadFile( $path_file, $video_title, $video_tags_final, $video_description, $category);
+														}
+														if(!$no_playlist) $playlist_details = $phptube->diffuseOnPlaylist($video_playlist);
+														if($result == false){
+															$code_error = 4;
+															$description_error = $phptube->error;
+														}else{
+															$code_error = 0;
+															$description_error = $phptube->url;
+														}
+														break;
+													case 'DAILYMOTION':														
+														function clean_tag_dailymotion($value){ return str_replace(',','',$value);}
+														$video_tags = array_map('clean_tag_dailymotion', $video_tags);
+														$video_tags = 'immobilier,'.implode(',',$video_tags);
+														if(strlen($video_tags) > 150){ 
+															$video_tags = substr($video_tags,0,150);
+															$video_tags = preg_replace('/,[^,]*$/i','',$video_tags);
+														}
+														if(strlen($video_title) > 60){ 
+															$video_title = substr($video_title,0,60);
+														}
+														if(strlen($video_description) > 1000){ 
+															$video_description = substr($video_description,0,1000);
+														}
+														$class = "PHPDailyMotion";
+														if(!$auto || true){ $class = "PHPDailyMotionAPI";}
+														$dailymotion = new $class($login,$pwd,$debug); 
+														if($check_before_delete && preg_match( $tab_getID[$site], $tab_video['URL_VIDEO_DIFFUSION'], $result) > 0){
+															$idVideo = $result[1];
+															$result = $dailymotion->deleteVideo($idVideo);
+															if($result == false){
+																$code_error = -3;
+																$description_error = $phptube->error;
+																break;
+															}
+														}
+														if($todo == "edit"){
+															$result = $dailymotion->edit($tab_video['URL_VIDEO_DIFFUSION'], $video_title, $video_tags, $video_description, $category);
+														}else{
+															$result = $dailymotion->uploadFile($path_file,$video_title,$video_tags,$video_description, $category);
+														}
+														$playlist_details = $dailymotion->diffuseOnPlaylist($video_playlist);
+														if($result !== true){
+															$code_error = 4;
+															$description_error = $result;
+														}else{
+															$code_error = 0;
+															$description_error = $dailymotion->url;
+														}
+														break;
+													case 'METACAFE':	
+														$class = "PHPMetacafe";
+														$phptube = new $class( $login, $pwd, $debug); 
+														if($todo == "edit"){
+															$result = $phptube->edit($tab_video['URL_VIDEO_DIFFUSION'], $video_title, $video_tags, $video_description, $category);
+														}else{
+															$result = $phptube->uploadFile($path_file, $video_title, $video_tags, $video_description, $category);
+														}
+														if($result !== true){
+															$code_error = 4;
+															$description_error = $result;
+														}else{
+															$code_error = 0;
+															$description_error = $phptube->url;
+														}
+														break;
+													case 'VIEWTHISHOME':
+														$infos = array();
+														$infos['tour'] = get_tour_data($id);
+														$infos['user'] = get_user_data($infos['tour']['ID_UTILISATEUR']);
+														$db_data['name'] = 'video';
+														//$infos = $tab_video;
+														$phptube = new PHPViewThisHome($login,$pwd, $debug);
+														$result = $phptube->uploadFile($path_file,$video_title,$video_description,$infos);
+														if($result !== true){
+															$code_error = 4;
+															$description_error = $phptube->error;
+														}else{
+															$code_error = 0;
+															$description_error = $phptube->url;
+														}
+														break;
+				
+													case 'KEWEGO':
+														$tmp = array();
+														for($i=0;$i<count($video_tags) && $i < 12;$i++){ $tmp[] = '"'.$video_tags[$i].'"';}
+														$video_tags = $tmp;
+														$video_tags = implode(', ',$video_tags);
+														if(strlen($video_title) > 255){ $video_title = substr( $video_title, 0, 255);}
+														if(strlen($video_description) > 1000){  $video_description = substr($video_description,0,1000);}
+														$infos = array();
+														$infos['tour'] = get_tour_data($id);
+														$infos['user'] = get_user_data($infos['tour']['ID_UTILISATEUR']);
+														$db_data['name'] = 'video';
+														//$infos = $tab_video;
+														$phptube = new PHPKewego($login, $pwd, $debug);
+														$result = $phptube->uploadFile($path_file, $video_title, $video_tags, $video_description, $infos);
+														if($result !== true){
+															$code_error = 4;
+															$description_error = $phptube->error;
+														}else{
+															$code_error = 0;
+															$description_error = $phptube->url;
+														}
+														break;
+													case 'YAHOO':
+														$video_tags = implode( ', ', $video_tags);
+														$phptube = new PHPYahoo($login, $pwd, $debug);
+														$result = $phptube->uploadFile($path_file, $video_title, $video_tags, $video_description, $infos);
+														if($result !== true){
+															$code_error = 4;
+															$description_error = $phptube->error;
+														}else{
+															$code_error = 0;
+															$description_error = $phptube->url;
+														}
+														break;
+													case 'WATTV':
+														$video_tags = implode(', ', $video_tags);
+														$phptube = new PHPWattv($login, $pwd, $debug);
+														$result = $phptube->uploadFile($path_file, $video_title, $video_tags, $video_description, $infos);
+														if($result !== true){
+															$code_error = 4;
+															$description_error = $phptube->error;
+														}else{
+															$code_error = 0;
+															$description_error = $phptube->url;
+														}
+														break;
+													case 'VIMEO':
+														$video_tags = implode(', ', $video_tags);
+														$phptube = new PHPVimeo($login, $pwd, $debug);
+														$result = $phptube->uploadFile($path_file, $video_title, $video_tags, $video_description, $infos);
+														if($result !== true){
+															$code_error = 4;
+															$description_error = $phptube->error;
+														}else{
+															$code_error = 0;
+															$description_error = $phptube->url;
+														}
+														break;
+													default:
+														$code_error = 5;
+														$description_error = "Website ".$site." unsupported";
+														break;
+												}
+		
+												@unlink($path_file);
+											}else{ $code_error = 12;}
+										}else{ $code_error = 3;}
+									}else{ $code_error = 2;}
+								}
+							}else{$code_error = 6;}
+							break;
+
+						case "error":
+							$need_response = true;
+							if(is_guid($id)){
+								$sql = "SELECT TYPE_VIDEO FROM VIDEO WHERE ID_VIDEO='".$id."'";
+								$type = db_getOne($sql, "video");
+								$sql = "SELECT ID_VIDEO FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$id."' AND SITE_DIFFUSION='".strtoupper($site)."' AND LOGIN_DIFFUSION='".fix_text($login)."'";
+								$result = db_getOne($sql, "video");
+								if(is_guid($result)){ $code_error = 8;}
+								else{ $code_error = 9;}
+							}else{ $code_error = 1;}
+							break;
+
+						case "check_diffusion":
+							if(is_guid($id)){
+								if($login != ""){
+									$sql = "SELECT ID_STATUT_DIFFUSION FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$id."' AND SITE_DIFFUSION='".$site."' AND LOGIN_DIFFUSION='".$login."'";
+									$result = db_getOne($sql,"video");
+									if($result == "1"){	echo "true";}
+									else if($result == "0"){ echo "0";}
+									else{ echo "false";}
+								}else{ $code_error = 6;}
+							}else{ $code_error = 1;}
+							exit;
+					}
+				}else{ $code_error = 15;}
+			}else{ $code_error = 16;}
+		}else{ $code_error = 14;}
+	}else{ $code_error = 2;}
+}else{ $code_error = 11;}
+//write_stupeflix_log("[DIFFUSION][".strtoupper($todo)."]: ".$id." (".$site.":".$login."/".$pwd." mode:".$mode.") result:".$code_error.". ".$tab_error[$code_error].($description_error != "" ? " - description: ".$description_error: ""));
+
+exec("find ".PATH_TMP_DIFFUSION."* -mtime 1 -exec rm {} \;");
+
+if($need_response){
+	/* Prepare VideoRequestResult XML */
+	if($responseInJson){
+		$json = array('code' => $code_error, 'text' => $tab_error[$code_error]);
+		if($description_error != ""){
+			$json['description'] = $description_error;
+			if($tab_getID[$site] != ""  && preg_match($tab_getID[$site],$description_error,$result) > 0){
+				$json['id'] = $result[1];
+			}
+			if($playlist_details != "") $json['playlist'] = $playlist_details;
+		}
+		if($todo == "check" && $code_error != "0"){
+			$json['diffusion'] = array('code' => $tab_video['RESULT_CODE_DIFFUSION'], "text" => $tab_video['RESULT_TEXT_DIFFUSION']);
+			if($tab_video['RESULT_DESCRIPTION_DIFFUSION'] != ""){
+				$json['diffusion']['description'] = $tab_video['RESULT_DESCRIPTION_DIFFUSION'];
+			}
+		}
+		$xml_data = json_encode($json);
+	}else{
+		$xml_data ="<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+		$xml_data .="<VideoDiffusionRequestResult Version=\"1.0\">\n";
+		$xml_data.="	<VideoDiffusionResultCode>".$code_error."</VideoDiffusionResultCode>\n";
+		$xml_data.="	<VideoDiffusionResultText>".$tab_error[$code_error]."</VideoDiffusionResultText>\n";
+		if($description_error != ""){
+			$xml_data .="	<VideoDiffusionResultDescription><![CDATA[".$description_error."]]></VideoDiffusionResultDescription>\n";
+			if($tab_getID[$site] != ""  && preg_match($tab_getID[$site],$description_error,$result) > 0){
+				$xml_data .="	<VideoDiffusionResultId><![CDATA[".$result[1]."]]></VideoDiffusionResultId>\n";
+			}
+			if($playlist_details != ""){
+				$xml_data .="	<VideoDiffusionResultPlayListInfos><![CDATA[".$playlist_details."]]></VideoDiffusionResultDescriptionPlayListInfos>\n";
+			}
+		}
+		if($todo == "check" && $code_error != "0"){
+			$xml_data .="	<VideoDiffusionResultDetails>\n";
+			$xml_data .="		<VideoDiffusionResultCode>".$tab_video['RESULT_CODE_DIFFUSION']."</VideoDiffusionResultCode>\n";
+			$xml_data .="		<VideoDiffusionResultText>".$tab_video['RESULT_TEXT_DIFFUSION']."</VideoDiffusionResultText>\n";
+			if($tab_video['RESULT_DESCRIPTION_DIFFUSION'] != ""){
+				$xml_data .="		<VideoDiffusionResultDescription><![CDATA[".$tab_video['RESULT_DESCRIPTION_DIFFUSION']."]]></VideoDiffusionResultDescription>\n";
+			}
+			$xml_data .="	</VideoDiffusionResultDetails>\n";
+		}
+		$xml_data.="</VideoDiffusionRequestResult>";
+	}
+	if( $code_error != 6 && $code_error != 1 && $code_error != -2 && $login != "" && $todo != "check" && !($todo == "delete" && $code_error == "2") && is_guid($tab_video['ID_VIDEO']) /*&& !$edit_mode */&& $code_error != 15){ 
+		$sql = "SELECT ID_VIDEO, URL_VIDEO_DIFFUSION, URL_NOTIFICATION_DIFFUSION, RESULT_CODE_DIFFUSION, RESULT_TEXT_DIFFUSION, RESULT_DESCRIPTION_DIFFUSION, (SELECT TYPE_VIDEO FROM VIDEO WHERE ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO) TYPE_VIDEO, ID_STATUT_DIFFUSION FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$tab_video['ID_VIDEO']."' AND SITE_DIFFUSION='".fix_text($site)."' AND LOGIN_DIFFUSION='".fix_text($login)."'";
+		$result = db_query($sql, 'video');
+		$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+		$description = "";
+		if($todo != "delete"){ $url_video = "";}
+		if($code_error == 0){ $url_video = $description_error;}
+		else{ $description = $description_error;}
+		$sql = "";
+		$id_statut_diffusion = ($code_error != 0 ? "-1" : "2");
+		if($code_error == 16 || $todo == "edit" || ($todo == "fix" && $code_error != 0) ){ 
+			$url_video = $row['URL_VIDEO_DIFFUSION'];
+			$code_error = $row['RESULT_CODE_DIFFUSION'];
+			$id_statut_diffusion = $row['ID_STATUT_DIFFUSION'];
+		}
+		if(is_guid($row['ID_VIDEO'])){
+			$sql = "UPDATE VIDEO_DIFFUSION SET PASSWORD_DIFFUSION='".fix_text($pwd)."'".($code_error == 0 ? ",URL_VIDEO_DIFFUSION='".fix_text($url_video)."'" : "").",DATE_MODIFICATION_DIFFUSION=GETDATE(),RESULT_CODE_DIFFUSION='".fix_text($code_error)."',RESULT_TEXT_DIFFUSION='".fix_text($tab_error[$code_error])."',RESULT_DESCRIPTION_DIFFUSION='".fix_text($description,300)."',ID_STATUT_DIFFUSION='".$id_statut_diffusion."', AUTO='".($auto ? "1" : "0")."'".($notification != "" ? ",URL_NOTIFICATION_DIFFUSION='".fix_text($notification)."'" : "").", TITLE_DIFFUSION=N'".fix_text($title)."' WHERE ID_VIDEO='".$row['ID_VIDEO']."' AND SITE_DIFFUSION='".fix_text($site)."' AND LOGIN_DIFFUSION='".fix_text($login)."'";
+		}else{
+			$sql = "INSERT INTO VIDEO_DIFFUSION(Id_video, Site_diffusion, Login_diffusion, Password_diffusion, Url_video_diffusion, Date_creation_diffusion, Date_modification_diffusion, result_code_diffusion, result_text_diffusion, result_description_diffusion, Id_statut_diffusion, url_notification_diffusion, auto, title_diffusion) VALUES('".$tab_video['ID_VIDEO']."','".fix_text($site)."','".fix_text($login)."','".fix_text($pwd)."','".fix_text($url_video)."','".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."','".$code_error."','".fix_text($tab_error[$code_error])."','".fix_text($description)."','".$id_statut_diffusion."','".fix_text($notification)."','".($auto ? "1" : "0")."', N'".fix_text($title)."')";
+		}
+		db_query( $sql, 'video');
+		if($code_error == '-1'){
+			$sql = "SELECT count(*) FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$row['ID_VIDEO']."' AND ID_STATUT_DIFFUSION IN ( 0, 3)";
+			
+			if(db_getOne($sql, 'video') == 0){
+				db_close();
+				$sql = "UPDATE VIDEO_CRON SET ID_STATUT_CRON='-1', DATE_MODIFICATION_CRON='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$row['ID_VIDEO']."' AND ID_STATUT_CRON=0";
+				db_query($sql, 'videocron');
+			}
+		}
+//		event_log("[DIFFUSION][NOTIFICATION]: ".$id." notification: OK (".$notification.")", $file_logs);
+		if($code_error > 0 && ($row['RESULT_CODE_DIFFUSION'] != $code_error || $row['RESULT_DESCRIPTION_DIFFUSION'] != $description)){
+//			event_log("[DIFFUSION][NOTIFICATION]: no-notification", $file_logs);
+/*			$url = URL_LAUNCH_DIFFUSION_VIDEO;
+			$url = str_replace('#ID#',$id,$url);
+			$url = str_replace('#TYPE#',$type,$url);
+			$url = str_replace('#SITE#',$site,$url);
+			$url = str_replace('#NOTIFICATION#',urlencode($notification),$url);
+			$url = str_replace('#TITLE#',urlencode($title),$url);
+			$url = str_replace('#LOGIN#',$login,$url);
+			$url = str_replace('#PASSWORD#',$pwd,$url);
+			$url = str_replace('#MODE#',($auto ? "auto" : ""),$url);
+			//write_stupeflix_log("[DIFFUSION][RE-LAUNCH]: ".$url);
+			$xml_data = file_get_contents($url);
+*/		}else if(!$no_notification){
+			if($notification == "") $notification = $row['URL_NOTIFICATION_DIFFUSION'];
+			if($notification != ""){
+				//echo "[DIFFUSION][NOTIFICATION]: ".$id." notification: OK (".$notification.")<br />";
+				//echo "[DIFFUSION][NOTIFICATION][PARAMS]: ".$id."(".$tab_video['ID_DISTRIBUTEUR'].")/".$site."/".$url_video."/".$code_error."/".$type."<br />";
+				//write_stupeflix_log("[DIFFUSION][NOTIFICATION]: ".$id." notification: OK (".$notification.")");
+				//write_stupeflix_log("[DIFFUSION][NOTIFICATION][PARAMS]: ".$id."(".$tab_video['ID_DISTRIBUTEUR'].")/".$site."/".$url_video."/".$code_error."/".$type);
+//				event_log("[DIFFUSION][NOTIFICATION][PARAMS]: ".$id."(".$tab_video['ID_DISTRIBUTEUR'].")/".$site."/".$url_video."/".$code_error."/".$type, $file_logs);
+//echo $notification;
+				$client = &new HTTP_Request($notification);
+				$client->setMethod(HTTP_REQUEST_METHOD_POST);
+				$params = array(
+					"id" => $tab_video['ID_VISITE'],
+					"site" => $site,
+					"url" => $url_video,
+					"code" => $code_error,
+					"type" => $type,
+					"distrib" => $tab_video['ID_DISTRIBUTEUR'],	
+				);
+				if(preg_match($tab_getID[$site], $url_video, $result) > 0){
+					$params["ref"] = $result[1];
+				}
+				$params_debug = "";
+				foreach($params as $k=>$v){
+					$client->addPostData($k, $v);
+					$params_debug .= "&".$k."=".urlencode($v);
+				}
+				//echo $notification.preg_replace('/^&/i', '?', $params_debug);
+//				print_r(array("id" => $tab_video['ID_VISITE'], "site"=> $site,"url" => $url_video, "code"=> $code_error, "type"=> $type, "distrib"=> $tab_video['ID_DISTRIBUTEUR']));
+				$client->sendRequest();
+				//echo $client->getResponseBody();
+			}
+		}
+	
+		if($code_error != 0 && $code_error != "-1"){
+			$body = " - site: ".$site."\n - type: ".$type."\n - id: ".$id."\n\n - result: ".$code_error.". ".$tab_error[$code_error].($description_error != "" ? "\n - description: ".$description_error: "")."\n\n\n- video: http://video.previsite.net/detail_video.php?id=".$id."&tour=".$tab_video['ID_VISITE']."\n";
+	//		send_mail("video@previsite.com", 'VIDEO DIFFUSION', 'VIDEO DIFFUSION - ERROR - '.$site, $body, "julien@previsite.com");
+		}	
+	}
+
+	if(!$responseInJson) header('Content-type: text/xml');
+	echo $xml_data;	
+	exit;
+}
+
+function fix_tag_url($url){
+	return preg_replace('/\/$/i', '', preg_replace('/^http:\/\//i', '', $url));
+}
+
+function get_tags($infos, $type){
+//	print_r($infos);
+	global $tags_default;
+	$lang = $infos['ID_LANGUE'];
+	if(!file_exists(PATH_DICO.strtolower($infos['ID_LANGUE']).".php")){ $lang = "EN";}
+	require_once(PATH_DICO.strtolower($lang).".php");
+
+	$return = array();
+	switch($type){
+		case "AUTO":
+			$return[] = 'Vente';
+			$return[] = $_dico['neuf'][($infos['ID_NEUF'] == 1 ? 1 : 2)];
+			if($infos['NOM_MARQUE'] != ""){ $return[] = $infos['NOM_MARQUE'];}
+			if($infos['NOM_MODELE'] != ""){ $return[] = $infos['NOM_MODELE'];}
+			if($infos['NOM_VISITE'] != ""){ $return[] = $infos['NOM_VISITE'];}
+			if($infos['NOM_TYPE_ENERGIE'] != ""){ $return[] = $infos['NOM_TYPE_ENERGIE'];}
+			if($infos['NOM_TYPE_BOITE'] != ""){ $return[] = $infos['NOM_TYPE_BOITE'];}
+			if($infos['NOM_SOCIETE'] != ""){ $return[] = $infos['NOM_SOCIETE'];}
+			if($infos['SITEWEB_SOCIETE'] != ""){ $return[] = fix_tag_url($infos['SITEWEB_SOCIETE']);}
+			break;
+		case "LIMANGO":
+			$return = $tags_default[$type_reference];
+			break;
+		default:
+			//1  - Type de bien traduit        ex. "Maison", "Parking", "House", "Appartement", "Terrain", ..		
+			if($infos['TYPE_BIEN'] != ""){ $return[] = $infos['TYPE_BIEN'];}
+			else if($_dico['type_bien'][$infos['ID_TYPE_BIEN']]){ $return[] = $_dico['type_bien'][$infos['ID_TYPE_BIEN']];}
+			//2  - Type de transaction         ex. "Vente", "Sale", "Location", ..
+			if($infos['ID_TYPE_TRANSACTION'] != "" && $_dico['type_transaction'][$infos['ID_TYPE_TRANSACTION']] != ""){ $return[] = $_dico['type_transaction'][$infos['ID_TYPE_TRANSACTION']];}
+			//3  - Ville                       ex. "Suresnes", "New York"
+			if($infos['VILLE'] != ""){ $return[] = $infos['VILLE'];}
+			//4  - Nom société                 ex. "CABINET PAUL ROLLAND"
+			if($infos['NOM_SOCIETE'] != ""){ $return[] = $infos['NOM_SOCIETE'];}
+			//5 - Provider                    ex. Seloger.com", "Previsite"
+			if($infos['NOM_DISTRIBUTEUR'] != ""){ $return[] = $infos['NOM_DISTRIBUTEUR'];}
+			//6 - Region/Etat                 ex. "Seine-et-Marne", "Idaho"
+			if($infos['NOM_ETAT'] != ""){ $return[] = $infos['NOM_ETAT'];}
+			//7 - Site Web société            ex. "www.seloger.com"
+			if(fix_tag_url($infos['SITEWEB_SOCIETE']) != ""){ $return[] = fix_tag_url($infos['SITEWEB_SOCIETE']);}
+			//8 - Custom                   à ajouter de base pour chaque vidéo FR   “immobilier”, "annonce", « previsite »
+			$tags = array();
+			if($infos['TAGS_USER'] != "" || $infos['TAGS_DISTRIB'] != ""){
+				$tags = explode(';', $infos['TAGS_USER']);
+				$tags = array_merge($tags, explode(';', $infos['TAGS_DISTRIB']));
+			}else if(count($tags_default[$infos['ID_PAYS']]) > 0){
+				foreach($tags_default[$infos['ID_PAYS']] as $v){ $tags[] = $v;}
+			}
+			if(count($tags) > 0){
+				foreach($tags as $v){ 
+					if(trim($v) != ""){ $return[] = trim($v);}
+				}
+			}
+			//9 - Code Postal                 ex. "92150"			
+			if($infos['CODE_POSTAL'] != ""){ $return[] = $infos['CODE_POSTAL'];}
+			//10  - Nb de Pièce                 ex. "7 pièces", "2 pièces"
+			if($infos['NB_ROOM'] > 0 && $_dico['room'] != ""){ $return[] = $infos['NB_ROOM']." ".$_dico['room'.($infos['NB_ROOM'] > 1 ? 's' : '' )];}
+			if(preg_match('/^(US|CA)$/i', $infos['ID_PAYS']) > 0){
+				//11*  - Nb de Chambre               ex. "2 chambres", "2 BR", "3 BR" *
+				if($infos['NB_BEDROOM'] > 0 && $_dico['bedroom'] != ""){ $return[] = $infos['NB_BEDROOM']." ".$_dico['bedroom'.($infos['NB_BEDROOM'] > 1 ? 's' : '' )];}
+				//12*  - Nb de SDB                   ex. "1 sdb", "1 BA" *
+				if($infos['NB_BATHROOM'] > 0 && $_dico['bathroom'] != ""){ $return[] = $infos['NB_BATHROOM']." ".$_dico['bathroom'.($infos['NB_BATHROOM'] > 1 ? 's' : '' )];}
+				//13* - Nom agent                   ex. "John Doe" *
+				if($infos['PRENOM_UTILISATEUR'] != "" || $infos['NOM_UTILISATEUR'] != ""){
+					$return[] = $infos['PRENOM_UTILISATEUR'].($infos['PRENOM_UTILISATEUR'] != "" ? " " : "").$infos['NOM_UTILISATEUR'];
+				}
+				//14* - Addresse                    ex. "2803 road street",
+				if($infos['ID_ADRESSE_CACHEE'] == 0 && $infos['ADRESSE'] != ""){ $return[] = $infos['ADRESSE'];}
+			}
+			//15 - Proximité                   ex. "Metro Abesses"
+			if($infos['VOISINNAGE'] != ""){ $return[] = $infos['VOISINNAGE'];}
+
+//			if($infos['SQUARE_FEET']  > 0){ $return[] = $infos['SQUARE_FEET']." ".$infos['NOM_UNITE_SURFACE'];}
+			//16 - Etage                       ex. "rdc", "dernier etage", "penthouse"
+			if($infos['ETAGE']  > 0 && $_dico['etage'] != ""){ $return[] = $infos['ETAGE']." ".$_dico['etage'];}
+			//17- Terrasse/Balcon/Cave/Parking/Box/exclusivité            ex. "terrasse", "balcon", "cave", "parking", "box"
+			$infos['PARKING'] = $infos['NOMBRE_PARKING_INT']+$infos['NOMBRE_PARKING_EXT'];
+			$complements = array( 'TERRASSE', 'BALCON', 'CAVE', 'PARKING', 'BOX', 'EXCLUSIVITE');
+			foreach($complements as $v){
+				if($infos[$v] > 0 && $_dico[strtolower($v)] != ""){ $return[] = $_dico[strtolower($v)];}
+			}
+			if($infos['REF_PORTAIL'] != ""){ $return[] = $infos['REF_PORTAIL'];}
+			break;
+	}
+//	print_r($return);exit;
+	return $return;
+}
+?>

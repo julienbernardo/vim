@@ -1,0 +1,93 @@
+<?php
+DEFINE('TYPE_MSG', 'MO');
+DEFINE('COUNTRY', 'US');
+
+/* code includes */
+require("phpmailer/class.phpmailer.php");
+require_once('include/fonction.db.php');
+require_once('include/fonctions.php');
+require_once('include/sms.php');
+require_once('include/global.php');
+require_once('include/storage.php');
+require_once('include/config_sms.php');
+require_once('DB.php');
+require_once('previsite/GetDsn.php');
+require_once('HTTP/Request.php');
+require_once('include/twilio.php');
+
+$dsn = $dsn_sms;
+//http://sms.previsite.net/twilio.php?todo=sms&AccountSid=AC491472c242b10eada2e0804560eef6e7&Body=PPTWCSXT&ToCity=NEW YORK&FromState=NY&ToZip=10010&ToState=NY&SmsSid=SMdd967d26c76052e8d27a4ec5d2272e9d&To=+19173384619&ToCountry=US&FromCountry=US&SmsMessageSid=SMdd967d26c76052e8d27a4ec5d2272e9d&ApiVersion=2010-04-01&FromCity=NEW YORK&SmsStatus=received&From=+13475594715&FromZip=10013
+$todo   	= $_REQUEST['todo'];
+$phone   	= $_REQUEST['From'];
+$phone_to	= $_REQUEST['To'];
+$data_src  	= $_REQUEST['Body'];
+$smsSid 	= $_REQUEST['SmsSid'];
+$SmsStatus	= $_REQUEST['SmsStatus'];
+$AccountSid = $_REQUEST['AccountSid'];
+$data	  	= strtoupper(trim($data_src));
+$country	= "US";
+
+$config = $config_sms[COUNTRY][TYPE_MSG];
+
+$log = "-----------------------\nDate: ".date('Y-m-d H:i:s')."\n";
+foreach($_REQUEST as $k=>$v){ $log .= $k." => ".$v."\n";}
+//file_put_contents("/var/www/sms.previsite.net/tmp/twilio.log", $log."-----------------------\n".substr(file_get_contents("/var/www/sms.previsite.net/tmp/twilio.log"), 0, 2000));
+if($AccountSid == TWILIO_ACCOUNTSID){
+	$output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	$output .= "<Response>\n";
+	$output_footer = "</Response>\n";
+	switch($todo){
+		case "voice":
+		    $output .= "<Dial>877-536-7180</Dial>\n";    
+		    break;
+		case "sms":
+			$type_msg = "MO";
+		    if(preg_match('/^(STOP|STOPNOW|QUIT|END|CANCEL|UNSUBSCRIBE|STOPALL|HELP)/i',$data) > 0){
+		    	if(preg_match('/^(HELP)/i',$data) > 0){ $msg = $config['MSG_KEYWORD_HELP'];}
+		    	else{
+				    $msg = $config['MSG_KEYWORD_STOP'];
+					desactivateNumber($phone, $operator, $country);
+				}
+		    }else{
+		    	$retour = activateNumber($phone, $operator, $country);
+		        if(is_array($config['KEYWORDS'][$data])){ 
+		        	$global['id'] = $config['KEYWORDS'][$data]['id']; 
+				    $global['user'] = $config['KEYWORDS'][$data]['user']; 
+		    	}else{ 
+		    	    checkVideo($data,&$global);
+		        }
+
+		        if($global['id']!=""){
+		    		/* WAP PUSH Message */
+					$msg = str_replace("#ID#", $data, $config['URL_VIDEO_MOBILE']);
+				}
+		    }
+		    if($msg == ""){ $msg = str_replace("#DATA#",$data,$config['VIDEO_NOT_FOUND']).$config['END_MESSAGE'];}
+	//        $output .= "<Sms statusCallback=\"".$url_notification."\">".$msg."</Sms>\n";
+		    
+		    $is_sent = false;
+		    $response = sendTwilioSMS($phone_to, $phone, $msg);
+		    $is_sent = ($response['response'] === true);
+		    $log_request = "";
+		    foreach($response['request'] as $k=>$v){ $log_request .= $k." => ".$v."\n";}
+		    
+		    if($phone != ""){
+				$idSms = generate_guid();
+				$sql = "INSERT INTO MO(ID_MO ,CODE_SMS ,NUMERO ,TITRE ,TEXTE ,WAP_PUSH ,ID_STATUT_MO ,DATE_CREATION_MO ,DATE_MODIFICATION_MO ,XML_REQUEST_MO ,XML_RESPONSE_MO ,XML_SOURCE_MO , ID_SESSION, REF_PAYS,ID_OPERATOR,SHORTCODE,RESULT_CODE,RESULT_TEXT,TARIF)
+								VALUES('".$idSms."' ,'".fix_text($data_src,20)."' ,'".formatNumber($phone, $country)."' ,'' ,'".fix_text($msg)."' ,'0' ,'".($is_sent ? "1" : "-1")."' ,'".date('Y-m-d H:i:s')."' ,'".date('Y-m-d H:i:s')."' ,'".fix_text($log_request)."' ,'".fix_text($response['response'])."' ,'".fix_text($log)."' , '".fix_text($smsSid)."','".fix_text($country)."','','','".($is_sent ? "0" : "-1")."','".($is_sent ? "OK" : fix_text($response['response']))."','0')";
+				db_query($sql);
+				//if(is_guid($global['id'])){ notifyUser($global['id'],$phone);}
+				// TODO: URL_NOTIFICATION_MT_US
+			}
+			break;
+		case "mt":
+			break;
+		
+	}
+	db_close();
+
+	header("content-type: text/xml");
+	echo $output.$output_footer;
+}
+exit;
+?>

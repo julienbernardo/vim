@@ -1,0 +1,178 @@
+<?php
+require_once('../include/global.php');
+require_once('../include/fonctions.php');
+
+define('URL_IMG_VIDEO_LOGO',	'http://mediarr.previsite.com/videologo/#ID#.#EXT#');
+define('URL_IMG_AGENCY',		'http://mediarr.previsite.com/agency/#ID#.#EXT#');
+define('URL_IMG_USER',			'http://mediarr.previsite.com/user/#ID#.#EXT#');
+define('URL_IMG_LOGOAGENT',		"http://".(SERVEUR_DEV ? "dev." :"")."tour.previsite.com/partners/new/images/logos/#LOGO#");
+define('PATH_CACHE_PINTEREST',	PATH_FTP_EXPORTS_151.'pinterest/');
+
+$id = $_REQUEST['id'];
+$debug = ($_REQUEST['debug'] == 'true');
+$todo = $_REQUEST['todo'];
+
+if(is_guid($id)){
+	$file_img = PATH_CACHE_PINTEREST.$id.".png";
+	if(!file_exists(PATH_CACHE_PINTEREST)) mkdir(PATH_CACHE_PINTEREST);
+	if($todo == "del" || $todo == "create"){ 
+		@unlink($file_img);
+		if($todo == "del") die("oki");
+	}
+	if(!file_exists($file_img)){
+		$url = str_replace('#TOUR#', $id, URL_GET_TOUR_INFOS);
+		$content = file_get_contents($url);
+		$json = json_decode($content, true);
+		if(is_array($json['TOUR']) && count($json['IMAGES']) > 0){
+			$config = array(
+				'start' => 20,
+				'step' => 20,
+				'size' => array('width' => 400, 'height' => 900),
+				'limit' => array(
+					'width' => array('min' => 150,'max' => '360'),
+					'height' => array('min' => 150,'max' => '360'),
+				),
+			);
+			$limit = $config['limit'];
+
+			$final = array();
+			$current_pos = $config['start'];
+			//image
+			$url_cover = "./cover/cover.png";
+			$src_cover = getimagesize($url_cover);
+			$src_cover = array('width' => $src_cover[0], 'height' => $src_cover[1]);
+			//$images = array('./cover/1.jpg', './cover/2.jpg');
+
+			for ($i = 0; $i < count($json['IMAGES']); $i++, $current_pos += $config['step']+$coef*$height) {
+				$replace = array(
+					'search' => array('%PATH%', '%SIZE%', '%ID%'),
+					'replace' => array('still', SIZE_STILL, $json['IMAGES'][$i]['ID_IMAGE']),
+				);
+				$url = str_replace($replace['search'], $replace['replace'], URL_MEDIA);
+				list($width, $height) = getimagesize($url);
+				$coef = get_redim_coef($width, $height, $limit['width']['min'],  $limit['height']['min'], $limit['width']['max'], $limit['height']['max']);
+				$final[] = array(
+					'pos' => $current_pos,
+					'url' => $url,
+					'src' => array('width' => $width, 'height' => $height),
+					'dst' => array('width' => $coef*$width, 'height' => $coef*$height),
+				);
+				if($url_cover != ""){
+					$final[] = array(
+						'pos' => $current_pos,
+						'url' => $url_cover,
+						'src' => $src_cover,
+						'dst' => array('width' => $coef*$width, 'height' => $coef*$height),
+					);
+				}
+			}
+
+			//header
+			$url_logo = getUrlLogo($json);
+			if($url_logo != ""){
+				list($width, $height) = getimagesize($url_logo);
+				$coef = 1;
+				if( $width < $limit['width']['min'] || $width > $limit['width']['max'] || $height > $limit['height']['min'] || $height > $limit['height']['max']){
+					$coef = get_redim_coef($width, $height, $limit['width']['min'],  $limit['height']['min'], $limit['width']['max'], $limit['height']['max']);
+				}
+				$final[] = array(
+					'pos' => $current_pos,
+					'url' => $url_logo,
+					'src' => array('width' => $width, 'height' => $height),
+					'dst' => array('width' => $coef*$width, 'height' => $coef*$height),
+				);
+				$current_pos += $config['step']+$coef*$height;
+			}
+
+			//creation image
+			$url_bg = "./cover/bg.png";
+			$config['size']['height'] = $current_pos+$config['step'];
+			$main_image = imagecreatetruecolor($config['size']['width'], $config['size']['height']);
+			$col = imagecolorallocate($main_image, 255,255,255);
+			imagefill($main_image,0,0, $col);
+			//add image
+			for ($i = 0; $i < count($final); $i++){
+				$img = openImage($final[$i]['url']);
+				if($img !== false){
+					imagecopyresampled($main_image, $img, ($config['size']['width']-$final[$i]['dst']['width'])/2, $final[$i]['pos'], 0,0, $final[$i]['dst']['width'], $final[$i]['dst']['height'], $final[$i]['src']['width'], $final[$i]['src']['height']);
+					imagedestroy($img);
+				}
+			}
+		}
+		imagepng($main_image, $file_img);
+		imagedestroy($main_image);
+	}
+
+	if(file_exists($file_img)){
+		if($todo == "create") die("true");
+		$img = file_get_contents($file_img);
+		if(!$debug){
+			header('Content-type: image/png');
+			echo $img;
+		}
+	}
+	exit;
+ }
+//header("HTTP/1.0 404 Not Found");
+//header("Status: 404 Not Found");
+exit;
+
+function openImage($file){
+	$img = false;
+	if(preg_match('/\.([^\.]+)$/i', $file,  $ext) > 0){
+		switch(strtolower($ext[1])){
+			case "png":
+				$img = imagecreatefrompng($file);
+				break;
+			case "jpg":
+			case "jpeg":
+				$img = imagecreatefromjpeg($file);
+				break;
+		}
+	}
+	return $img;
+}
+
+function getUrlLogo($json){
+	$url_logo = "";
+	if(is_guid($json['USER']['ID_LOGO_VIDEO'])){
+		$url_logo = array('search' => array('#ID#','#EXT#'), 'replace' => array($json['USER']['ID_LOGO_VIDEO'], $json['USER']['ID_LOGO_VIDEO_EXT']), 'url' => URL_IMG_VIDEO_LOGO);
+	}
+	if(is_guid($json['USER']['ID_LOGO_SOCIETE'])){
+		$url_logo = array('search' => array('#ID#','#EXT#'), 'replace' => array($json['USER']['ID_LOGO_SOCIETE'], $json['USER']['ID_LOGO_SOCIETE_EXT']), 'url' => URL_IMG_AGENCY);
+	}
+
+	if(is_guid($json['USER']['ID_LOGO_USER'])) {
+		$url_logo = array( 'search' => array('#ID#','#EXT#'), 'replace' => array($json['USER']['ID_LOGO_USER'],$json['USER']['ID_LOGO_USER_EXT']), 'url' => URL_IMG_USER);
+	}
+
+	if($json['USER']['ID_LOGO_DISTRIB'] != ""){
+		$url_logo = array('search' => '#LOGO#', 'replace' => $json['USER']['ID_LOGO_DISTRIB'], 'url' => URL_IMG_LOGOAGENT);
+	}
+	if(is_array($url_logo)){
+		$url_logo = str_replace( $url_logo['search'], $url_logo['replace'], $url_logo['url']);
+	}
+	return $url_logo;
+}
+
+function get_redim_coef($width, $height, $width_min, $height_min, $width_max, $height_max){
+	$coef = 1;
+	//echo $width_min."/".$height_min." < ".$width."/".$height." < ".$width_max."/".$height_max."<br />";
+	if($width > $width_max || $height > $height_max){
+		if($width_max/$width < $height_max/$height){
+			$coef = $width_max/$width;
+		}else{
+			$coef = $height_max/$height;
+		}
+	}else if($width < $width_min || $height < $height_min){
+		if($width_min/$width > $height_min/$height){
+			$coef = $width_min/$width;
+		}else{
+			$coef = $height_min/$height;
+		}
+	}
+	//echo "=".$coef."(".($coef*$width)."/".($coef*$height).")<br />";
+	//exit;
+	return $coef;
+}
+?>

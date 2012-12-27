@@ -1,0 +1,32 @@
+<?php
+function tts_post($id, $voice, $text){
+	$return = false;
+	if($text != "" && is_guid($id)){
+/*		$sql = "SELECT ID_VISITE FROM TTS WHERE ID_VISITE='".$id."'";
+		if(!is_guid(db_getOne($sql, 'software'))){
+			$sql = "INSERT INTO TTS(ID_VISITE, DATE_CREATION_TTS, DATE_MODIFICATION_TTS, ID_STATUT_TTS) VALUES('".$id."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '0')";
+		}else{
+			$sql = "UPDATE TTS SET ID_STATUT_TTS=0, DATE_MODIFICATION_TTS='".date('Y-m-d H:i:s')."' WHERE ID_VISITE='".$id."'";
+		}
+		db_query($sql, 'software');
+*/		
+		$url = str_replace('#ID#', $id, URL_TTS_POST_NOTIFICATION);
+		file_get_contents($url);
+		$exist = glob(PATH_TTS_TODO."*".$id."*.txt");
+		if($exist > 0){ 
+			foreach($exist as $f){ @unlink($f);}		
+		}
+		$file = PATH_TTS_TODO.date('YmdHis')."_".$id."_".$voice.".txt";
+		file_put_contents( $file, utf8_decode($text));
+		if(file_exists($file)){
+			$return = true;
+		}
+	}
+	return $return;
+}
+
+function tts_count(){
+	return count(glob(PATH_TTS_TODO."*.txt"));
+}
+
+?>

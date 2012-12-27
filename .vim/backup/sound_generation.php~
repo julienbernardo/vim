@@ -1,0 +1,154 @@
+<?php
+require_once 'DB.php';
+require_once 'HTTP/Request.php';
+require_once '/var/www/cron.previsite.net/include/global.php';
+require_once '/var/www/cron.previsite.net/include/fonctions.php';
+require_once '/var/www/cron.previsite.net/include/fonction.db.php';
+require_once '/var/www/cron.previsite.net/include/fonction.cron.php';
+require_once 'phpmailer2/class.phpmailer.php';
+
+ini_set('memory_limit', '-1');
+//ini_set('max_execution_time', '0');
+if(!checkScriptAlone(false, 2) && $_REQUEST['debug'] != 'true'){ exit;}
+
+DEFINE('URL_SOUND_COUNT', 		'http://music.previsite.net/cron.php?todo=count');
+DEFINE('URL_SOUND_LAUNCH_GENERATION',	'http://music.previsite.net/cron.php?todo=do&limit=200');
+define('URL_SOUND_GENERATE_TTS', 'http://#SERVER#.previsite.net/generate.php?id=#ID#&voice=#VOICE#');
+DEFINE('PATH_TTS', '/mnt/ftp/tts/');
+DEFINE('PATH_TODO', PATH_TTS.'todo/');
+DEFINE('PATH_TODO', PATH_TTS.'log/');
+DEFINE('TTS_LIMIT', 200);
+
+if(!file_exists(PATH_TODO)){ mkdir(PATH_TODO);}
+if(!file_exists(PATH_LOG)){ mkdir(PATH_LOG);}
+
+$out = "";
+if(!file_exists(PATH_LOG."cron\\")){ @mkdir(PATH_LOG."cron");}
+$return = array(
+	'done'=>0, 'error'=>0,
+	'servers' => array(
+		'music' => array('done'=>0, 'error'=>0, 'log' => array()),
+		'music2' => array('done'=>0, 'error'=>0, 'log' => array())
+	)
+);
+
+event_log('SCRIPT START');
+$date_start = time();
+$files = glob(PATH_TODO."*.txt");
+sort($files);
+event_log('COUNT SOUND: '.count($files).' files waiting...');
+foreach($files as $k=>$file){
+	if(file_exists($file)){
+		@rename($file, $file.".wait");
+		if(file_exists($file.".wait")){
+			$tour = explode("_", basename($file, ".txt"));
+	//		$voices_limit = array('CELIA', 'ESTER', 'ELIA', 'FEMKE', 'HILDE', 'MAX', 'JAN', 'ELS', 'JEROEN', 'SOFIE', 'SARAH', 'KLAUS', 'GERHARD', 'HELGA');
+			if(preg_match('/^(ESTER|ELIA)$/i', $tour[2]) > 0){
+				$tour[2] = "CELIA";
+			}
+			$voices_limit = array('ALYONA', 'CELIA', 'FEMKE', 'JEROEN', 'JULIA', 'KLAUS', 'MAX', 'SARAH', 'SOFIE', 'MARGAUX');
+			$server = ($server == "music" ? "music2" : "music");
+	//		$server = "music2";
+			if($return['servers'][$server]['error'] > 1){
+				$server = ($server == "music" ? "music2" : "music");
+				if($return['servers'][$server]['error'] > 1){ 
+					event_log("Too much error: music:".$return['servers']["music"]['error']." / music2:".$return['servers']["music2"]['error']);
+					break;
+				}
+			}
+
+			// Force music02
+	//		$server = "02";
+
+	// http://music01eu.previsite.net/generate.php?id=58EA3253-10D2-D052-4201-A08D6B8196F4&voice=Ryan&text=Fuck+you
+
+
+		//		event_log("[DEBUG][TTS] server:".($server != "01" ? "true" : "false").", search:".(array_search(strtoupper($tour[2]), $voices_limit) != null ? "true" : "false"));
+			if($server != "music" && array_search(strtoupper($tour[2]), $voices_limit) != null){ $server = "music";}
+			$replace = array(
+				'search' => array('#ID#', '#VOICE#', '#SERVER#'),
+		//				'replace' => array($tour[1], $tour[2], ( $k%2 == 0 || strtoupper($tour[2]) == "CELIA" ? "01" : "02"))
+				'replace' => array($tour[1], $tour[2], $server)
+			);
+			$url = str_replace($replace['search'], $replace['replace'], URL_SOUND_GENERATE_TTS);
+			$url.= "&text=".urlencode(file_get_contents($file.".wait"));
+	//		event_log("[DEBUG] url:".$url);
+			$req = &new HTTP_Request($url, array('timeout'=>60*10));
+		//		event_log("[DEBUG][TTS] ".$url);
+			$req->sendRequest();
+			$response = $req->getResponseBody();
+			$xml = @simplexml_load_string($response);
+			if(!$xml->MusicResultCode || $xml->MusicResultCode != 0){
+				event_log("[ERROR][TTS][".$server."] ".$tour[1]."- ".$xml->MusicResultCode.". ".$xml->MusicResultText." (".$url.")");
+				$return['error']++;	
+				$return['servers'][$server]['error']++;	
+				$return['servers'][$server]['log'][] = " - srv:".$server." (".$tour[1]." / ".$tour[2]."):".utf8_encode(file_get_contents($file.".wait"))." -> ".$response." (url:".$url.")\n";	
+				if($tour[3] == ""){ @rename($file.".wait", PATH_TODO.date('YmdHis')."_".$tour[1]."_".$tour[2]."_reprocess.txt");}
+				else{ @rename($file.".wait", PATH_TODO.date('YmdHis')."_".$tour[1]."_".$tour[2]."_re".$tour[3].".txt.bug");}
+			}else{
+				$return['done']++;
+				$return['servers'][$server]['done']++;
+				@unlink($file.".wait");
+				if($return['done'] > TTS_LIMIT){ 
+					event_log("Out of limit: ".$return['done']."/".TTS_LIMIT);
+					break;
+				}
+			}
+		}
+	}
+}
+
+if($return['error'] > 1){
+//if($server_blocked){
+	$phpmail = new PHPMailer();
+	$phpmail->IsSMTP();
+	$phpmail->IsHTML(false);
+	$phpmail->Host      = SMTP_MAIL;
+	$phpmail->From      = "music@previsite.com";
+	$phpmail->FromName  = 'music.previsite.net';
+	$phpmail->WordWrap  = 70;
+	$phpmail->Subject   = 'CRON TTS ALERT';
+
+	$body  = " - Duration: ".convert_duration_for_print(time()-$date_start, " ")."\n";
+	$body  .= " - ".$return['done']." done\n";
+	$body  .= " - ".$return['error']." error\n";
+	$logs = "";
+	$server_blocked = false;
+	foreach($return['servers'] as $k=>$v){
+		if($v['done'] == 0){ $server_blocked = true;}
+		$body .= " - ".$k.": ".$v['done']." done / ".$v['error']." error \n";
+		if(count($v['log']) > 0){ $logs .= implode("", $v['log']);}
+	}
+	$server_blocked &= ($return['done'] > 0);
+	$phpmail->Body      = $body."\n\n".$logs;
+//	$phpmail->AddAddress("jbernardo@previsite.com","Julien");
+	if($server_blocked){ 
+		$phpmail->AddAddress("report@previsite.com","Report");
+//	}else{ 
+//		$phpmail->AddAddress("julien@previsite.com","Julien");
+//	}
+		$phpmail->Send();
+	}
+}
+event_log("Resume: ".$return['done'].' done / '.$return['error'].' error');
+foreach($return['servers'] as $k=>$v){
+	event_log(" - ".$k.": ".$v['done']." done / ".$v['error']." error");
+}
+event_log('SCRIPT END');
+exit;	
+	
+/*	$options = array(
+      'http'=>array(
+        'method'=>"GET",
+        'header'=>"Accept-language: en\r\n",
+          'timeout' => 60*60
+          )
+    );
+    $context = stream_context_create($options);
+//	file_get_contents("http://example.com/", 0, $ctx); 
+	$result = file_get_contents(URL_SOUND_LAUNCH_GENERATION, false, $context);
+//	echo $result;
+	event_log('GENERATE SOUND: '.$result);
+//	event_log('COUNT SOUND: '.file_get_contents(URL_SOUND_COUNT).' files waiting.');
+*/
+?>

@@ -1,0 +1,3343 @@
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:31:02
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57117
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500662
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=674817804 (Length:2029685)
+
+
+
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:01
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:04
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>DC3C0B65-04BC-4462-ABC1-B62372D310F3
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57118
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500664
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1345083757 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:04
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:06
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>DC3C0B65-04BC-4462-ABC1-B62372D310F3
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57119
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500666
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1638776890 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2029684/2029685
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:06
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:08
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>DC3C0B65-04BC-4462-ABC1-B62372D310F3
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57120
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500668
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=333367236 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2029684/2029685
+Content-Length: 2021493
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:09
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:11
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=24576-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>DC3C0B65-04BC-4462-ABC1-B62372D310F3
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57123
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500671
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:31:12
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57124
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500672
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=281633906 (Length:1626598)
+
+
+
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:31:11
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1055952414 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 24576-2029684/2029685
+Content-Length: 2005109
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:12
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:15
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>1AB8DBBA-2A95-4578-B2C5-6D82F2CA9865
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57125
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500675
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=399887775 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/1626598
+Content-Length: 2
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:31:14
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:16
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1626597
+HTTP_X_PLAYBACK_SESSION_ID=>1AB8DBBA-2A95-4578-B2C5-6D82F2CA9865
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57126
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500676
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=881738224 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1626597/1626598
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:31:16
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:18
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_IF_MODIFIED_SINCE=>Mon, 24 Sep 2012 15:31:14
+HTTP_IF_NONE_MATCH=>"3199a6a8a962bcbb77fca850c361e9b1"
+HTTP_X_PLAYBACK_SESSION_ID=>72E09B6A-4827-4909-92ED-6335291CE502
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_CONNECTION=>keep-alive
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57127
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500678
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:18
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>78F3804F-0916-4C22-BC75-A7211DC9792E
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57128
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500678
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1886119217 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/1626598
+Content-Length: 2
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:31:17
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=269892683 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/1626598
+Content-Length: 2
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:31:18
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:20
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1626597
+HTTP_X_PLAYBACK_SESSION_ID=>78F3804F-0916-4C22-BC75-A7211DC9792E
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57129
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500680
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=463632199 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1626597/1626598
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:31:23
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:31
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=1626597-1626597
+HTTP_X_PLAYBACK_SESSION_ID=>78F3804F-0916-4C22-BC75-A7211DC9792E
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57130
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500691
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:31:32
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57131
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500692
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1435712009 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 1626597-1626597/1626598
+Content-Length: 1
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:31:32
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=687554039 (Length:2029685)
+
+
+
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:33
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:36
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_IF_MODIFIED_SINCE=>Mon, 24 Sep 2012 15:31:04
+HTTP_IF_NONE_MATCH=>"23842d3e91f9073deaf7d73b5ef2f6c3"
+HTTP_X_PLAYBACK_SESSION_ID=>7A2122D3-1BE7-43EB-8FF9-0F5AADE31611
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_CONNECTION=>keep-alive
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57132
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500696
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=664479288 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:37
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:39
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>7A2122D3-1BE7-43EB-8FF9-0F5AADE31611
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57133
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500699
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1677371407 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2029684/2029685
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:39
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:31:41
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>7A2122D3-1BE7-43EB-8FF9-0F5AADE31611
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>57134
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500701
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1967070684 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2029684/2029685
+Content-Length: 2021493
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:42
+Connection: keep-alive
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:31:59
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43259
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500719
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=511746471 (Length:2029685)
+
+
+
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:31:59
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:01
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>00E53441-688D-4B50-A6AE-24940F1364DF
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43260
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500721
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1329271572 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:05
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:07
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>00E53441-688D-4B50-A6AE-24940F1364DF
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43261
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500727
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=165103494 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2029684/2029685
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:06
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:09
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>00E53441-688D-4B50-A6AE-24940F1364DF
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43262
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500729
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1971145121 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2029684/2029685
+Content-Length: 2021493
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:08
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:11
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=972-8191
+HTTP_X_PLAYBACK_SESSION_ID=>00E53441-688D-4B50-A6AE-24940F1364DF
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43263
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500731
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1139435073 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 972-8191/2029685
+Content-Length: 7220
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:13
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:16
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_IF_MODIFIED_SINCE=>Mon, 24 Sep 2012 15:32:05
+HTTP_IF_NONE_MATCH=>"23842d3e91f9073deaf7d73b5ef2f6c3"
+HTTP_X_PLAYBACK_SESSION_ID=>3962D302-00AE-4756-84F8-A930A9958D42
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_CONNECTION=>keep-alive
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43264
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500736
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:16
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>0487BA66-155F-4227-A63E-7DE068099DF3
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43265
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500736
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:16
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>250B9BB9-3806-4719-9C49-0341874457D4
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43266
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500736
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1724781463 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:17
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1392866490 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:17
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:19
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>250B9BB9-3806-4719-9C49-0341874457D4
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43267
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500739
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=461205317 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:18
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1782265452 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2029684/2029685
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:19
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:21
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>250B9BB9-3806-4719-9C49-0341874457D4
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43268
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500741
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1957569404 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2029684/2029685
+Content-Length: 2021493
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:20
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:23
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=972-8191
+HTTP_X_PLAYBACK_SESSION_ID=>250B9BB9-3806-4719-9C49-0341874457D4
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43269
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500743
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=582561810 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 972-8191/2029685
+Content-Length: 7220
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:26
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:28
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=31044-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>250B9BB9-3806-4719-9C49-0341874457D4
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43270
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp&34455=455
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?34455=455
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500748
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1981776609 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 31044-2029684/2029685
+Content-Length: 1998641
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:29
+Connection: keep-alive
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:32:37
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43271
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500757
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1464837681 (Length:2029685)
+
+
+
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:37
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:41
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_IF_MODIFIED_SINCE=>Mon, 24 Sep 2012 15:31:04
+HTTP_IF_NONE_MATCH=>"23842d3e91f9073deaf7d73b5ef2f6c3"
+HTTP_X_PLAYBACK_SESSION_ID=>66D4259E-5BF0-4CC8-ADAF-4C8FD83146FD
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_CONNECTION=>keep-alive
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43272
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500761
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1514012637 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:42
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:44
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>66D4259E-5BF0-4CC8-ADAF-4C8FD83146FD
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43273
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500764
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=601310421 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2029684/2029685
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:43
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:46
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>66D4259E-5BF0-4CC8-ADAF-4C8FD83146FD
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43274
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500766
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=110168848 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2029684/2029685
+Content-Length: 2021493
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:45
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:48
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=972-8191
+HTTP_X_PLAYBACK_SESSION_ID=>66D4259E-5BF0-4CC8-ADAF-4C8FD83146FD
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43275
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500768
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=282031998 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 972-8191/2029685
+Content-Length: 7220
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:48
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:51
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_IF_MODIFIED_SINCE=>Mon, 24 Sep 2012 15:31:04
+HTTP_IF_NONE_MATCH=>"23842d3e91f9073deaf7d73b5ef2f6c3"
+HTTP_X_PLAYBACK_SESSION_ID=>3919427E-A500-4D4F-83C8-29949612A0A4
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_CONNECTION=>keep-alive
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43276
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500771
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:51
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>533A0708-09B0-4233-90B3-97B830D746A4
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43277
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500771
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:51
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>7899E671-1A7E-4B89-BADA-84A358068EE2
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43278
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500771
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1932091629 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:51
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1138451456 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:51
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1189403564 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:55
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:57
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>7899E671-1A7E-4B89-BADA-84A358068EE2
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43279
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500777
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=779759249 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2029684/2029685
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:56
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:32:59
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>7899E671-1A7E-4B89-BADA-84A358068EE2
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43280
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500779
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=2091402931 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2029684/2029685
+Content-Length: 2021493
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:32:59
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:02
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=972-8191
+HTTP_X_PLAYBACK_SESSION_ID=>7899E671-1A7E-4B89-BADA-84A358068EE2
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43281
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500782
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=953371374 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 972-8191/2029685
+Content-Length: 7220
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:33:03
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:06
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=29756-2029684
+HTTP_X_PLAYBACK_SESSION_ID=>7899E671-1A7E-4B89-BADA-84A358068EE2
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43282
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500786
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=626387794 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 29756-2029684/2029685
+Content-Length: 1999929
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:33:06
+Connection: keep-alive
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:33:26
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43283
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?gh=6889
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500806
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=151969951 (Length:1626598)
+
+
+
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:33:26
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:28
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_IF_MODIFIED_SINCE=>Mon, 24 Sep 2012 15:31:04
+HTTP_IF_NONE_MATCH=>"23842d3e91f9073deaf7d73b5ef2f6c3"
+HTTP_X_PLAYBACK_SESSION_ID=>0F6B70AE-7579-4A7E-B4EA-2E81C3FD1A37
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_CONNECTION=>keep-alive
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43284
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500808
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:29
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>101B62B8-EEA0-43BB-B320-007FAA8E750D
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43285
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?gh=6889
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500809
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=280364156 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/1626598
+Content-Length: 2
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:33:28
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:30
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1626597
+HTTP_X_PLAYBACK_SESSION_ID=>101B62B8-EEA0-43BB-B320-007FAA8E750D
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43286
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?gh=6889
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500810
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1280632727 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1626597/1626598
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:33:30
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=2040575014 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2029685
+Content-Length: 2
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:33:30
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:32
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>180B1FB6-28C9-40AB-8B4A-6CA4A583183C
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43287
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?gh=6889
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500812
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:32
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=7087-8191
+HTTP_X_PLAYBACK_SESSION_ID=>0F6B70AE-7579-4A7E-B4EA-2E81C3FD1A37
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43288
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500812
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1607432782 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/1626598
+Content-Length: 2
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:33:34
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:36
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1626597
+HTTP_X_PLAYBACK_SESSION_ID=>180B1FB6-28C9-40AB-8B4A-6CA4A583183C
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43290
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?gh=6889
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500816
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=3554753 (Length:2029685)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 7087-8191/2029685
+Content-Length: 1105
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:33:36
+Connection: keep-alive
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1622698456 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1626597/1626598
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:33:37
+Connection: keep-alive
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:33:44
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43291
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=3gp
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500824
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.3gp?r=1398071886 (Length:2029685)
+
+
+
+Content-Length: 2029685
+ETag: "23842d3e91f9073deaf7d73b5ef2f6c3"
+Last-Modified: Mon, 24 Sep 2012 15:33:43
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:33:49
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=1626597-1626597
+HTTP_X_PLAYBACK_SESSION_ID=>180B1FB6-28C9-40AB-8B4A-6CA4A583183C
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43292
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4&gh=6889
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?gh=6889
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500829
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1091839875 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 1626597-1626597/1626598
+Content-Length: 1
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:33:51
+Connection: keep-alive
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:34:46
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_REFERER=>http://dev.m.previsite.com/pzfrtxwc
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_DNT=>1
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43296
+REDIRECT_QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REDIRECT_URL=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REQUEST_URI=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500886
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4?r=603705879 (Length:7962006)
+
+
+
+Content-Length: 7962006
+ETag: "0ecacfbea20874f679f65d12a639d976"
+Last-Modified: Mon, 24 Sep 2012 15:34:59
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:35:02
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>217FFDEA-1DDF-4622-94C3-A07424DEB46D
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43297
+REDIRECT_QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REDIRECT_URL=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REQUEST_URI=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500902
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4?r=1157807698 (Length:7962006)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/7962006
+Content-Length: 2
+ETag: "0ecacfbea20874f679f65d12a639d976"
+Last-Modified: Mon, 24 Sep 2012 15:35:07
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:35:09
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-7962005
+HTTP_X_PLAYBACK_SESSION_ID=>217FFDEA-1DDF-4622-94C3-A07424DEB46D
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43298
+REDIRECT_QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REDIRECT_URL=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REQUEST_URI=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500909
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4?r=1573570432 (Length:7962006)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-7962005/7962006
+Content-Length: 7962006
+ETag: "0ecacfbea20874f679f65d12a639d976"
+Last-Modified: Mon, 24 Sep 2012 15:35:18
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:35:22
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_IF_MODIFIED_SINCE=>Mon, 24 Sep 2012 15:35:07
+HTTP_IF_NONE_MATCH=>"0ecacfbea20874f679f65d12a639d976"
+HTTP_X_PLAYBACK_SESSION_ID=>51C0B1F8-5593-4E4B-A500-D6235ADA464A
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_CONNECTION=>keep-alive
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43299
+REDIRECT_QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REDIRECT_URL=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REQUEST_URI=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500922
+argv=>Array
+argc=>1
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:35:22
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>D2DE77F3-8411-480C-8786-31E92311FE3D
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43300
+REDIRECT_QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REDIRECT_URL=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REQUEST_URI=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500922
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4?r=177842979 (Length:7962006)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/7962006
+Content-Length: 2
+ETag: "0ecacfbea20874f679f65d12a639d976"
+Last-Modified: Mon, 24 Sep 2012 15:35:23
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+2012-09-24 17:35:25
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-7962005
+HTTP_X_PLAYBACK_SESSION_ID=>D2DE77F3-8411-480C-8786-31E92311FE3D
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>en-us
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPhone; U; CPU OS 6_0 like Mac OS X; en_us)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>37.160.1.134
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>43301
+REDIRECT_QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REDIRECT_URL=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA&ext=mp4
+REQUEST_URI=>/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348500925
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4?r=1409010650 (Length:7962006)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/7962006
+Content-Length: 2
+ETag: "0ecacfbea20874f679f65d12a639d976"
+Last-Modified: Mon, 24 Sep 2012 15:35:23
+Connection: keep-alive
+
+http://media.previsite.com/video/9F1376C8-8B0B-A40F-EFA0-F8B9584BC6DA.mp4?r=858529232 (Length:7962006)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-7962005/7962006
+Content-Length: 7962006
+ETag: "0ecacfbea20874f679f65d12a639d976"
+Last-Modified: Mon, 24 Sep 2012 15:35:30
+Connection: keep-alive
+--------------------------------------------------------------
+Mozilla/5.0 (iPhone; CPU iPhone OS 5_1_1 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9B206 Safari/7534.48.3
+2012-09-24 17:38:59
+REDIRECT_STATUS=>200
+HTTP_USER_AGENT=>Mozilla/5.0 (iPhone; CPU iPhone OS 5_1_1 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9B206 Safari/7534.48.3
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_HOST=>dev.m.previsite.com
+HTTP_CACHE_CONTROL=>max-age=43200
+HTTP_CONNECTION=>keep-alive
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>92.90.16.46
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>29839
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501139
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=2108051861 (Length:1626598)
+
+
+
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:39:01
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+2012-09-24 17:39:04
+REDIRECT_STATUS=>200
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_X_PLAYBACK_SESSION_ID=>D9C1A3E1-744C-4126-876F-A1E2BA22EC4A
+HTTP_HOST=>dev.m.previsite.com
+HTTP_CACHE_CONTROL=>max-age=43200
+HTTP_CONNECTION=>keep-alive
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>92.90.16.46
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60319
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501144
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1629126886 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/1626598
+Content-Length: 2
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:39:05
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+2012-09-24 17:39:07
+REDIRECT_STATUS=>200
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1626597
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_X_PLAYBACK_SESSION_ID=>D9C1A3E1-744C-4126-876F-A1E2BA22EC4A
+HTTP_HOST=>dev.m.previsite.com
+HTTP_CACHE_CONTROL=>max-age=43200
+HTTP_CONNECTION=>keep-alive
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>92.90.16.46
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>47130
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501147
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1722812181 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1626597/1626598
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:39:07
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+2012-09-24 17:39:10
+REDIRECT_STATUS=>200
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_X_PLAYBACK_SESSION_ID=>3FC2ABFF-0069-4181-B03E-308577449633
+HTTP_HOST=>dev.m.previsite.com
+HTTP_CACHE_CONTROL=>max-age=43200
+HTTP_CONNECTION=>keep-alive
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>92.90.16.46
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>53593
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501150
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=1441821273 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/1626598
+Content-Length: 2
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:39:13
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+2012-09-24 17:39:15
+REDIRECT_STATUS=>200
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=0-1626597
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_X_PLAYBACK_SESSION_ID=>3FC2ABFF-0069-4181-B03E-308577449633
+HTTP_HOST=>dev.m.previsite.com
+HTTP_CACHE_CONTROL=>max-age=43200
+HTTP_CONNECTION=>keep-alive
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>92.90.16.46
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>38079
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501155
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=268463901 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1626597/1626598
+Content-Length: 1626598
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:39:15
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+2012-09-24 17:39:19
+REDIRECT_STATUS=>200
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.9B206 (iPhone; U; CPU OS 5_1_1 like Mac OS X; fr_fr)
+HTTP_ACCEPT=>*/*
+HTTP_RANGE=>bytes=1626597-1626597
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_X_PLAYBACK_SESSION_ID=>3FC2ABFF-0069-4181-B03E-308577449633
+HTTP_HOST=>dev.m.previsite.com
+HTTP_CACHE_CONTROL=>max-age=43200
+HTTP_CONNECTION=>keep-alive
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>92.90.16.46
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>14467
+REDIRECT_QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REDIRECT_URL=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=1E87109C-FAAD-8357-FD63-BC063793CE50&ext=mp4
+REQUEST_URI=>/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501159
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/1E87109C-FAAD-8357-FD63-BC063793CE50.mp4?r=506289561 (Length:1626598)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 1626597-1626597/1626598
+Content-Length: 1
+ETag: "3199a6a8a962bcbb77fca850c361e9b1"
+Last-Modified: Mon, 24 Sep 2012 15:39:20
+Connection: keep-alive
+--------------------------------------------------------------
+Mozilla/5.0 (iPad; CPU OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+2012-09-24 17:43:18
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_REFERER=>http://dev.m.previsite.com/wow
+HTTP_ACCEPT_ENCODING=>gzip, deflate
+HTTP_ACCEPT=>text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>Mozilla/5.0 (iPad; CPU OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60290
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501398
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=500975118 (Length:2138001)
+
+
+
+Content-Length: 2138001
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:21
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:23
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>670F3FD7-3115-4CF8-BBA7-68BB6F8D968B
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60291
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501403
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=1710164489 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2138001
+Content-Length: 2
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:23
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:25
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>670F3FD7-3115-4CF8-BBA7-68BB6F8D968B
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60292
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501405
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=195253324 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2138000/2138001
+Content-Length: 2138001
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:29
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:31
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>670F3FD7-3115-4CF8-BBA7-68BB6F8D968B
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60293
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501411
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=2015091075 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2138000/2138001
+Content-Length: 2129809
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:31
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:34
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=24576-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>670F3FD7-3115-4CF8-BBA7-68BB6F8D968B
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60294
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501414
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=368434129 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 24576-2138000/2138001
+Content-Length: 2113425
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:39
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:41
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=4004-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>670F3FD7-3115-4CF8-BBA7-68BB6F8D968B
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60295
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501421
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=1414026322 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 4004-2138000/2138001
+Content-Length: 2133997
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:47
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:50
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=16384-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>670F3FD7-3115-4CF8-BBA7-68BB6F8D968B
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60298
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501430
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=695621545 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 16384-2138000/2138001
+Content-Length: 2121617
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:49
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:52
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-1
+HTTP_X_PLAYBACK_SESSION_ID=>056DFE34-6C2E-400D-93EF-5038BD7A6A08
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60302
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501432
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=1541276688 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-1/2138001
+Content-Length: 2
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:53
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:55
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=0-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>056DFE34-6C2E-400D-93EF-5038BD7A6A08
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60304
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501435
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=1194044795 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 0-2138000/2138001
+Content-Length: 2138001
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:43:55
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:43:57
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=8192-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>056DFE34-6C2E-400D-93EF-5038BD7A6A08
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60305
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501437
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=1132646029 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 8192-2138000/2138001
+Content-Length: 2129809
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:44:02
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:44:04
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=24576-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>056DFE34-6C2E-400D-93EF-5038BD7A6A08
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60308
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501444
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=1325420308 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 24576-2138000/2138001
+Content-Length: 2113425
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:44:06
+Connection: keep-alive
+--------------------------------------------------------------
+AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+2012-09-24 17:44:08
+REDIRECT_STATUS=>200
+HTTP_HOST=>dev.m.previsite.com
+HTTP_RANGE=>bytes=4004-2138000
+HTTP_X_PLAYBACK_SESSION_ID=>056DFE34-6C2E-400D-93EF-5038BD7A6A08
+HTTP_ACCEPT_ENCODING=>identity
+HTTP_ACCEPT=>*/*
+HTTP_ACCEPT_LANGUAGE=>fr-fr
+HTTP_CONNECTION=>keep-alive
+HTTP_USER_AGENT=>AppleCoreMedia/1.0.0.10A403 (iPad; U; CPU OS 6_0 like Mac OS X; fr_fr)
+PATH=>/usr/local/bin:/usr/bin:/bin
+SERVER_SIGNATURE=>
+SERVER_SOFTWARE=>Apache
+SERVER_NAME=>dev.m.previsite.com
+SERVER_ADDR=>195.154.160.40
+SERVER_PORT=>80
+REMOTE_ADDR=>86.76.102.197
+DOCUMENT_ROOT=>/var/www/mobile.previsite.com
+SERVER_ADMIN=>webmaster@previsite.com
+SCRIPT_FILENAME=>/var/www/mobile.previsite.com/video/download.php
+REMOTE_PORT=>60311
+REDIRECT_QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REDIRECT_URL=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+GATEWAY_INTERFACE=>CGI/1.1
+SERVER_PROTOCOL=>HTTP/1.1
+REQUEST_METHOD=>GET
+QUERY_STRING=>id=FDD6FB06-998A-D3E8-519B-53E43932A483&ext=3gp
+REQUEST_URI=>/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp
+SCRIPT_NAME=>/video/download.php
+PHP_SELF=>/video/download.php
+REQUEST_TIME=>1348501448
+argv=>Array
+argc=>1
+
+http://media.previsite.com/video/FDD6FB06-998A-D3E8-519B-53E43932A483.3gp?r=277779315 (Length:2138001)
+
+
+
+Accept-Ranges: bytes
+Content-Range: bytes 4004-2138000/2138001
+Content-Length: 2133997
+ETag: "50dbe021f5b76f9e2ea8592862e99525"
+Last-Modified: Mon, 24 Sep 2012 15:44:16
+Connection: keep-alive

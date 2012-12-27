@@ -1,0 +1,405 @@
+<?php
+
+require_once 'DB.php';
+require_once '../include/global.php';
+require_once '../include/fonctions.php';
+require_once '../include/fonction.db.publish.php';
+require_once '../include/fonction.db.rest.php';
+require_once 'previsite/GetDsn.php';
+
+// params
+$tour	= $_REQUEST['tour'];
+$user	= $_REQUEST['user'];
+$partner = $_REQUEST['partner'];
+$mode	= $_REQUEST['mode'];
+$output  = 'false';
+$delete_pending = (empty($_REQUEST['delete_pending']) or $_REQUEST['delete_pending'] != 'true' or $_REQUEST['delete_pending'] != '1' ) ? false:true;
+$unpublish_flag = $_REQUEST['flag'];
+
+$skip_limitations = !empty($_REQUEST['skip_limit']); // Pour la synchro, ne pas tenir compte des limitations
+
+
+if(!is_guid($tour) /*|| !is_guid($user)*/ || !is_guid($partner)) die($output);
+
+$getdsn = new GetDsn(array('MEMCACHED' => !SERVER_DEV));
+$dsn = $getdsn->byTourID($tour);
+$db = DB::connect($dsn);
+
+$must_active = false;
+
+$tab_tour = get_tour_data_2013($tour, $user, $must_active);
+
+$flag = -1;
+
+
+// dev.api.previsite.com/publication/software_unpublish.php?partner=C3187B7F-3F56-86C5-EF9D-BFECE5CC7FFA&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1
+
+
+// 2012-06-11 : Virer Youtube US
+if(ID_YOUTUBE_US==$partner) {
+	$partner = ID_YOUTUBE_FR;
+}
+
+// found
+if(!empty($tab_tour)) {
+	switch($partner) {
+		// Zonaprop : suppression en asynchrone via cron.previsite.net
+		case 'EAA329DE-B60A-8ACB-458F-3D747CF16650':
+			delete_publication($partner, $tour);
+			$output = 'true';
+			break;
+
+		// Facebook Wall
+		case 'A47CFC83-DB74-13CA-82C8-E3D981A0F5BA':
+			$tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+			$status_id = get_ref_portail($tour, $partner);
+			$url_publish  = 'http://facebook.previsite.net/newsfeed/unpub.php';
+			$url_publish .= '?usercode='.urlencode($tab_partners[$partner]['PREFIX']);
+			$url_publish .= '&token='.urlencode($tab_partners[$partner]['PASSWORD']);
+			$url_publish .= '&id='.urlencode($status_id);
+			
+			$result = @file_get_contents($url_publish);
+
+			if('true'===$result) {
+				delete_publication($partner, $tour);
+				$output = 'true';
+			}
+			break;
+
+		case ID_TWITTER:
+			require_once '../include/twitteroauth/twitteroauth.php';
+			$status_id = get_ref_portail($tour, $partner, $delete_pending);
+			// http://dev.api.previsite.com/publication/software_unpublish.php?partner=E5607DDA-327B-2432-8A43-C5E25D54432C&tour=C72DC7EF-80AD-2811-9BE3-E1AA3E3676B1&ref=toto
+			if(!empty($status_id)) {
+				$tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+				$log = $tab_partners[$partner]['PREFIX'];
+				$pwd = $tab_partners[$partner]['PASSWORD'];
+
+				if(empty($log) || empty($pwd)) {
+					$log = TWITTER_LOG;
+					$pwd = TWITTER_PWD;
+				}
+
+				$connection = new TwitterOAuth(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, $log, $pwd);
+
+				$status = $connection->post('statuses/destroy/'.$status_id, array(
+					'id' => $status_id
+				));
+				
+
+				// tweet connu et supprime
+				$delete_db  = !isset($status->error) && isset($status->id);
+				// ou tweet inconnu
+				$delete_db |= isset($status->error) && (strpos(strtolower($status->error), 'pas de statut trouv') !== false || strpos(strtolower($status->error), 'no status found') !== false);
+
+				$delete_db = true;
+
+				if($delete_db) {
+					delete_publication($partner, $tour);
+					$output = 'true';
+				}
+
+			} else {
+				delete_publication($partner, $tour);
+				$output = 'true';
+			}
+			break;
+
+		case ID_METACAFE:
+		case ID_YOUTUBE_FR:
+		case ID_YOUTUBE_US:
+		case ID_DAILYMOTION_FR:
+		case ID_VIEWTHISHOME:
+		case ID_KEWEGO:
+		case ID_YAHOO:
+		case ID_WATTV:
+		case ID_DAILYCORP:
+		case ID_YOUTUBECORP:
+			$is_corp = in_array($partner, array(ID_YOUTUBECORP, ID_DAILYCORP));
+			$tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+			$ref = get_ref_portail( $tour, $partner);
+			$type = '';
+			switch($partner){
+				case ID_YOUTUBECORP:
+					$website = 'YOUTUBE';
+					break;
+				case ID_DAILYCORP:
+					$website = 'DAILYMOTION';
+					break;
+				case ID_VIEWTHISHOME:
+					$website = 'VIEWTHISHOME';
+					$type	 = 'US';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "viewthishome@previsite.com";
+						$tab_partners[$partner]['PASSWORD'] = "viewthishome007!";
+					}
+					break;
+				case ID_KEWEGO:
+					$website = 'KEWEGO';
+					$type	 = 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "kewego@previsite.com";
+						$tab_partners[$partner]['PASSWORD'] = "Previsite2010";
+					}
+					break;
+				case ID_YAHOO:
+					$website = 'YAHOO';
+					$type	 = 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "previsitevideo@yahoo.com";
+						$tab_partners[$partner]['PASSWORD'] = "Previsite2010!";
+					}
+					break;
+				case ID_WATTV:
+					$website = 'WATTV';
+					$type	 = 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "wattv@previsite.com";
+						$tab_partners[$partner]['PASSWORD'] = "Previsite2010!";
+					}
+					break;
+				case ID_YOUTUBE_FR:
+					$website = 'YOUTUBE';
+					$type	= 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						$tab_partners[$partner]['PREFIX'] = "VisiteVirtuelleImmo";
+						$tab_partners[$partner]['PASSWORD'] = "youtube007!";
+						//$tab_partners[$partner]['PREFIX'] = "PrevisiteChannel";
+						//$tab_partners[$partner]['PASSWORD'] = "youtube007!";
+					}
+					break;
+				case ID_METACAFE:
+					$website = 'METACAFE';
+					$type	= 'FR';
+					break;
+				default:
+					$website = 'DAILYMOTION';
+					$type	= 'FR';
+					if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+						//$tab_partners[$partner]['PREFIX'] = "PrevisiteChannel";
+						//$tab_partners[$partner]['PASSWORD'] = "dailymotion007!";
+						$tab_partners[$partner]['PREFIX'] = "VisiteVirtuelleImmo";
+						$tab_partners[$partner]['PASSWORD'] = "dailymotion007!";
+					}
+					break;
+			}
+			// FR_DOOR pour tous les imports Fr
+			if('FR'==$type && 'auto'==$mode) {
+				$type = 'FR_DOOR';
+			}
+
+			// Ajout Corp
+			if($is_corp) {
+				$tab_distrib_options = get_distrib_option($tab_tour['ID_DISTRIBUTEUR'], array('PROFILVIDEO'));
+				if(!empty($tab_distrib_options['PROFILVIDEO'])) {
+					$type = $tab_distrib_options['PROFILVIDEO'].'_CORP';
+				}
+			} else {
+				$tab_user_options = get_user_option($user);
+				if($tab_user_options['PROFILVIDEO'] != "") {
+					$type = $tab_user_options['PROFILVIDEO'];
+				}
+			}
+			
+
+			if(empty($tab_partners[$partner]['PREFIX']) || empty($tab_partners[$partner]['PASSWORD'])) {
+				die('need profile or login');
+			}
+			// modif julien pour dépublication du bon profil //
+//			$tab_user_options = get_user_option($user);
+//			if($tab_user_options['PROFILVIDEO'] != ""){ $type = $tab_user_options['PROFILVIDEO'];}
+  			// modif julien pour dépublication du bon profil //
+
+			$tab_pattern  = array('%TODO%', '%ID%', '%TYPE%', '%LOGIN%', '%PASSWORD%', '%SITE%', '%URL%', '%TITLE%', '%DATE%', '%MODE%', '%REF%', '%DISTRIB%');
+			$tab_replace  = array('delete', $tour, $type, urlencode($tab_partners[$partner]['PREFIX']), urlencode($tab_partners[$partner]['PASSWORD']), $website, '', '', '', $mode, urlencode($ref), '');
+			
+			$url_delete   = str_replace( $tab_pattern, $tab_replace, URL_DIFFUSION_VIDEO);
+			echo $url_delete;exit;
+			$result_delete = @file_get_contents($url_delete);
+			$delete_db = $result_delete=="true";
+			if($delete_db){
+				$id_diff = get_id_diffusion_portail($tour, $partner);
+				$diff_liaisons = get_diffusion_portail_liaison($id_diff);
+				for($i=0;$i < count($diff_liaisons);$i++){
+					$params = array(
+						'tour' => $tour,
+						'user' => $user,
+						'partner' => $diff_liaisons[$i]['ID_PORTAIL'],
+						'flag' => $unpublish_flag,
+						'delete_pending' => ($delete_pending ? 'true' : ''),
+						'mode' => 'liaison',
+					);	
+					$url_delete_liaison = "";
+					foreach($params as $k=>$v){
+						$url_delete_liaison .= "&".$k."=".urlencode($v);
+					}
+					$url_delete_liaison = URL_UNPUBLISH.preg_replace('/^&/i', '?', $url_delete_liaison);
+					file_get_contents($url_delete_liaison);
+				}
+			}
+			break;
+		case ID_LINKEDIN:
+		   $tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+		   $log = "";
+		   $pwd = "";
+		   if(!is_guid($tab_partners[$partner]['PREFIX'])){
+				$log = $tab_partners[$partner]['PREFIX'];
+				$pwd = $tab_partners[$partner]['PASSWORD'];
+			}
+			$ref = get_ref_portail($tour, $partner);
+			
+			$replace = array(
+	   			'search' => array( '#TODO#', '#ID#', '#LOGIN#', '#PASSWORD#', '#REF#'),
+	   			'replace' => array( 'delete', $tour, urlencode($log), urlencode($pwd), urlencode($ref))
+	   		);
+	   		
+	   		$url_diffusion = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_LINKEDIN);
+			$data = @file_get_contents($url_diffusion);
+
+			$xml = simplexml_load_string($data);
+			if(count($xml) > 0 && $xml->DiffusionResultCode == "0"){
+				$delete_db = true;
+			}
+			break;
+			
+		case ID_VIADEO:
+			$tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+		   	$log = "";
+		   	$pwd = "";
+		   	if(!is_guid($tab_partners[$partner]['PREFIX'])){
+				$log = $tab_partners[$partner]['PREFIX'];
+				$pwd = $tab_partners[$partner]['PASSWORD'];
+			}
+			$ref = get_ref_portail($tour, $partner);
+			$replace = array(
+	   			'search' => array( '#TODO#', '#ID#', '#LOGIN#', '#PASSWORD#',  '#COUNTY#', '#COUNTRY#', '#CATEGORY#', '#REF#'),
+	   			'replace' => array( 'delete', $tour, urlencode($log), urlencode($pwd), '', '', '', urlencode($ref))
+	   		);
+	   		$url_diffusion = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_VIADEO);
+			$data = @file_get_contents($url_diffusion);
+
+			$xml = simplexml_load_string($data);
+		   $xml = simplexml_load_string($data);
+			if(count($xml) > 0 && $xml->DiffusionResultCode == "0"){
+				$delete_db = true;
+			}
+			break;
+
+		case ID_GOOGLE4HOME:
+			$tab_pattern  = array('#TODO#', '#TOUR#');
+			$tab_replace  = array('delete', $tour);
+			$url_delete   = str_replace($tab_pattern,$tab_replace,URL_DIFFUSION_GOOGLE4HOME);
+			$delete_db	= @(file_get_contents($url_delete)=='true');
+			break;
+		
+		case ID_TREND:
+		case ID_MRIS:
+			$tab_options = get_portail_options($partner);
+			$message = "";
+			$todo = "delete";
+			require 'auto/'.$tab_options['PUBLICATION'];
+			$delete_db = ereg("true", $data);
+			break;
+			
+		case "6094FB43-68C0-F106-2F87-DAD6AA4CC749": // vitevitevite
+		case "5B1CC2DE-4AFB-F4D3-F6F0-99FE6BB22887": // koreanBridge
+		case "79775614-56AD-211C-2492-262B9131751B": // craigslistexp
+		case "33DDD024-C1FC-E676-E86E-948EB0633BFE": // tablica
+		case "BF1750CC-F1CC-887D-1681-C1CAA0A49665": // classificadosmil
+		case "92DC7378-DBEA-20C6-9E85-BA23238B970C": // adoos
+		case "4A24A75D-FBC9-BC06-27AA-6D9036D78BE2": // gumtree
+			$partner_code = get_partner_code($partner);
+			$exportFile = PATH_PUBLICATION_EXPORT.strtolower($partner_code).".php";
+			if(file_exists($exportFile)){
+				$todo_export = "unpublish";
+				$tab_partners = get_user_partner_infos($tab_tour['ID_SOCIETE'], $partner);
+				$keys = array_keys($tab_partners);
+				$tab_partners = $tab_partners[$keys[0]];
+				$infos = array(
+					'PARTNER' => $tab_partners,
+				);
+				$infos['PARTNER']['REF_PORTAIL'] = get_ref_portail($tour, $partner);
+				include($exportFile);
+				if($output === true){
+					$delete_db = true;
+				}
+			}
+			break;
+		
+		case ID_GOOGLEPLUS:
+			if($mode == 'export'){
+				$ref = get_ref_portail($tour, $partner, true);
+				if($ref != ""){
+					$replace = array(
+						'search' => array('#REF#', '#TOUR#', '#ACTION#'),
+						'replace' => array($ref, $tour, 'unpublish'),
+					);
+					$url = str_replace($replace['search'], array_map('urlencode', $replace['replace']), URL_DIFFUSION_GOOGLEPLUS);
+					$output = file_get_contents($url);
+					$json = json_decode($output, true);
+					if($json['status'] == 'success'){
+						$delete_db = true;
+						$flag = -1;
+					}
+				}else{
+					$delete_db = true;
+					$flag = -1;
+				}
+			}else{
+				$delete_db = true;
+				$flag = -2;
+			}
+			break;
+
+		case ID_PINTEREST:
+		case ID_PINTEREST_CORP:
+		case ID_PINTEREST_IMAGE:
+			$delete_db = true;
+			$flag = -2;
+			if($_REQUEST['mode'] != "liaison"){
+				$id_diff = get_id_diffusion_portail($tour, $partner);
+				delete_diffusion_portail_liaison($id_diff);
+			}
+			break;
+
+		default:
+			if('auto'==$mode) {
+				$flag = -2;
+			}
+			$delete_db	= true;
+			break;
+	}
+
+	if($delete_db && delete_publication($partner, $tour, $flag) > 0) {
+		$output = 'true';
+	}
+} else {
+	$output = 'tour_not_found';
+}
+
+
+//if('true'==$output) {
+//	// 2012-11-20 : Modifier date_modification_visite si option sur portail
+//	update_tour_date_on_publication($partner, $tour);
+//}
+
+
+
+// Republier si filtre DATEM_
+if(!$skip_limitations && 'true'==$output) {
+	$tab_limit = check_publication_limit($partner, $tour);
+	if(stripos($tab_limit['ORDRE_DIFFUSION'], 'DATEM_')!==false) {
+		$tour = get_tour_to_publish($partner, $tab_limit['PREFIXE_PORTAIL'], $tab_limit['ORDRE_DIFFUSION'], $tour);
+		if(is_guid($tour)) {
+			$url = URL_PUBLISH.'?'.http_build_query(array(
+				'partner' => $partner,
+				'tour' => $tour,
+				'ref' => $tour
+			));
+			@file_get_contents($url);
+		}
+	}
+}
+
+echo $output;
+

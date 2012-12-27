@@ -1,0 +1,184 @@
+<?php
+require_once 'DB.php';
+require_once 'HTTP/Request.php';
+require_once '/var/www/cron.previsite.net/include/global.php';
+require_once '/var/www/cron.previsite.net/include/fonctions.php';
+require_once '/var/www/cron.previsite.net/include/fonction.cron.php';
+require_once 'phpmailer2/class.phpmailer.php';
+
+ini_set('memory_limit', '-1');
+ini_set('max_execution_time', '0');
+$debug = ($_REQUEST['debug'] == 'true');
+if(!checkScriptAlone() && !$debug){ exit;}
+$bases = array(
+	array('name'=> '11', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.11/PREVISITE_REALESTATE?unicode=yes'),
+	array('name'=> '17', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '19', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.19/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '21', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.21/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '211', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.211/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '213', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.213/PREVISITE_SOFTWARE?unicode=yes'),
+);
+
+$date_reference = date('Y-m-d H:i:s', time()-60*60);
+
+event_log('-----------------------------------');
+event_log('---------------START---------------');
+event_log('-----------------------------------');
+$content = "";
+$nb_account_found = 0;
+$login_error= array();
+foreach($bases as $base){
+	$db['name'] = $base['name'];
+	$db['dsn'] = $base['dsn'];
+	event_log('[DB:'.$base['name'].'] START');
+	$logs = array();
+	$sql_where = array(
+		array('site' => 'YOUTUBE', 'error'=> 'Authentication with Google failed. Reason: BadAuthentication'),
+		array('site' => 'YOUTUBE', 'error'=> 'Authentication with Google failed. Reason: AccountDisabled'),
+		array('site' => 'YOUTUBE', 'error'=> 'Authentication with Google failed. Reason: NoLinkedYouTubeAccount'),
+		array('site' => 'DAILYMOTION', 'error'=> 'Login failed: invalid_grant (Invalid credentials.)'),
+	);
+	foreach($sql_where as $where){
+		$sql = "SELECT distinct ID_UTILISATEUR, VIDEO.ID_DISTRIBUTEUR, NOM_DISTRIBUTEUR, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, RESULT_DESCRIPTION_DIFFUSION 
+			FROM VIDEO_DIFFUSION 
+			INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO 
+			INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO.ID_DISTRIBUTEUR 
+			INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE 
+			WHERE DATE_MODIFICATION_DIFFUSION BETWEEN '".date('Y-m-d', mktime()-24*60*60)." 00:00:00' AND '".date('Y-m-d')." 00:00:00' AND site_diffusion='".$where['site']."' AND RESULT_DESCRIPTION_DIFFUSION='".$where['error']."' 
+			AND ID_STATUT_VISITE > 0 AND (RESULT_CODE_DIFFUSION < -1 OR RESULT_CODE_DIFFUSION > 0)";
+		$result = sql_query($sql, $db, $debug);
+		if($debug){ event_log('[DB:'.$base['name'].'] Request:'.$sql);}
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$key = $r['LOGIN_DIFFUSION']." / ".$r['PASSWORD_DIFFUSION'];
+			$key_distrib = $r['NOM_DISTRIBUTEUR']." (".$r['ID_DISTRIBUTEUR'].")"; 
+			if(!is_array($login_error[$key_distrib])){ $login_error[$key_distrib] = array();}
+			if(!is_array($login_error[$key_distrib][$where['site']])){ $login_error[$key_distrib][$where['site']] = array();}
+			$login_error[$key_distrib][$where['site']][$key] = $r;
+			$logs[$where['site']]++; 
+		}
+	}
+	if(count($logs) > 0){
+		foreach($logs as $k=>$v) event_log('[DB:'.$base['name'].']['.$k.'] '.$v.' found');
+	}
+	sql_disconnect($db, $debug);
+}
+
+if(count($login_error) >0){
+	$tmp = array();
+	foreach($login_error as $distrib=>$sites){
+		if(count($sites) > 0){
+			$content .= "\n\t- -> distributor: ".$distrib.": \n";
+			foreach($sites as $site=>$tab){
+				if(count($tab) > 0){
+					$tmp[$site] += count($tab);
+					$nb_account_found += count($tab);
+					foreach($tab as $key => $r){
+						$content .= "\t\t -> ".$key.": \n";
+						$content .= "\t\t\t -> site:".$site."\n";
+						$content .= "\t\t\t -> error:".$r['RESULT_DESCRIPTION_DIFFUSION']."\n";
+						$content .= "\t\t\t -> example user:".$r['ID_UTILISATEUR']."\n\n";
+					}
+				}
+			}
+		}
+	}
+}
+
+if($content != ""){
+	$content = $nb_account_found." count found\n".$content;
+	$phpmail = new PHPMailer();
+	$phpmail->IsSMTP();
+	$phpmail->IsHTML(false);
+	$phpmail->Host      = SMTP_MAIL;
+	$phpmail->From      = "cron@previsite.com";
+	$phpmail->FromName  = 'Diffusion Resume '.date('Y-m-d');
+	//$phpmail->WordWrap  = 70;
+	$phpmail->Subject   = 'Diffusion Resume '.date('Y-m-d');
+
+	$phpmail->Body = $content;
+	//		$phpmail->AddAddress("social@previsite.com", "Social");
+	//		$phpmail->AddAddress("gateway@previsite.com", "Gateway");
+	$phpmail->AddAddress("report@previsite.com", "Report");
+	$phpmail->Send();
+}
+event_log('[DB:'.$base['name'].'] END');
+event_log('-----------------------------------');
+event_log('----------------END----------------');
+event_log('-----------------------------------');
+exit;
+/**
+*	sql request for cron
+**/
+function sql_connect(&$db, $debug = false){
+	$log_function = $type."_log";
+	if($db['dsn'] != ""){
+		if(!isset($db['conn'])){
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] '.$db['name']);}
+			//PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'pear_error_handler');
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] CONNECT TO '.$db['dsn']);}
+			$db['conn'] = DB::connect($db['dsn']);
+		}
+		if(!PEAR::isError($db['conn'])){ 
+			return false;
+		}else{
+			event_log('[SQL_CONNECT][ERROR] '.$db['name'].': '.$db['conn']->getCode().'. '.$db['conn']->getMessage().' ('.$db['dsn'].')');
+		}
+	}
+	unset($db['conn']);
+	return false;
+}
+
+function sql_disconnect(&$db, $debug = false){
+	$log_function = "event_log";
+	if($debug){ 
+		$log_function('[DEBUG][SQL_DISCONNECT] '.$db['name']);
+	}
+	if(isset($db['conn'])){
+		$db['conn']->disconnect();
+		unset($db['conn']);
+	}
+}
+
+function sql_query($sql, &$db, $debug = false, $r = 0, $nbTry = 0){
+	if($sql != ""){
+		$log_function = "event_log";
+		$log_error = "";
+		sql_connect($db, $debug);
+		if(isset($db['conn'])){
+			if($r == 0){
+				if($debug){ $log_function('[DEBUG][SQL_QUERY] '.$db['name'].':'.$sql);}
+				$result = $db['conn']->query($sql);
+			}else{
+				if($debug){ $log_function('[DEBUG][SQL_GETONE] '.$db.':'.$sql);}
+				$result = $db['conn']->getOne($sql);
+			}
+			if(!PEAR::isError($result)){ return $result;}
+			else{
+				$log_error = '[SQL_QUERY][ERROR] '.$db['name'].':'.$result->getCode().". ".$result->getMessage().' ('.$result->getUserInfo().') ';
+				$log_function($log_error, $script_name);
+			}
+		}else{
+			$log_error = '[SQL_QUERY][ERROR] '.$db['name'].': Connection failed';
+			$log_function($log_error, $script_name);
+		}
+		if($nbTry < 10 && !$debug){
+			$nbTry++;
+			sql_disconnect($db, $debug);
+			$log_function('[SQL_QUERY][ERROR] wait '.($nbTry*60).'s before next try ('.$nbTry.')');
+			sleep($nbTry*60);
+			return sql_query($sql, $db, $debug,$r, $nbTry);
+		}else{
+			sql_disconnect($db, $debug);
+			event_log('[SQL_QUERY][ERROR] '.$db['name'].' SCRIPT STOPPED');
+			event_log('REQUEST:'.$sql);
+			event_log($log_error, "", $debug);
+			exit;
+		}
+	}
+	return false;
+}
+
+function sql_getOne($sql, &$db, $debug = false){
+	return sql_query($sql, $db, $debug, 1);
+}
+?>

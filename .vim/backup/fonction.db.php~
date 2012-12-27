@@ -1,0 +1,1048 @@
+<?php
+
+function log_query($function_name, $sql, $time) {
+	$logfile = PATH_TEMP.'query.txt';
+	if(!is_file($logfile) || filesize($logfile)>100000) {
+		$handle = fopen($logfile, 'w');
+	} else {
+		$handle = fopen($logfile, 'a+');
+	}
+	if($handle!==false) {
+		fwrite($handle, date('Y-m-d H:i:s').' - '.$function_name.' ('.ceil($time*1000).'ms)');
+		fwrite($handle, "\n".$sql."\n--\n");
+		fclose($handle);
+	}
+}
+
+/* Fonctions de traitement d'erreurs pour PEAR */
+function pear_error_handler($error_obj) {
+	global $db_data;
+	if(SERVER_DEV) echo $error_obj->getMessage().": ".$error_obj->getDebugInfo();
+	error_log($error_obj->getMessage().": ".$error_obj->getDebugInfo());
+    switch($error_obj->getCode()) {
+        case "-24": // Erreur connexion
+        	/*
+        	if($db_data['mode']=='normal' || $db_data['mode']=='degraded'){
+	        	// mise ?jout du fichier connector.php
+	        	if($db_data['mode']=='degraded') $new_mode = 'down';
+	        	else $new_mode ='degraded';
+	        	$line = "<?php\n";
+				$line.= "$"."db_data 						= array();\n";
+				foreach($db_data['pool'] as $key => $value){
+					if($key==$db_data['name']){
+						$line.= "$"."db_data['pool']['".$key."'] 		= array('STATUS'=>'".$new_mode."','NAME'=>'".$value['NAME']."','DSN'=> '".$value['DSN']."', 'DSN_DEGRADED'=> '".$value['DSN_DEGRADED']."');\n";
+					}else{
+						$line.= "$"."db_data['pool']['".$key."'] 		= array('STATUS'=>'".$value['STATUS']."','NAME'=>'".$value['NAME']."','DSN'=> '".$value['DSN']."', 'DSN_DEGRADED'=> '".$value['DSN_DEGRADED']."');\n";
+					}
+				}
+				$line.= "?>";
+				$fh = fopen(DB_CONNECTOR, 'w');
+				fwrite($fh, $line);
+				fclose($fh);
+				// reload viewer
+				if($db_data['mode']=='normal'){
+					header("Location:".$_SERVER['REQUEST_URI']);
+					exit;
+				}
+			}
+			*/
+			header('Location: /unavailable.php');
+			exit;
+            break;
+        case "-2": // Erreur syntaxe SQL
+        case "-1":
+            echo "Sorry, your request cannot be processed now... Please retry later...";
+            break;
+    }
+    exit;
+}
+
+
+function db_query($sql,$db="TOUR",$r=0){
+	global $_bench;
+	global $db_data;
+	if(array_key_exists($db, $db_data['pool'])){ $db_data['name'] = $db;}
+
+	if(!isset($db_data['mode'])) $db_data['mode'] = $db_data['pool'][$db_data['name']]['STATUS'];
+	if($db_data['mode']=='down'){
+		header('Location: /unavailable.php');
+		exit;
+	}else if($db_data['mode']=='degraded'){
+		if(eregi('insert|update|delete',$sql)) return;
+	}
+	if($sql!=""){
+//		$sql = "--VID_\n ".$sql;
+		if(!isset($db_data['conn'][$db]['CONN'])){
+			if($db_data['mode']=='degraded'){
+				$dsn = $db_data['pool'][$db_data['name']]['DSN_DEGRADED'];
+				$name = $db_data['pool'][$db_data['name']]['NAME']." degraded";
+			}else{
+				$dsn = $db_data['pool'][$db_data['name']]['DSN'];
+				$name = $db_data['pool'][$db_data['name']]['NAME'];
+			}
+
+			if(count($db_data['conn']) > 0){
+				foreach($db_data['conn'] as $key => $value){
+					if($value['DSN']==$dsn && $key!=$db){
+						$db_data['conn'][$db]['CONN'] = $db_data['conn'][$key]['CONN'];
+						$_bench['use_existing_db_conn '.$name] = getmicrotime();
+						break;
+					}
+				}
+			}
+			
+			$db_data['conn'][$db]['DSN'] = $dsn;
+			if(!isset($db_data['conn'][$db]['CONN'])){
+				$_bench['start_connecting_db '.$name] = getmicrotime();
+				PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'pear_error_handler');
+				$db_data['conn'][$db]['CONN'] = DB::connect($dsn);
+				$temp_dsn = eregi("@(.*)\?",$dsn,$regs);
+				$_bench['connected to '.$regs[1]] = getmicrotime();
+			}
+		}
+		if($r==0) return $db_data['conn'][$db]['CONN']->query($sql);
+		else return $db_data['conn'][$db]['CONN']->getOne($sql);
+	}
+}
+
+function db_close($db = "") {
+	global $_bench;
+	global $db_data;
+	if(is_array($db_data['conn'])){
+		foreach($db_data['conn'] as $key => $value){
+			if($db == "" || $db == $key){
+				if(isset($value['CONN'])){
+					$value['CONN']->disconnect();
+					$_bench['disconnect_db '.$key] = getmicrotime();
+					$db_data['conn'][$key] = null;
+				}
+			}
+		}
+	}
+}
+
+function db_getOne($sql,$db="TOUR"){
+	return db_query($sql,$db,1);
+}
+
+/**
+*
+*	PREVISITE_REALESTATE
+*
+**/
+
+function get_tts_statut($id_visite){
+	global $db_data;
+	if(is_guid($id_visite)){
+		$sql = "SELECT ID_STATUT_TTS FROM TTS WHERE ID_VISITE='".$id_visite."'";
+		$result = db_getOne($sql, $db_data['name']);
+		if(preg_match('/^\d+$/i',$result) > 0){
+			return $result;
+		}
+	}
+	return "1";	
+}
+
+
+
+/**
+*
+* PREVISITE_VIDEO
+*
+**/
+
+function changeDistribPriority($distrib){
+	$return = "distrib not found";
+	if(is_guid($distrib)){
+		$sql = "SELECT COUNT(*) FROM VIDEO_CRON WHERE ID_DISTRIBUTEUR='".$distrib."' AND ID_STATUT_CRON=0";
+		$return = db_getOne($sql, "video")." videos found and updated";
+		
+		$sql = "UPDATE VIDEO_CRON SET DATE_DERNIER_CRON='".date('Y-m-d H:i:s', mktime()-1*365*24*60*60)."' WHERE ID_DISTRIBUTEUR='".$distrib."' AND ID_STATUT_CRON=0";
+		db_query($sql, "video");
+	}
+	return $return;
+}
+
+function saveCronConfig($limit_generation, $limit_by_distrib, $distrib_limit){
+	if($limit_generation > -1 && $limit_by_distrib > -1){
+		$sql = "UPDATE VIDEO_CRON_LIMIT SET LIMIT_GENERATION='".fix_int($limit_generation)."', LIMIT_DISTRIBUTEUR='".fix_int($limit_by_distrib)."', LIMIT_BY_DISTRIBUTEUR='".fix_text($distrib_limit)."' WHERE 1=1";
+		$result = db_query($sql, "video");
+		return true;
+	}
+	return false;
+}
+
+function getCronConfig(){
+	$return = array('LIMIT_GENERATION' => CRON_GENERATION_LIMIT, 'LIMIT_DISTRIBUTEUR' => CRON_GENERATION_LIMIT_PER_DISTRIB, 'LIMIT_BY_DISTRIBUTEUR');
+	$sql = "SELECT LIMIT_GENERATION, LIMIT_DISTRIBUTEUR, LIMIT_BY_DISTRIBUTEUR FROM VIDEO_CRON_LIMIT";
+	$result = db_query($sql, "video");
+	if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		$r['LIMIT_BY_DISTRIBUTEUR'] = json_decode( $r['LIMIT_BY_DISTRIBUTEUR'], true);
+		return $r; 
+	}
+	return $return;
+}
+
+
+function getCronStatsDetail($start, $end){
+	global $db_data;
+	$return = array();
+	$regExp = '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/i';
+	if(preg_match($regExp, $start) > 0 && preg_match($regExp, $end) > 0){
+		$sql = "SELECT DSN, ID_CONVERSION, ID_VIDEO, DISTRIBUTEUR.ID_DISTRIBUTEUR, ID_VISITE, ID_STATUT_CONVERSION, TAILLE_VIDEO, DATE_CONVERSION, DUREE_CONVERSION FROM VIDEO_CRON_SUIVI INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO_CRON_SUIVI.ID_DISTRIBUTEUR WHERE DATE_CONVERSION BETWEEN '".$start."' AND '".$end."' ORDER BY DSN ASC";
+		$result = db_query($sql, $db_data['name']);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+		if(count($return) > 0){
+			$dsn = "";
+			for($i=0; $i < count($return); $i++){
+				if($dsn == "" || $return[$i]['DSN'] != $dsn){
+					db_close();
+					$dsn = $return[$i]['DSN'];
+					$db_data['name'] = $dsn;
+					$db_data['pool'][$db_data['name']]['DSN'] = $dsn;
+				}
+				$return[$i]['CONVERSIONS'] = array();
+				$sql = "SELECT REF_VIDEO, REF_VIDEO_PROFIL, RESULT_CODE_CONVERSION, RESULT_TEXT_CONVERSION, TYPE_CONVERSION FROM VIDEO_CONVERSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_CONVERSION.ID_VIDEO WHERE ID_CONVERSION='".$return[$i]['ID_CONVERSION']."'";
+				$result = db_query($sql, $db_data['name']);
+				while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[$i]['CONVERSIONS'][] = $r;}
+			}
+		}
+	}
+	db_close();
+	return $return;
+}
+
+function getCronInProgress(){
+	$data_array	= array();
+	$sql = "SELECT ID_VIDEO, ID_DISTRIBUTEUR, DATE_MODIFICATION_CRON, ID_VISITE FROM VIDEO_CRON WHERE ID_STATUT_CRON=1";
+	$result = db_query($sql , "video");
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $data_array[] = $r;}
+	return $data_array;
+}
+
+function getCronStats($delai, $order){
+	global $db_data;
+	$data_array	= array();
+	$sql = "SELECT DATE_CONVERSION, ID_STATUT_CONVERSION, TAILLE_VIDEO, DUREE_CONVERSION FROM VIDEO_CRON_SUIVI ".($delai != "" ? "WHERE DATE_CONVERSION > '".date('Y-m-d H:i:s', mktime()-$delai)."'" : "")." ORDER BY DATE_CONVERSION ".($order == "ASC" ? "ASC" : "DESC");
+	$result = db_query( $sql, $db_data['name']);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $data_array[] = $row;}
+	return $data_array;
+}
+
+
+function deleteRowVideoCron($id_conversion, $id_video, $id_distributeur, $id_visite, $id_statut_conv, $duree = 0,$size = 0){
+	if(is_guid($id_video) && is_guid($id_conversion) && is_guid($id_distributeur) && is_guid($id_visite)){
+		$sql = "SELECT ID_CONVERSION FROM VIDEO_CRON_SUIVI WHERE ID_CONVERSION='".fix_text($id_conversion)."'";
+		$result = db_getOne($sql, "video");
+		if(!is_guid($result)){
+			$sql = "INSERT INTO VIDEO_CRON_SUIVI(ID_CONVERSION, ID_VIDEO, ID_DISTRIBUTEUR, ID_VISITE, ID_STATUT_CONVERSION, TAILLE_VIDEO, DATE_CONVERSION, DUREE_CONVERSION) VALUES( '".fix_text($id_conversion)."', '".$id_video."', '".$id_distributeur."', '".$id_visite."', '".$id_statut_conv."', '".$size."', '".date('Y-m-d H:i:s')."','".$duree."')";
+		}else{
+			$sql = "UPDATE VIDEO_CRON_SUIVI SET ID_STATUT_CONVERSION='".$id_statut_conv."', TAILLE_VIDEO='".$size."', DATE_CONVERSION='".date('Y-m-d H:i:s')."', DUREE_CONVERSION='".$duree."' WHERE ID_CONVERSION='".fix_text($id_conversion)."'";
+		}
+		db_query($sql , "video");
+		$sql = "DELETE FROM VIDEO_CRON WHERE ID_VIDEO='".$id_video."'";
+		db_query($sql , "video");
+	}
+}
+
+
+
+function get_last_cron($filters = ""){
+	global $db_data;
+	$data_array = array();
+	$sql = "SELECT ID_VIDEO, ID_VISITE, DATE_CREATION_CRON, DATE_MODIFICATION_CRON, DATE_DERNIER_CRON, NOM_DISTRIBUTEUR, DISTRIBUTEUR.ID_DISTRIBUTEUR, ID_STATUT_CRON, DATE_CREATION_CRON FROM VIDEO_CRON INNER JOIN DISTRIBUTEUR ON VIDEO_CRON.ID_DISTRIBUTEUR=DISTRIBUTEUR.ID_DISTRIBUTEUR WHERE ID_STATUT_CRON > -1 ORDER BY ID_STATUT_CRON DESC, DATE_DERNIER_CRON asc"; 
+	$result = db_query( $sql, $db_data['name']);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) { $data_array[] = $row;}
+	return $data_array;
+}
+
+function get_videos_need_rediffusion(){
+	global $db_data;
+	$data_array = array('DETAIL'=>array(), 'TOTAL'=>0);
+	$sql = "SELECT NOM_DISTRIBUTEUR,COUNT(*) NB FROM VIDEO INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO.ID_DISTRIBUTEUR WHERE ID_STATUT_VIDEO='2' group by NOM_DISTRIBUTEUR";
+	$result = db_query($sql, $db_data['name']);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		$data_array['DETAIL'][$r['NOM_DISTRIBUTEUR']] = $r['NB'];
+		$data_array['TOTAL'] += $r['NB'];
+	}
+	return $data_array;
+}
+
+
+function get_last_conversions($filters = "", $isUser = false){
+	global $db_data;
+	$data_array = array();
+	$table = "VIDEO".($isUser ? "_UTILISATEUR" : "");
+	$sql = "SELECT ID_CONVERSION, DATE_MODIFICATION_CONVERSION, REF_VIDEO_PROFIL, DATE_DEMANDE_CONVERSION, DATE_TRAITEMENT_CONVERSION, ID_STATUT_CONVERSION, TAILLE_VIDEO, NB_IMAGE, XML_SOURCE_CONVERSION, DATE_FIN_CONVERSION, RESULT_CODE_CONVERSION, RESULT_TEXT_CONVERSION, TYPE_CONVERSION, NB_CONVERSIONS, ".$table.".ID_".$table.",  TYPE_".$table.", ID_STATUT_".$table;
+	if(!$isUser){
+		$sql .= ", VIDEO.ID_VISITE, REF_VIDEO, ID_CRON";
+	}else{ 
+		$sql .= ", VIDEO_UTILISATEUR.ID_UTILISATEUR ID_VISITE, '-' REF_VIDEO";
+	}
+	$sql .= " FROM VIDEO_CONVERSION 
+		RIGHT JOIN ".$table." ON ".$table.".ID_".$table."=VIDEO_CONVERSION.ID_VIDEO ".(!$isUser && preg_match('/ID_UTILISATEUR/i',$filters) > 0 ? " INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE " : "").($filters != "" ? $filters : "")." ORDER BY DATE_MODIFICATION_CONVERSION DESC";
+	$time = microtime(true);
+	$result = db_query( $sql, $db_data['name']);
+	log_query(__FUNCTION__, $sql, microtime(true)-$time);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+		if(!is_guid($row['ID_CONVERSION'])){  $row['ID_CONVERSION'] = $row['ID_VIDEO'];}
+		if(!is_array($data_array[$row['ID_CONVERSION']])){ $data_array[$row['ID_CONVERSION']] = array();}
+		$data_array[$row['ID_CONVERSION']][$row['REF_VIDEO_PROFIL']] = $row;
+	}
+	return $data_array;
+}
+
+//function get_video_infos_for_diffusion($id, $tour, $type = "", $site = "", $login = "", $ref = ""){
+//	global $db_data;
+//	$data_array = array();
+//	if((is_guid($tour) || is_guid($id)) && $type !="" && $site != "" && $login != ""){
+//		if($ref != "" && is_guid($tour)){
+//			$sql="SELECT VIDEO.ID_VIDEO, VISITE.ID_VISITE, REF_VIDEO, DATE_MODIFICATION_VIDEO, ID_STATUT_VIDEO, DESCRIPTION, PRIX_BIEN, DISTRIBUTEUR.ID_DISTRIBUTEUR, DISTRIBUTEUR.NOM_DISTRIBUTEUR, SYMBOLE_DEVISE, ADRESSE, VILLE, CODE_POSTAL, REF_ETAT, TYPE_VIDEO, ID_PAYS, PROFIL_AVAILABLE, DUREE_CONVERSION, NOM_VISITE, URL_ANNONCE, WAIT_TTS, ID_CRON, NB_CONVERSIONS, ID_LANGUE, ID_TEMPLATE FROM VIDEO INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO.ID_DISTRIBUTEUR INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE INNER JOIN DEVISE ON DEVISE.REF_DEVISE=VISITE.REF_DEVISE WHERE VIDEO.ID_VISITE='".$tour."' AND  URL_VIDEO_DIFFUSION LIKE '%".fix_text($ref)."%'";
+//			$result = db_query( $sql, $db_data['name']);
+//			$data_array = $result->fetchRow(DB_FETCHMODE_ASSOC);
+//		}
+//		if(!is_guid($data_array['ID_VISITE'])){		
+//			$sql="SELECT VIDEO.ID_VIDEO, VISITE.ID_VISITE, REF_VIDEO, DATE_MODIFICATION_VIDEO, ID_STATUT_VIDEO, DESCRIPTION, PRIX_BIEN, DISTRIBUTEUR.ID_DISTRIBUTEUR, DISTRIBUTEUR.NOM_DISTRIBUTEUR, SYMBOLE_DEVISE, ADRESSE, VILLE, CODE_POSTAL, REF_ETAT, TYPE_VIDEO, ID_PAYS, PROFIL_AVAILABLE, DUREE_CONVERSION, NOM_VISITE, URL_ANNONCE, WAIT_TTS, ID_CRON, NB_CONVERSIONS, ID_LANGUE, ID_TEMPLATE FROM VIDEO INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO.ID_DISTRIBUTEUR INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE INNER JOIN DEVISE ON DEVISE.REF_DEVISE=VISITE.REF_DEVISE WHERE ".(is_guid($tour) ? "VIDEO.ID_VISITE='".$tour."'" : "VIDEO.ID_VIDEO='".$id."'")." and TYPE_VIDEO='".$type."'";
+//			$time = microtime(true);
+//			$result = db_query( $sql, $db_data['name']);
+//			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+
+//			$data_array = $result->fetchRow(DB_FETCHMODE_ASSOC);
+//		}
+//		if(is_guid($data_array['ID_VISITE'])){
+//	  		if($data_array['ID_TEMPLATE'] != '21'){
+//	  			$sql = "SELECT ID_TYPE_TRANSACTION, ID_ADRESSE_CACHEE, VISITE_TPL_EU.ID_TYPE_BIEN, NOM_TYPE_BIEN TYPE_BIEN, NOMBRE_PIECE NB_ROOM, NOMBRE_CHAMBRE NB_BEDROOM, NOMBRE_SALLE_BAIN NB_BATHROOM, SURFACE_HABITABLE SQUARE_FEET, NOM_UNITE_SURFACE, DPE_LETTRE, DPE_VALEUR, GES_LETTRE, GES_VALEUR FROM VISITE_TPL_EU LEFT JOIN TYPE_BIEN ON TYPE_BIEN.ID_TYPE_BIEN=VISITE_TPL_EU.ID_TYPE_BIEN INNER JOIN UNITE_SURFACE ON UNITE_SURFACE.ID_UNITE_SURFACE=VISITE_TPL_EU.ID_UNITE_SURFACE_HABITABLE WHERE ID_VISITE='".$data_array['ID_VISITE']."'";
+//	  		}else{
+//	  			$sql = "SELECT ID_TYPE_TRANSACTION,ID_ADRESSE_CACHEE,VISITE_TPL_US.ID_TYPE_BIEN, NOM_TYPE_BIEN TYPE_BIEN,NOMBRE_CHAMBRE NB_BEDROOM,NOMBRE_SALLE_BAIN NB_BATHROOM,ESPACE_TOTAL SQUARE_FEET FROM VISITE_TPL_US LEFT JOIN VISITE_TPL_US_TYPE_BIEN ON VISITE_TPL_US_TYPE_BIEN.ID_TYPE_BIEN=VISITE_TPL_US.ID_TYPE_BIEN WHERE ID_VISITE='".$data_array['ID_VISITE']."'";
+//	  		}
+//			$result = db_query( $sql, $db_data['name']);
+//			$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+//			$data_array = array_merge($data_array, $row);	  		
+//		}
+//		if(is_guid($data_array['ID_VIDEO'])){
+//			$sql = "SELECT TOP 1 SITE_DIFFUSION, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, URL_VIDEO_DIFFUSION, DATE_MODIFICATION_DIFFUSION, RESULT_CODE_DIFFUSION, RESULT_TEXT_DIFFUSION, RESULT_DESCRIPTION_DIFFUSION, URL_NOTIFICATION_DIFFUSION, ID_STATUT_DIFFUSION, TITLE_DIFFUSION FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$data_array['ID_VIDEO']."' AND SITE_DIFFUSION='".strtoupper($site)."' AND LOGIN_DIFFUSION='".fix_text($login)."' ORDER BY DATE_MODIFICATION_DIFFUSION DESC";
+//			$time = microtime(true);
+//			$result = db_query( $sql, $db_data['name']);
+//			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+//			if($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+//				$data_array = array_merge($row, $data_array);
+//			}
+//		}
+//	}
+//	return $data_array;
+//}
+
+function get_video_user_infos($id_conversion){
+	global $db_data;
+	$data_array = array();
+	if(is_guid($id_conversion)){
+		$sql = array(
+			"SELECT ID_VIDEO FROM VIDEO_CONVERSION WHERE ID_CONVERSION='#ID#'",
+			"SELECT ID_VIDEO_UTILISATEUR FROM VIDEO_UTILISATEUR WHERE ID_VIDEO_UTILISATEUR='#ID#'",
+			"SELECT TOP 1 ID_VIDEO_UTILISATEUR FROM VIDEO_UTILISATEUR WHERE ID_UTILISATEUR='#ID#' ORDER BY DATE_MODIFICATION_VIDEO_UTILISATEUR DESC",
+		);
+		$i = 0;
+		do{
+			$sql_request = str_replace('#ID#', $id_conversion, $sql[$i++]);
+			$id_video = db_getOne($sql_request, $db_data['name']);
+			
+		}while(!is_guid($id_video) && $i < count($sql));
+		if(is_guid($id_video)){
+			$sql="SELECT ID_VIDEO_UTILISATEUR ID_VIDEO, TYPE_VIDEO_UTILISATEUR TYPE_VIDEO, ID_UTILISATEUR, DATE_CREATION_VIDEO_UTILISATEUR DATE_CREATION_VIDEO, DATE_MODIFICATION_VIDEO_UTILISATEUR DATE_MODIFICATION_VIDEO, ID_STATUT_VIDEO_UTILISATEUR ID_STATUT_VIDEO, DISTRIBUTEUR.ID_DISTRIBUTEUR, PROFIL_AVAILABLE, NB_CONVERSIONS, LATITUDE, LONGITUDE, NOM_AGENCE, TELEPHONE, EMAIL, ADRESSE, CODE_POSTAL, VILLE, ID_PAYS, DESCRIPTION, ZONE, EMPLOYE, NOM_DISTRIBUTEUR, DIFFUSION FROM VIDEO_UTILISATEUR INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO_UTILISATEUR.ID_DISTRIBUTEUR WHERE ID_VIDEO_UTILISATEUR='".$id_video."'";
+			$time = microtime(true);
+			$result = db_query( $sql, $db_data['name']);
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+			if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) { 
+				$data_array = $row;
+				if(is_guid($data_array['ID_UTILISATEUR'])){
+					$sql = "SELECT ID_UTILISATEUR_IMAGE FROM UTILISATEUR_IMAGE WHERE ID_UTILISATEUR='".$data_array['ID_UTILISATEUR']."' AND ID_STATUT_UTILISATEUR_IMAGE=1 ORDER BY POIDS_UTILISATEUR_IMAGE ASC";
+					$result = db_query( $sql, $db_data['name']);
+					$data_array['LOGOS'] = array();
+					while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) { 
+						$data_array['LOGOS'][] = $row['ID_UTILISATEUR_IMAGE'];
+					}
+				}
+			}
+		}
+	}
+	return $data_array;
+}
+
+function get_tour_data_http($tour) {
+	$url = str_replace('#TOUR#', $tour, URL_GET_TOUR_INFOS);
+	$json = json_decode( file_get_contents($url), true );
+	return $json;
+}
+
+function set_tour_data_http($tour, $http_params) {
+	$url_update = str_replace('#TOUR#', $tour, URL_GET_TOUR_INFOS);
+	$opts = array(
+		'http' => array(
+			'method' => 'POST',
+			'header' => 'Content-type: application/x-www-form-urlencoded',
+			'content' => http_build_query($http_params)
+		)
+	);
+	$result = file_get_contents($url_update, false, stream_context_create($opts));
+	return @json_decode($result, true);
+}
+
+function get_video_infos($id_conversion){
+	global $db_data;
+	$data_array = array();
+	if(is_guid($id_conversion)){
+		$sql = array(
+			"SELECT ID_VIDEO FROM VIDEO_CONVERSION WHERE ID_CONVERSION='#ID#'",
+			"SELECT ID_VIDEO FROM VIDEO WHERE ID_VIDEO='#ID#'",
+			"SELECT ID_VIDEO FROM VIDEO WHERE ID_VISITE='#ID#'"
+		);
+		$i = 0;
+		do{
+			$id_video = db_getOne(str_replace('#ID#', $id_conversion, $sql[$i++]), $db_data['name']);
+		}while(!is_guid($id_video) && $i < count($sql));
+		
+		if(is_guid($id_video)){
+			$sql=<<<SQL
+SELECT
+	v.ID_VISITE,
+	VIDEO.ID_VIDEO, REF_VIDEO, DATE_CREATION_VIDEO, DATE_MODIFICATION_VIDEO, ID_STATUT_VIDEO, 
+	DISTRIBUTEUR.ID_DISTRIBUTEUR, DISTRIBUTEUR.NOM_DISTRIBUTEUR, 
+	TYPE_VIDEO, PROFIL_AVAILABLE, DUREE_CONVERSION, WAIT_TTS, ID_CRON, 
+	NB_CONVERSIONS
+FROM
+	VIDEO
+	INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO.ID_DISTRIBUTEUR
+	INNER JOIN VISITE V ON V.ID_VISITE=VIDEO.ID_VISITE
+--	LEFT JOIN VISITE_DETAIL_PRIX_SURFACE VP ON V.ID_VISITE=VP.ID_VISITE
+--	LEFT JOIN DEVISE ON DEVISE.REF_DEVISE COLLATE FRENCH_CI_AS = VP.REF_DEVISE COLLATE FRENCH_CI_AS
+WHERE
+	ID_VIDEO='$id_video'
+SQL;
+//	LEFT JOIN VISITE_URL vu ON V.ID_VISITE=vu.ID_VISITE
+//	LEFT JOIN VISITE_TEXTE VT ON V.ID_VISITE=VT.ID_VISITE AND V.ID_LANGUE COLLATE French_CI_AS=VT.ID_LANGUE COLLATE French_CI_AS
+//	VT.DESCRIPTION, PRIX_BIEN, SYMBOLE_DEVISE, ADRESSE, VILLE, CODE_POSTAL, REF_ETAT, ID_PAYS, VT.NOM_VISITE, V.ID_LANGUE, ID_TEMPLATE, vu.URL_ANNONCE
+
+			$time = microtime(true);
+			$result = db_query( $sql, $db_data['name']);
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+			if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+				$data_array = $row;
+			}
+			if(is_guid($data_array['ID_VIDEO'])){
+				$sql = "SELECT SITE_DIFFUSION, URL_VIDEO_DIFFUSION, RESULT_CODE_DIFFUSION, RESULT_TEXT_DIFFUSION, RESULT_DESCRIPTION_DIFFUSION FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$data_array['ID_VIDEO']."' AND ID_STATUT_DIFFUSION > 1";
+				$time = microtime(true);
+				$result = db_query( $sql, $db_data['name']);
+				log_query(__FUNCTION__, $sql, microtime(true)-$time);
+				$data_array['DIFFUSION'] = array();
+				while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) { $data_array['DIFFUSION'][] = $row;}
+			}
+			if(is_guid($data_array['ID_VISITE'])){
+				$sql = "SELECT ID_VIDEO,TYPE_VIDEO FROM VIDEO WHERE ID_VISITE='".$data_array['ID_VISITE']."' ORDER BY TYPE_VIDEO";
+				$result = db_query($sql, $db_data['name']);
+				$data_array['TYPE_VIDEO_AVAILABLE'] = array();
+				while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $data_array['TYPE_VIDEO_AVAILABLE'][$row['ID_VIDEO']] = $row['TYPE_VIDEO'];}
+
+				
+				// RS 2012-12-05 : Rest API
+				$json = get_tour_data_http($data_array['ID_VISITE']);
+				if(!empty($json['TOUR'])) {
+					$data_array = array_merge($data_array, array(
+						'DESCRIPTION' => $json['TOUR']['DESCRIPTION'],
+						'PRIX_BIEN' => $json['TOUR']['PRIX_BIEN'],
+						'SYMBOLE_DEVISE' => $json['TOUR']['SYMBOLE_DEVISE'],
+						'ADRESSE' => $json['TOUR']['ADRESSE'],
+						'VILLE' => $json['TOUR']['VILLE'],
+						'CODE_POSTAL' => $json['TOUR']['CODE_POSTAL'],
+						'REF_ETAT' => $json['TOUR']['REF_ETAT'],
+						'ID_PAYS' => $json['TOUR']['ID_PAYS'],
+						'NOM_VISITE' => $json['TOUR']['NOM_VISITE'],
+						'ID_LANGUE' => $json['TOUR']['ID_LANGUE'],
+						'ID_TEMPLATE' => $json['TOUR']['ID_TEMPLATE'],
+						'URL_ANNONCE' => $json['TOUR']['URL_ANNONCE'],
+						'ID_TYPE_TRANSACTION' => $json['TOUR']['ID_TYPE_TRANSACTION'],
+						'ID_ADRESSE_CACHEE' => $json['TOUR']['ID_ADRESSE_CACHEE'],
+						'ID_TYPE_BIEN' => $json['TOUR']['ID_TYPE_BIEN'],
+						'NB_ROOM' => $json['TOUR']['NB_ROOM'],
+						'NB_BEDROOM' => $json['TOUR']['NB_BEDROOM'],
+						'NB_BATHROOM' => $json['TOUR']['NB_BATHROOM'],
+						'SQUARE_FEET' => $json['TOUR']['SQUARE_FEET'],
+						'NOM_UNITE_SURFACE' => $json['TOUR']['NOM_UNITE_SURFACE'],
+						'DPE_LETTRE' => $json['TOUR']['DPE_LETTRE'],
+						'DPE_VALEUR' => $json['TOUR']['DPE_VALEUR'],
+						'GES_LETTRE' => $json['TOUR']['GES_LETTRE'],
+						'GES_VALEUR' => $json['TOUR']['GES_VALEUR'],
+						'TYPE_BIEN' => $json['TOUR']['NOM_TYPE_BIEN_DEFAUT']
+					));
+				}
+
+//	  		if($data_array['ID_TEMPLATE'] != '21'){
+//	  			$sql = "SELECT ID_TYPE_TRANSACTION, ID_ADRESSE_CACHEE, VISITE_TPL_EU.ID_TYPE_BIEN, NOM_TYPE_BIEN TYPE_BIEN, NOMBRE_PIECE NB_ROOM, NOMBRE_CHAMBRE NB_BEDROOM, NOMBRE_SALLE_BAIN NB_BATHROOM, SURFACE_HABITABLE SQUARE_FEET, NOM_UNITE_SURFACE, DPE_LETTRE, DPE_VALEUR, GES_LETTRE, GES_VALEUR FROM VISITE_TPL_EU LEFT JOIN TYPE_BIEN ON TYPE_BIEN.ID_TYPE_BIEN=VISITE_TPL_EU.ID_TYPE_BIEN INNER JOIN UNITE_SURFACE ON UNITE_SURFACE.ID_UNITE_SURFACE=VISITE_TPL_EU.ID_UNITE_SURFACE_HABITABLE WHERE ID_VISITE='".$data_array['ID_VISITE']."'";
+//	  		}else{
+//	  			$sql = "SELECT ID_TYPE_TRANSACTION,ID_ADRESSE_CACHEE,VISITE_TPL_US.ID_TYPE_BIEN, NOM_TYPE_BIEN TYPE_BIEN,NOMBRE_CHAMBRE NB_BEDROOM,NOMBRE_SALLE_BAIN NB_BATHROOM,ESPACE_TOTAL SQUARE_FEET FROM VISITE_TPL_US LEFT JOIN VISITE_TPL_US_TYPE_BIEN ON VISITE_TPL_US_TYPE_BIEN.ID_TYPE_BIEN=VISITE_TPL_US.ID_TYPE_BIEN WHERE ID_VISITE='".$data_array['ID_VISITE']."'";
+//	  		}
+//				$result = db_query( $sql, $db_data['name']);
+//				if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+//					$data_array = array_merge($data_array, $row);	  		
+//				}
+			}
+		}
+	}
+	return $data_array;
+}
+
+function get_video_conversions($id_video){
+	global $db_data;
+	$data_array = array();
+	if(is_guid($id_video)){
+		$sql = "SELECT ID_CONVERSION, DATE_MODIFICATION_CONVERSION, REF_VIDEO_PROFIL, ID_VIDEO, DATE_DEMANDE_CONVERSION, ID_STATUT_CONVERSION, NB_IMAGE, DATE_FIN_CONVERSION, RESULT_CODE_CONVERSION, RESULT_TEXT_CONVERSION, TYPE_CONVERSION FROM VIDEO_CONVERSION WHERE ID_VIDEO='".$id_video."' ORDER BY DATE_MODIFICATION_CONVERSION DESC";
+		
+		$time = microtime(true);
+		$result = db_query($sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			if(!is_array($data_array[$row['ID_CONVERSION']])){ $data_array[$row['ID_CONVERSION']] = array();}
+			$data_array[$row['ID_CONVERSION']][$row['REF_VIDEO_PROFIL']] = $row;
+		}
+	}
+	return $data_array;
+}
+
+function get_conversion_infos($id_conversion, $isUser = false){
+	global $db_data;
+	$data_array = array();
+	if(is_guid($id_conversion)){
+		$sql = "SELECT VIDEO_CONVERSION.ID_VIDEO, ".($isUser ? "ID_UTILISATEUR" : "")." ID_VISITE, ID_CONVERSION, ID_STATUT_CONVERSION, XML_SOURCE_CONVERSION, DATE_DEMANDE_CONVERSION, DATE_FIN_CONVERSION, TAILLE_VIDEO, URL_POST_CONVERSION, URL_NOTIFICATION_CONVERSION, RESULT_CODE_CONVERSION, RESULT_TEXT_CONVERSION, REF_VIDEO_PROFIL, TYPE_CONVERSION, ID_RESOURCE FROM VIDEO_CONVERSION INNER JOIN ".($isUser ? "VIDEO_UTILISATEUR " : "")." VIDEO ON VIDEO.ID_VIDEO".($isUser ? "_UTILISATEUR" : "")."=VIDEO_CONVERSION.ID_VIDEO WHERE ID_CONVERSION='".$id_conversion."' ORDER BY REF_VIDEO_PROFIL";
+		$time = microtime(true);
+		$result = db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[] = $row;
+		}
+	}
+	return $data_array;
+}
+
+function get_conversion_details($id_conversion){
+	global $db_data;
+	$data_array = array();
+	if(is_guid($id_conversion)){
+		$sql = "SELECT ID_VIDEO, ID_CONVERSION, XML_SOURCE_CONVERSION, REF_VIDEO_PROFIL FROM VIDEO_CONVERSION WHERE ID_CONVERSION='".$id_conversion."' ORDER BY REF_VIDEO_PROFIL";
+		$time = microtime(true);
+		$result = db_query($sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $data_array[] = $row;}
+	}
+	return $data_array;
+}
+
+function get_video_distributeur($id_visite){
+	global $db_data;
+	if(is_guid($id_visite)){
+		$sql = "SELECT ID_DISTRIBUTEUR FROM VISITE INNER JOIN SOCIETE ON SOCIETE.ID_SOCIETE=VISITE.ID_SOCIETE WHERE ID_VISITE='".$id_visite."'";
+		return db_getOne($sql, $db_data['name']);
+	}
+	return "";
+}
+
+function insert_video_infos_cron($id_video, $ref_video, $type, $distrib, $tour, $wait_for_tts = true, $repost = false){
+	global $db_data;
+	if(is_guid($id_video) && is_guid($distrib) && is_guid($tour)){
+		db_close();
+		$old_name = $db_data['name'];
+		$db_data['name'] = "video";
+		$sql = "SELECT ID_VISITE FROM VIDEO_CRON WHERE ID_VIDEO='".$id_video."'";
+		if(!is_guid(db_getOne($sql, $db_data['name']))){
+			$sql = "INSERT INTO VIDEO_CRON (Id_video, ID_VISITE, Id_distributeur, Id_statut_cron, Date_creation_cron, Date_modification_cron, Date_dernier_cron) VALUES('".$id_video."', '".$tour."', '".$distrib."', 0, '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."')";
+		}else if(!$repost){
+			$sql = "UPDATE VIDEO_CRON SET id_visite='".$tour."', id_distributeur='".$distrib."', Id_statut_cron=0, Date_modification_cron='".date('Y-m-d H:i:s')."', Date_dernier_cron='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$id_video."'";
+		}
+		if($sql != "")	db_query( $sql, $db_data['name']);
+		if($repost) return;
+		db_close();
+		$db_data['name'] = $old_name;
+		$sql = "SELECT ID_VIDEO, ID_STATUT_VIDEO FROM VIDEO WHERE ID_VIDEO='".$id_video."'";
+		$time = microtime(true);
+		$result = db_query($sql, $db_data['name']);
+		$r = $result->fetchRow(DB_FETCHMODE_ASSOC);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		$sql = "";
+		if(!is_guid($r['ID_VIDEO'])){
+			if($ref_video == ""){ $ref_video = substr($id_video,0,8);}
+			$sql = "INSERT INTO VIDEO(ID_VIDEO,REF_VIDEO, DATE_CREATION_VIDEO, DATE_MODIFICATION_VIDEO, ID_STATUT_VIDEO, TYPE_VIDEO, ID_CRON, WAIT_TTS, ID_VISITE".(is_guid($distrib) ?  ", ID_DISTRIBUTEUR":"").") VALUES( '".$id_video."', '".fix_text($ref_video,20)."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '0', '".fix_text($type)."', '1', '".($wait_for_tts ? "1" : "0")."','".$tour."'".(is_guid($distrib) ?  ", '".$distrib."'":"").")";
+		}else if($r['ID_STATUT_VIDEO'] != 0){
+			$sql = "UPDATE VIDEO SET DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."', ID_STATUT_VIDEO='0', TYPE_VIDEO='".fix_text($type)."', ID_CRON='1',  WAIT_TTS='".($wait_for_tts ? "1" : "0")."' WHERE ID_VIDEO='".$id_video."'";
+		}
+		if($sql != ""){ 
+			$time = microtime(true);
+			db_query($sql,$db_data['name']);
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		}
+	}
+}
+
+function update_video_infos( $id_tour, $ref_video, $type, $distrib, $wait_for_tts = false){
+	global $db_data;
+	$return = false;
+	if(is_guid($id_tour) && $type != ""){
+		$sql = "SELECT COUNT(*) FROM VIDEO WHERE ID_VISITE='".$id_tour."' AND TYPE_VIDEO='".fix_text($type)."'";
+		if(db_getOne($sql, $db_data['name']) > 1){
+			$pos_doublon = -1;
+			$vids = array();
+			$sql = "SELECT ID_VIDEO, REF_VIDEO, ID_STATUT_VIDEO, NB_CONVERSIONS, TYPE_VIDEO FROM VIDEO WHERE ID_VISITE='".$id_tour."' AND TYPE_VIDEO='".fix_text($type)."'";
+			$result = db_query($sql, $db_data['name']);
+			while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $vids[] = $row;}
+			for($i = 0;$i < count($vids); $i++){
+				$sql = "SELECT RESULT_CODE_DIFFUSION, ID_STATUT_DIFFUSION FROM VIDEO_DIFFUSION WHERE ID_VIDEO='".$vids[$i]['ID_VIDEO']."'";
+				$result = db_query($sql, $db_data['name']);
+				while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+					if($row['RESULT_CODE_DIFFUSION'] > 0 && $row['ID_STATUT_DIFFUSION'] == -1) $row['ID_STATUT_DIFFUSION'] = 0;
+					$vids[$i]['DIFFUSION_ACTIVE'] += ($row['ID_STATUT_DIFFUSION'] > 0 ? 1 : 0);
+					$vids[$i]['DIFFUSION_WAITING'] += ($row['ID_STATUT_DIFFUSION'] == 0 ? 1 : 0);
+				}
+				if($pos_doublon < 0 
+					|| $vids[$pos_doublon]['DIFFUSION_ACTIVE'] > $vids[$i]['DIFFUSION_ACTIVE']
+					|| ($vids[$pos_doublon]['DIFFUSION_ACTIVE'] == $vids[$i]['DIFFUSION_ACTIVE'] && $vids[$pos_doublon]['DIFFUSION_WAITING'] > $vids[$i]['DIFFUSION_WAITING'])
+					|| ($vids[$pos_doublon]['DIFFUSION_ACTIVE'] == $vids[$i]['DIFFUSION_ACTIVE'] && $vids[$pos_doublon]['DIFFUSION_WAITING'] == $vids[$i]['DIFFUSION_WAITING'] && $vids[$pos_doublon]['NB_CONVERSIONS'] > $vids[$i]['NB_CONVERSIONS'])
+				){ 
+					$pos_doublon = $i;
+				}
+			}
+			if($pos_doublon >= 0){
+				$sql = "UPDATE VIDEO SET TYPE_VIDEO='".fix_tex($vids[$pos_doublon]['TYPE_VIDEO']."_DOUBLON", 20)."', ID_STATUT_VIDEO='".($vids[$pos_doublon]['ID_STATUT_VIDEO'] == 0 ? "-1" : $vids[$pos_doublon]['ID_STATUT_VIDEO'])."' WHERE ID_VIDEO='".$vids[$pos_doublon]['ID_VIDEO']."'";
+				db_query($sql, $db_data['name']);
+				$sql = "UPDATE VIDEO_DIFFUSION SET ID_STATUT_DIFFUSION='-1', DATE_MODIFICATION_DIFFUSION='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$vids[$pos_doublon]['ID_VIDEO']."' AND ID_STATUT_DIFFUSION=0";
+				db_query($sql, $db_data['name']);
+			}else return "doublon";
+		}
+		$sql = "SELECT ID_VIDEO, ID_STATUT_VIDEO, WAIT_TTS, ID_CRON, DATE_MODIFICATION_VIDEO FROM VIDEO WHERE ID_VISITE='".$id_tour."' AND TYPE_VIDEO='".fix_text($type)."'";
+		$time = microtime(true);
+		$result = db_query($sql, $db_data['name']);
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+			$id_video = $r['ID_VIDEO'];
+			if($wait_for_tts){ $r['WAIT_TTS'] = 1;}
+		}
+		$sql = "";
+		if(!is_guid($id_video)){
+			$id_video =	generate_guid();
+			if($ref_video == ""){ $ref_video = substr($id_video,0,8);}
+			$sql = "INSERT VIDEO(ID_VIDEO, ID_VISITE,REF_VIDEO, DATE_CREATION_VIDEO, DATE_MODIFICATION_VIDEO, ID_STATUT_VIDEO, TYPE_VIDEO, WAIT_TTS".(is_guid($distrib) ?  ", ID_DISTRIBUTEUR":"").") VALUES('".$id_video."', '".$id_tour."','".fix_text($ref_video,20)."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."','0','".fix_text($type)."','".$r['WAIT_TTS']."'".(is_guid($distrib) ?  ", '".$distrib."'":"").")";
+			$return = true;
+		}else if($r['ID_STATUT_VIDEO'] != 0){
+			$sql = "UPDATE VIDEO SET DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."', ID_STATUT_VIDEO='0', WAIT_TTS='".$r['WAIT_TTS']."' WHERE ID_VIDEO='".$id_video."'";
+			$return = true;
+		}else if($r['ID_STATUT_VIDEO'] == 0 && ($r['ID_CRON'] == 1 || date('Y-m-d H:i:s', mktime()-12*60*60) > $r['DATE_MODIFICATION_VIDEO'])){
+//		}else if($r['ID_STATUT_VIDEO'] == 0 && $r['ID_CRON'] == 1){
+			$return = true;
+		}
+		if($sql != ""){ 
+			$time = microtime(true);
+			db_query($sql,$db_data['name']);
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		}
+	}
+	if($return == true){ return $id_video;}
+	if(is_guid($id_video) && $r['ID_STATUT_VIDEO'] == 0){ return true;}
+	return false;
+}
+ 
+//utilisateur
+function update_video_user_infos($infos, $preview = false){
+	global $db_data;
+	$return = false;
+	$user = $infos['ID_UTILISATEUR'];
+	$distrib = $infos['ID_DISTRIBUTEUR'];
+	$type = $infos['TYPE_VIDEO'];
+	$tab_user = $infos;
+	if(is_guid($user) && $type != ""){
+		$id_video = "";
+		$id_pays = "";
+		$sql = "SELECT ID_VIDEO_UTILISATEUR, ID_STATUT_VIDEO_UTILISATEUR, DATE_MODIFICATION_VIDEO_UTILISATEUR, ID_PAYS FROM VIDEO_UTILISATEUR WHERE ID_UTILISATEUR='".$user."' AND TYPE_VIDEO_UTILISATEUR='".fix_text($type)."'";
+		$time = microtime(true);
+		$result = db_query($sql, $db_data['name']);
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+			$id_video = $r['ID_VIDEO_UTILISATEUR'];
+			$id_pays = $r['ID_PAYS'];
+			$id_statut_video = $r['ID_STATUT_VIDEO_UTILISATEUR'];
+		}
+		if(!is_guid($distrib) || $id_pays == ""){
+			$sql = "SELECT ID_DISTRIBUTEUR,ID_PAYS FROM UTILISATEUR INNER JOIN SOCIETE ON SOCIETE.ID_SOCIETE=UTILISATEUR.ID_SOCIETE WHERE ID_UTILISATEUR='".$user."'";
+			$result = db_query($sql, $db_data['name']);
+			if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+				$distrib = $row['ID_DISTRIBUTEUR'];
+				$id_pays = strtoupper($row['ID_PAYS']);
+			}
+		}
+		$sql = "";
+		$id_statut_video_new = ($preview ? $id_statut_video : "0");
+		if(!is_guid($id_video)){
+			$id_video =	generate_guid();
+			$sql = "INSERT VIDEO_UTILISATEUR(ID_VIDEO_UTILISATEUR, ID_UTILISATEUR, ID_DISTRIBUTEUR, DATE_CREATION_VIDEO_UTILISATEUR, DATE_MODIFICATION_VIDEO_UTILISATEUR, ID_STATUT_VIDEO_UTILISATEUR, TYPE_VIDEO_UTILISATEUR,ID_PAYS) VALUES('".$id_video."', '".$user."', '".$distrib."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."','".$id_statut_video_new."','".fix_text($type)."', '".fix_text($id_pays,2)."')";
+			$return = true;
+			db_query($sql,$db_data['name']);
+		}
+		if($id_statut_video != 0){
+			if($id_statut_video_new == "-1"){
+				list($lat, $lng) = explode("#", $tab_user['GPS']);
+				$sql = "UPDATE VIDEO_UTILISATEUR SET Date_modification_video_utilisateur='".date('Y-m-d H:i:s')."',  Id_statut_video_utilisateur='".$id_statut_video_new."', Latitude='".$lat."', Longitude='".$lng."', Nom_agence='".fix_text($tab_user['AGENCE_NAME'],100)."', Telephone='".fix_text($tab_user['TELEPHONE'],30)."', Email='".fix_text($tab_user['EMAIL'],150)."', Adresse='".fix_text($tab_user['ADRESSE'],150)."', Code_postal='".fix_text($tab_user['CODE_POSTAL'],50)."', Ville='".fix_text($tab_user['VILLE'],100)."',  Description='".fix_text($tab_user['DESCRIPTION'],500)."', Zone='".fix_text($tab_user['ZONES'],300)."', Employe='".fix_text($tab_user['EMPLOYES'],1000)."', DIFFUSION='".fix_text($tab_user['DIFFUSION'],300)."' WHERE ID_VIDEO_UTILISATEUR='".$id_video."'";
+				$return = true;
+			}else{
+				$sql = "UPDATE VIDEO_UTILISATEUR SET DATE_MODIFICATION_VIDEO_UTILISATEUR='".date('Y-m-d H:i:s')."', ID_STATUT_VIDEO_UTILISATEUR='".$id_statut_video."', ID_PAYS='".fix_text($id_pays,2)."' WHERE ID_VIDEO_UTILISATEUR='".$id_video."'";
+				$return = true;
+			}
+			db_query($sql,$db_data['name']);
+		}
+	}
+	return ($return ? $id_video : false);
+}
+ 
+function insert_conversion($id_video, $ref_video, $conversions, $tab_tour, $id_distributeur, $nbimg, $type, $wait_for_tts = false, $is_video_user = false){
+	global $db_data;
+	$id = "";
+	$refs = array();
+	if(is_guid($id_video)){
+		$wait_for_tts_old = 0;
+		$sql = "SELECT ID_VIDEO, PROFIL_AVAILABLE, WAIT_TTS, ID_CRON FROM VIDEO WHERE ID_VIDEO='".$id_video."'";
+		$time = microtime(true);
+		$result = db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			$id = $r['ID_VIDEO'];
+			$tmp = explode(',',$r['PROFIL_AVAILABLE']);
+			$wait_for_tts_old = $r['WAIT_TTS'];
+			$id_cron = $r['ID_CRON'];
+			foreach($tmp as $v){ $refs[getProfilExt($v)] = $v;}
+		}
+
+		if(!is_guid($id)){
+			$sql= "INSERT INTO VIDEO(Id_video, Ref_video, Id_visite, Type_video, Date_creation_video, Date_modification_video, Id_statut_video, Id_distributeur, Profil_available, Wait_TTS, Id_cron, Nb_conversions) VALUES('".$id_video."', '".$ref_video."', '".$tab_tour['ID_VISITE']."', '".fix_text($type == "" ? "FR" : $type )."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', 0, ".(is_guid($id_distributeur) ? "'".$id_distributeur."'" : "NULL")." , '', '".($wait_for_tts_old ? "1" : "0")."','0', '0')";
+			
+			$time = microtime(true);
+			db_query( $sql, $db_data['name']);
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		}
+
+		if(is_array($conversions) && count($conversions) > 0){
+			foreach($conversions as $conv){
+				if($refs[getProfilExt($conv['ref'])] != ""){
+					$sql = "UPDATE VIDEO_CONVERSION SET ID_STATUT_CONVERSION='-1',RESULT_TEXT_CONVERSION='TIMEOUT - A NEW GENERATION HAS ASKED',RESULT_CODE_CONVERSION='-1' FROM VIDEO_CONVERSION WHERE ID_VIDEO='".$id_video."' AND REF_VIDEO_PROFIL='".$refs[getProfilExt($conv['ref'])]."' AND ID_STATUT_CONVERSION BETWEEN '0' AND '2'" ;
+				}
+				$sql = "INSERT INTO VIDEO_CONVERSION( ID_CONVERSION, REF_VIDEO_PROFIL, DATE_DEMANDE_CONVERSION, DATE_MODIFICATION_CONVERSION, ID_STATUT_CONVERSION, NB_IMAGE, URL_POST_CONVERSION, URL_NOTIFICATION_CONVERSION, XML_SOURCE_CONVERSION, ID_VIDEO, TYPE_CONVERSION, ID_RESOURCE)VALUES('".$conv['id']."', '".fix_text($conv['ref'])."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '0', '".$nbimg."', '".$conv['url_post']."', '".$conv['url_notification']."', '".fix_text($conv['xml'])."', '".$id_video."', '".$type."', '".$conv['resource']."')";
+				$time = microtime(true);
+				db_query( $sql, $db_data['name']); 
+				log_query(__FUNCTION__, $sql, microtime(true)-$time);
+				$refs[getProfilExt($conv['ref'])] = $conv['ref'];
+			}
+		}		
+		$profil_available = "";
+		foreach($refs as $r){ 
+			if($r != ""){ $profil_available .= ",".$r;}
+		}
+		$profil_available = preg_replace('/^,/','',$profil_available);
+		
+		$sql = "UPDATE VIDEO SET ID_STATUT_VIDEO='0', PROFIL_AVAILABLE='".$profil_available."', REF_VIDEO='".fix_text($ref_video, 20)."'".(is_guid($id_distributeur) ? ", ID_DISTRIBUTEUR='".$id_distributeur."' " : "").", WAIT_TTS='".($wait_for_tts ? "1" : "0")."'".(!$wait_for_tts ? ", DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."'" : "")." WHERE ID_VIDEO='".$id_video."'";
+		$time = microtime(true);
+		db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		
+		$sql = "DELETE FROM VIDEO_CONVERSION WHERE ID_CONVERSION IN (SELECT ID_CONVERSION FROM (SELECT ROW_NUMBER() OVER (ORDER BY DATE_REF DESC) ROW,  ID_CONVERSION FROM (SELECT DISTINCT ID_CONVERSION, (SELECT MAX(DATE_MODIFICATION_CONVERSION) FROM VIDEO_CONVERSION DT WHERE DT.ID_CONVERSION=VIDEO_CONVERSION.ID_CONVERSION) DATE_REF FROM VIDEO_CONVERSION WHERE ID_VIDEO='".$id_video."') AS TAB) AS TAB WHERE ROW > 5)";
+		$time = microtime(true);
+		db_query($sql, $db_data['name']);	
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		
+	}
+}
+
+
+function insert_conversion_user($id_video, $conversions, $tab_user, $type){
+	global $db_data;
+	$id = "";
+	$refs = array();
+	if(is_guid($id_video)){
+		$wait_for_tts_old = 0;
+		$sql = "SELECT ID_UTILISATEUR FROM VIDEO_UTILISATEUR WHERE ID_VIDEO_UTILISATEUR='".$id_video."'";
+		$time = microtime(true);
+		$user = db_getOne( $sql, $db_data['name']);
+		if(is_guid($user)){
+			if(is_array($conversions) && count($conversions) > 0){
+				foreach($conversions as $conv){
+					if($refs[getProfilExt($conv['ref'])] != ""){
+						$sql = "UPDATE VIDEO_CONVERSION SET ID_STATUT_CONVERSION='-1',RESULT_TEXT_CONVERSION='TIMEOUT - A NEW GENERATION HAS ASKED',RESULT_CODE_CONVERSION='-1', VIDEO_UTILISATEUR='1' FROM VIDEO_CONVERSION WHERE ID_VIDEO='".$id_video."' AND REF_VIDEO_PROFIL='".$refs[getProfilExt($conv['ref'])]."' AND ID_STATUT_CONVERSION BETWEEN '0' AND '2'" ;
+					}
+					$sql = "INSERT INTO VIDEO_CONVERSION( ID_CONVERSION, REF_VIDEO_PROFIL, DATE_DEMANDE_CONVERSION, DATE_MODIFICATION_CONVERSION, ID_STATUT_CONVERSION, URL_POST_CONVERSION, URL_NOTIFICATION_CONVERSION, XML_SOURCE_CONVERSION, ID_VIDEO, TYPE_CONVERSION, ID_RESOURCE, Nb_image, VIDEO_UTILISATEUR) VALUES('".$conv['id']."', '".fix_text($conv['ref'])."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '0', '".$conv['url_post']."', '".$conv['url_notification']."', '".fix_text($conv['xml'])."', '".$id_video."', '".$type."', '".$conv['resource']."', '0', '1')";
+					$time = microtime(true);
+					db_query( $sql, $db_data['name']); 
+					log_query(__FUNCTION__, $sql, microtime(true)-$time);
+					$refs[getProfilExt($conv['ref'])] = $conv['ref'];
+				}
+			}		
+			$profil_available = "";
+			foreach($refs as $r){ 
+				if($r != ""){ $profil_available .= ",".$r;}
+			}
+			$profil_available = preg_replace('/^,/','',$profil_available);
+		
+//			$sql = "UPDATE VIDEO_UTILISATEUR SET ID_STATUT_VIDEO_UTILISATEUR='0', PROFIL_AVAILABLE='".$profil_available."'".(is_guid($id_distributeur) ? ", ID_DISTRIBUTEUR='".$id_distributeur."' " : "").", DATE_MODIFICATION_VIDEO_UTILISATEUR='".date('Y-m-d H:i:s')."'" : "")." WHERE ID_VIDEO_UTILISATEUR='".$id_video."'";
+			
+			list($lat, $lng) = explode("#", $tab_user['GPS']);
+			$sql = "UPDATE VIDEO_UTILISATEUR SET Date_modification_video_utilisateur='".date('Y-m-d H:i:s')."',  Id_statut_video_utilisateur='0', Profil_available='".$profil_available."', Latitude='".$lat."', Longitude='".$lng."', Nom_agence='".fix_text($tab_user['NOM_AGENCE'],100)."', Telephone='".fix_text($tab_user['TELEPHONE'],30)."', Email='".fix_text($tab_user['EMAIL'],150)."', Adresse='".fix_text($tab_user['ADRESSE'],150)."', Code_postal='".fix_text($tab_user['CODE_POSTAL'],50)."', Ville='".fix_text($tab_user['VILLE'],100)."',  Description='".fix_text($tab_user['DESCRIPTION'],500)."', Zone='".fix_text($tab_user['ZONES'],300)."', Employe='".fix_text($tab_user['EMPLOYES'],1000)."', DIFFUSION='".fix_text($tab_user['DIFFUSION'],300)."' WHERE ID_VIDEO_UTILISATEUR='".$id_video."'";
+			$time = microtime(true);
+			db_query( $sql, $db_data['name']);
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		
+			$sql = "DELETE FROM VIDEO_CONVERSION WHERE ID_CONVERSION IN (SELECT ID_CONVERSION FROM (SELECT ROW_NUMBER() OVER (ORDER BY DATE_REF DESC) ROW,  ID_CONVERSION FROM (SELECT DISTINCT ID_CONVERSION, (SELECT MAX(DATE_MODIFICATION_CONVERSION) FROM VIDEO_CONVERSION DT WHERE DT.ID_CONVERSION=VIDEO_CONVERSION.ID_CONVERSION) DATE_REF FROM VIDEO_CONVERSION WHERE ID_VIDEO='".$id_video."') AS TAB) AS TAB WHERE ROW > 5)";
+			$time = microtime(true);
+			db_query($sql, $db_data['name']);	
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		}		
+	}
+}
+
+function update_conversion_start($id_resource,$profile){
+	global $db_data;
+	$sql = "SELECT ID_VIDEO FROM VIDEO_CONVERSION WHERE ID_RESOURCE='".$id_resource."'  AND REF_VIDEO_PROFIL='".$profile."'";
+	$time = microtime(true);
+	$id_video = db_getOne($sql, $db_data['name']);
+	log_query(__FUNCTION__, $sql, microtime(true)-$time);
+	if(is_guid($id_video)){
+		$sql = "UPDATE VIDEO_CONVERSION SET ID_STATUT_CONVERSION='1', DATE_TRAITEMENT_CONVERSION='".date('Y-m-d H:i:s')."',DATE_MODIFICATION_CONVERSION='".date('Y-m-d H:i:s')."' WHERE ID_RESOURCE='".$id_resource."' AND REF_VIDEO_PROFIL='".$profile."'";
+		$time = microtime(true);
+		db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		$sql = "SELECT ID_CRON FROM VIDEO WHERE ID_VIDEO='".$id_video."'";
+		if(db_getOne($sql, $db_data['name']) == 1){ 
+			$sql = "UPDATE VIDEO SET DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."', ID_CRON=2 WHERE ID_VIDEO='".$id_video."'";
+			$time = microtime(true);
+			db_query( $sql, $db_data['name']);
+			log_query(__FUNCTION__, $sql, microtime(true)-$time);
+			//update cron
+			$old_name = $db_data['name'];
+			$db_data['name'] = "video";
+			$sql = "UPDATE VIDEO_CRON SET Id_statut_cron=1, Date_modification_cron='".date('Y-m-d H:i:s')."', Date_dernier_cron='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$id_video."'";
+			db_query( $sql, $db_data['name']);
+			db_close();
+			$db_data['name'] = $old_name;
+		}
+	}
+}
+
+function update_conversion_complete( $id_resource, $profile){
+	global $db_data;
+	$sql = "SELECT ID_VIDEO FROM VIDEO_CONVERSION WHERE ID_RESOURCE='".$id_resource."' AND REF_VIDEO_PROFIL='".$profile."'";
+	$time = microtime(true);
+	$id_video = db_getOne($sql,$db_data['name']);
+	log_query(__FUNCTION__, $sql, microtime(true)-$time);
+	if(is_guid($id_video)){
+		$sql = "UPDATE VIDEO_CONVERSION SET ID_STATUT_CONVERSION='2', DATE_FIN_CONVERSION='".date('Y-m-d H:i:s')."',DATE_MODIFICATION_CONVERSION='".date('Y-m-d H:i:s')."' WHERE ID_RESOURCE='".$id_resource."' AND REF_VIDEO_PROFIL='".$profile."'";
+		$time = microtime(true);
+		db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+	}
+}
+
+function get_last_conversion_state_inprogress( $id_video, $debug = false){
+	global $db_data;
+	$data_array = array();
+	$sql_where = "";
+	if(is_guid($id_video)){
+		$sql = "SELECT ID_STATUT_VIDEO,TYPE_VIDEO,(SELECT TOP 1 ID_CONVERSION FROM VIDEO_CONVERSION WHERE ID_VIDEO=VIDEO.ID_VIDEO ORDER BY DATE_MODIFICATION_CONVERSION DESC) ID_LAST_CONVERSION FROM VIDEO WHERE ID_VIDEO='".$id_video."' ".($debug != true ? "AND ID_STATUT_VIDEO=0 " : "");
+		$time = microtime(true);
+		$result = db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+			if(is_guid($row['ID_LAST_CONVERSION'])){
+				$sql = "SELECT REF_VIDEO_PROFIL, ID_STATUT_CONVERSION, TYPE_CONVERSION, ID_RESOURCE FROM VIDEO_CONVERSION WHERE ID_CONVERSION='".$row['ID_LAST_CONVERSION']."' ORDER BY ID_STATUT_CONVERSION ASC";
+				$time = microtime(true);
+				$result = db_query( $sql, $db_data['name']);
+				log_query(__FUNCTION__, $sql, microtime(true)-$time);
+				while($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+					$data_array[] = $row;
+				}
+			}
+		}
+	}
+	return $data_array;
+}
+
+
+function get_last_conversion_state( $id_video, $tour, $type){
+	global $db_data;
+	$data_array = array();
+	$sql_where = "";
+	if(is_guid($id_video)){ $sql_where = "ID_VIDEO='".$id_video."'";}
+	else if(is_guid($tour) && $type != ""){ $sql_where = "ID_VISITE='".$tour."' AND TYPE_VIDEO='".$type."'";}
+	if($sql_where != ""){
+		$sql = "SELECT ID_STATUT_VIDEO,TYPE_VIDEO,(SELECT TOP 1 ID_CONVERSION FROM VIDEO_CONVERSION WHERE ID_VIDEO=VIDEO.ID_VIDEO ORDER BY DATE_MODIFICATION_CONVERSION DESC) ID_LAST_CONVERSION FROM VIDEO WHERE ".$sql_where;
+		$time = microtime(true);
+		$result = db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+			$data_array = $row;
+			if(is_guid($row['ID_LAST_CONVERSION'])){
+				$sql = "SELECT ID_STATUT_CONVERSION, TYPE_CONVERSION FROM VIDEO_CONVERSION WHERE ID_CONVERSION='".$row['ID_LAST_CONVERSION']."' ORDER BY ID_STATUT_CONVERSION ASC";
+				$time = microtime(true);
+				$result = db_query( $sql, $db_data['name']);	
+				log_query(__FUNCTION__, $sql, microtime(true)-$time);
+				if($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+					$data_array = array_merge($data_array,$row);
+				}
+			}
+		}
+	}
+	return $data_array;
+}
+
+function get_last_diffusion($filter = ""){
+	global $db_data;
+	$data_array = array();
+	$sql = "SELECT VIDEO.ID_VIDEO,VISITE.ID_VISITE,ID_DISTRIBUTEUR, REF_VIDEO, SITE_DIFFUSION, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, URL_VIDEO_DIFFUSION, DATE_MODIFICATION_DIFFUSION, RESULT_CODE_DIFFUSION, RESULT_TEXT_DIFFUSION, RESULT_DESCRIPTION_DIFFUSION, URL_NOTIFICATION_DIFFUSION, VIDEO_DIFFUSION.ID_STATUT_DIFFUSION, TITLE_DIFFUSION, ID_DISTRIBUTEUR, TYPE_VIDEO FROM VIDEO_DIFFUSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE ".$filter." ORDER BY DATE_MODIFICATION_DIFFUSION DESC";
+	$time = microtime(true);
+	$result = db_query( $sql, $db_data['name']);
+	log_query(__FUNCTION__, $sql, microtime(true)-$time);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+		$data_array[] = $row;
+	}
+	return $data_array;
+}
+
+function get_diffusion_infos($id, $site, $login){
+	global $db_data;
+	$data_array = array();
+	if(is_guid($id) && $site !="" && $login != ""){
+		$sql = "SELECT VIDEO_DIFFUSION.ID_VIDEO, ID_VISITE, ID_DISTRIBUTEUR, TITLE_DIFFUSION, SITE_DIFFUSION, LOGIN_DIFFUSION, TYPE_VIDEO, PASSWORD_DIFFUSION, URL_NOTIFICATION_DIFFUSION, AUTO FROM VIDEO_DIFFUSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO WHERE VIDEO_DIFFUSION.ID_VIDEO='".$id."' AND SITE_DIFFUSION='".$site."' AND LOGIN_DIFFUSION='".$login."'";
+		$time = microtime(true);
+		$result = db_query( $sql, $db_data['name']);
+		log_query(__FUNCTION__, $sql, microtime(true)-$time);
+		while($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+			//if(!is_array($data_array[$row['ID_VIDEO']])){ $data_array[$row['ID_VIDEO']] = array();}
+			$data_array = $row;
+		}	
+	}
+	return $data_array;
+}
+
+function getSounds(){
+	global $db_data;
+	$data_array = array();
+	$sql = "SELECT ID_MUSIQUE_VIDEO FROM MUSIQUE_VIDEO WHERE ID_STATUT_MUSIQUE > 0";
+	$time = microtime(true);
+	$result = db_query($sql, $db_data['name']);
+	log_query(__FUNCTION__, $sql, microtime(true)-$time);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+		$data_array[] = $row['ID_MUSIQUE_VIDEO'];
+	}
+	return $data_array;
+}
+
+function getDurationMusic($id_sound){
+	global $db_data;
+	$result = false;
+	if(is_guid($id_sound)){
+		$sql = "SELECT DUREE_MUSIQUE_VIDEO FROM MUSIQUE_VIDEO WHERE ID_MUSIQUE_VIDEO='".$id_sound."'";
+		$result = db_getOne($sql, $db_data['name']);
+	}
+	return $result;
+}
+
+function getSoundState($id_sound){
+	global $db_data;
+	$result = -1;
+	if(is_guid($id_sound)){
+		$sql = "SELECT ID_STATUT_MUSIQUE FROM MUSIQUE_VIDEO WHERE ID_MUSIQUE_VIDEO='".$id_sound."' AND ID_STATUT_MUSIQUE > 0";
+		$result = db_getOne($sql, $db_data['name']);
+	}
+	return ($result >= 0);
+}
+
+function getProfilExt($profil){
+	global $db_data;
+	$result = false;
+	if($profil != ""){
+		$sql = "SELECT EXTENSION FROM VIDEO_PROFIL WHERE REF_VIDEO_PROFIL='".strtolower($profil)."' AND ID_STATUT_PROFIL > 0";
+		$result = db_getOne($sql, $db_data['name']);
+	}
+	return $result;
+}
+
+function getProfilExts(){
+	global $db_data;
+	$data_array = false;
+	$sql = "SELECT REF_VIDEO_PROFIL, EXTENSION FROM VIDEO_PROFIL WHERE ID_STATUT_PROFIL > 0";
+	$result = db_query($sql, $db_data['name']);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+		$data_array[strtolower($row['REF_VIDEO_PROFIL'])] = strtolower($row['EXTENSION']);
+	}
+	return $data_array;
+}
+
+function getProfilSize($profil){
+	global $db_data;
+	$data_array = false;
+	if($profil != ""){
+		$sql = "SELECT WIDTH,HEIGHT FROM VIDEO_PROFIL WHERE REF_VIDEO_PROFIL='".strtolower($profil)."' AND ID_STATUT_PROFIL > 0";
+		$result = db_query($sql, $db_data['name']);
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC) ){
+			$data_array = $row;
+		}
+	}
+	return $data_array;
+}
+
+function getProfilGroupByExt(){
+	global $db_data;
+	$data_array = array();
+	$sql = "SELECT REF_VIDEO_PROFIL,EXTENSION FROM VIDEO_PROFIL WHERE ID_STATUT_PROFIL > 0 ORDER BY REF_VIDEO_PROFIL";
+	$result = db_query( $sql, $db_data['name']);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		if(!is_array($data_array[$row['EXTENSION']])){ $data_array[$row['EXTENSION']] = array();}
+		$data_array[$row['EXTENSION']][] = $row['REF_VIDEO_PROFIL'];
+	}
+	return $data_array;
+}
+
+
+function getDiffusionStats(){
+	global $db_data;
+	$data_array = array('inprogress' =>array(), 'wait'=>array());
+	$sql = "SELECT ID_STATUT_CRON,NOM_DISTRIBUTEUR,count(*) nb from VIDEO_CRON INNER JOIN DISTRIBUTEUR ON DISTRIBUTEUR.ID_DISTRIBUTEUR=VIDEO_CRON.ID_DISTRIBUTEUR WHERE ID_STATUT_CRON=1 OR ID_STATUT_CRON=0 group by ID_STATUT_CRON,NOM_DISTRIBUTEUR ORDER BY NOM_DISTRIBUTEUR";
+	$time = microtime(true);
+	$result = db_query( $sql, $db_data['name']);
+	log_query(__FUNCTION__, $sql, microtime(true)-$time);
+	while($row = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		$data_array[($row['ID_STATUT_CRON'] == 1 ?'inprogress' : 'wait')][$row['NOM_DISTRIBUTEUR']] = $row['nb'];
+	}
+	return $data_array;
+}
+/**
+*
+*	VIDEOTOUR
+*
+*/
+function get_videotour_data($id_videotour){
+//ADDRESS, AGENT_EMAIL, AGENT_FIRST_NAME, AGENT_LAST_NAME, AGENT_PHONE, CITY, COMPANY_ADDRESS, COMPANY_EMAIL, COMPANY_NAME, COMPANY_URL, ID_MLS, LATITUDE, LISTED_DATE, LISTING_STATUS, LISTING_TYPE, LONGITUDE, LOT_SIZE, NB_BATHROOM, NB_BEDROOM, NEIGHBORHOOD, PRICE, SQUARE_FEET, STATE, YEAR_BUILT, ZIP
+	$data_array = array();
+	if(is_guid($id_videotour)){
+		$sql = "SELECT ID_VIDEOTOUR,DESCRIPTION_VIDEOTOUR DESCRIPTION,ADDRESS_VIDEOTOUR ADRESSE,CITY_VIDEOTOUR VILLE,ZIP_VIDEOTOUR CODE_POSTAL,ROOM_VIDEOTOUR ROOM,SQUARE_FEET_VIDEOTOUR SQUARE_FEET,BATHROOM_VIDEOTOUR NB_BATHROOM,PRICE_VIDEOTOUR PRICE,ID_MUSIC_VIDEOTOUR ID_MUSIQUE_VIDEO,NB_IMAGE,ID_STATUT_VIDEOTOUR,CONTACT_VIDEOTOUR CONTACT,TITLE_VIDEOTOUR NOM_VISITE,ID_COUNTRY ID_PAYS,MEASURE_UNIT,TTS_VOICE FROM VIDEOTOUR WHERE ID_VIDEOTOUR='".$id_videotour."'";
+  	$result = db_query($sql,"videotour");
+  	if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+  		$data_array = $row;
+			$data_array['DESCRIPTION'] = preg_replace('/\v/',' ',$data_array['DESCRIPTION']);
+  	}
+	}
+	return $data_array;
+}
+
+/**
+*	list db
+**/
+function getListDistrib(){
+	$data_array = array();
+	$sql = "SELECT ID_DISTRIBUTEUR, NOM_DISTRIBUTEUR, ID_PAYS_DISTRIBUTEUR, NOM_PAYS NOM_PAYS_DISTRIBUTEUR FROM DISTRIBUTEUR INNER JOIN PAYS ON PAYS.ID_PAYS=DISTRIBUTEUR.ID_PAYS_DISTRIBUTEUR WHERE ID_STATUT_DISTRIBUTEUR > 0 ORDER BY NOM_PAYS, NOM_DISTRIBUTEUR";
+	$result = db_query($sql, "main");
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $data_array[$r['ID_DISTRIBUTEUR']] = $r;}
+	return $data_array;
+}
+
+
+?>

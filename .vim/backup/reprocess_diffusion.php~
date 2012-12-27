@@ -1,0 +1,442 @@
+<?php
+require_once 'DB.php';
+require_once 'HTTP/Request.php';
+require_once '/var/www/cron.previsite.net/include/global.php';
+require_once '/var/www/cron.previsite.net/include/fonctions.php';
+require_once '/var/www/cron.previsite.net/include/fonction.db.php';
+require_once '/var/www/cron.previsite.net/include/fonction.cron.php';
+
+ini_set('memory_limit', '-1');
+ini_set('max_execution_time', '0');
+if(!checkScriptAlone() && $_REQUEST['debug'] != 'true'){ exit;}
+
+DEFINE('RELAUNCH_DIFFUSION_DELETE', false);
+DEFINE('LAUNCH_VIDEO_REPROCESS', 	false);
+DEFINE('REPROCESS_UPLOAD_ERROR', 	false);
+DEFINE('REMOVE_INCOMPLETE_DIFFUSION', false);
+DEFINE('CHECK_DIFFUSION_ERROR', 	false);
+define('PURGE_PATH_DIFFUSION_TMP', 	false);
+define('RELAUNCH_DIFFUSION', 	true);
+
+define('PATH_DIFFUSION_TMP', '/var/www/api.previsite.com/tmp/diffusion/');
+DEFINE('URL_CHECK_DIFFUSION',		'http://video.previsite.net/diffusion.php?todo=check&id=#ID#&site=#SITE#&type=#TYPE#&notification=#NOTIFICATION#&login=#LOGIN#&password=#PASSWORD#&title=#TITLE#&mode=auto');
+DEFINE('URL_PUBLICATION', 'http://api.previsite.com/publication/?todo=#TODO#&id=#ID#&site=#SITE#&type=#TYPE#&ref=#REF#&login=#LOGIN#&password=#PASSWORD#&url=#URL#&date=#DATE#&title=#TITLE#&distrib=#DISTRIB#&mode=auto');
+DEFINE('URL_NOTIFICATION', 'http://api.previsite.com/publication/notification.php');
+DEFINE('URL_DIFFUSION', 'http://video.previsite.net/diffusion.php?todo=#TODO#&id=#ID#&site=#SITE#&login=#LOGIN#&password=#PASSWORD#&type=#TYPE#&notification=#NOTIFICATION#&title=#TITLE#&mode=auto&distrib=#DISTRIB#');
+DEFINE('URL_GENERATION', 'http://video.previsite.net/generate.php?id=#ID#&type=#TYPE#&ref=#REF#&distrib=#DISTRIB#&mode=auto');
+DEFINE('URL_CHECK_ACCOUNT', 'http://api.previsite.com/diffusion/manage.php?login=#LOGIN#&password=#PASSWORD#&site=#SITE#&distrib=#DISTRIB#&todo=check');
+
+$sites = array(
+	'A7D2ED18-84B5-E063-65B8-4A23DF54FC0A'=> array('NAME'=>	'YOUTUBEUS', 	'SITE' => 'YOUTUBE', 	'TYPE' => 'US'),
+	'38429EA1-8BAD-1795-807E-B46BCF131567'=> array('NAME'=>	'DAILYMOTION', 	'SITE' => 'DAILYMOTION', 'TYPE' => 'FR'),
+	'59C4948B-DB6D-FDAF-E15D-CD67B8347126'=> array('NAME'=>	'YOUTUBEFR', 	'SITE' => 'YOUTUBE', 	'TYPE' => 'FR'),
+	'B18D4B31-EC0C-934B-953F-CFD48ADECC81'=> array('NAME'=>	'VIEWTHISHOME', 'SITE' => 'VIEWTHISHOME', 'TYPE' => 'US')
+);
+
+$list_voice = array('EN'=>'heather', 'ES'=>'maria', 'FR'=>'bruno', 'IT'=>'chiara');
+
+$bases = array(
+	array('name'=> '11', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.11/PREVISITE_REALESTATE?unicode=yes'),
+	array('name'=> '17', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '19', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.19/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '211', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.211/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '21', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.21/PREVISITE_SOFTWARE?unicode=yes'),
+	array('name'=> '213', 'dsn'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.213/PREVISITE_SOFTWARE?unicode=yes'),
+);
+
+$servers_api = array(40,81,82,83);
+
+$date_reference = date('Y-m-d H:i:s', time()-60*60);
+
+$list_portail = array();
+foreach($sites as $k=>$v){
+	$list_portail[] = array('CODE_PORTAIL' => $v['NAME'], 'ID_PORTAIL' => $k);
+}
+
+event_log('-----------------------------------');
+event_log('---------------START---------------');
+event_log('-----------------------------------');
+
+if(RELAUNCH_DIFFUSION){
+	event_log('--DIFFUSION--');
+	foreach($bases as $base){
+		$db_data['name'] = $base['name'];
+		$obj_conn['dsn'] = $base['dsn'];
+		
+		$stop_youtube = '(too_many_recent_calls|Error writing request to server|CAPTCHA challenge issued by server|Service Unavailable)';
+		
+		$portail_reprocess_sql = array(
+			//array('site' => 'DOWNLOAD VIDEO', 'sql_where' => "where result_code_diffusion='3' and result_text_diffusion='DOWNLOAD VIDEO' and date_modification_diffusion "),
+			array('site'=> 'DAILYMOTION (abuse)','sql_where'=>"where (result_code_diffusion='4' and (result_description_diffusion='Platform abuse suspected (account block for 24h)') and site_diffusion='DAILYMOTION')", 'stop'=>'You reached your upload rate limit'),
+			array('site'=> 'DAILYMOTION (upload limit)','sql_where'=>"where (result_code_diffusion='4' and (result_description_diffusion='403. You reached your upload rate limit, please slow down. (access_forbidden)') and site_diffusion='DAILYMOTION')", 'stop'=>'You reached your upload rate limit'),
+			array('site'=> 'DAILYMOTION(login failed)','sql_where'=>"where (result_code_diffusion='4' and (result_description_diffusion like 'Login failed%') and site_diffusion='DAILYMOTION')", 'stop'=>'You reached your upload rate limit'),
+			array('site'=> 'YOUTUBE (captcha)', 'sql_where'=>"where result_code_diffusion='4' and result_description_diffusion='CAPTCHA challenge issued by server' and site_diffusion='YOUTUBE'", 'stop'=>$stop_youtube),
+			array('site'=> 'YOUTUBE (error request)', 'sql_where'=>"where result_code_diffusion='4' and result_description_diffusion='Error writing request to server' and site_diffusion='YOUTUBE'", 'stop'=>$stop_youtube),
+			array('site'=> 'YOUTUBE (abuse)', 'sql_where'=>"where result_code_diffusion='4' and result_description_diffusion like '%too_many_recent_calls%' and site_diffusion='YOUTUBE'", 'stop'=>$stop_youtube),
+			array('site'=> 'YOUTUBE (service unavailable)', 'sql_where'=>"where result_code_diffusion='4' and result_description_diffusion like '%Service Unavailable%' and site_diffusion='YOUTUBE'", 'stop'=>$stop_youtube),
+			array('site'=> 'YOUTUBE (login failed)', 'sql_where'=>"where result_code_diffusion='4' and result_description_diffusion like 'Authentication with Google failed.%' and site_diffusion='YOUTUBE'", 'stop'=>$stop_youtube),
+		);
+	
+		foreach($portail_reprocess_sql as $infos){
+			$site = $infos['site'];
+			$sql_where = $infos['sql_where'];
+			$stop = $infos['stop'];
+			$db_data['name'] = $base['name'];
+			$obj_conn['dsn'] = $base['dsn'];
+			event_log('[DIFFUSION][DB:'.$base['name'].']['.$site.'] SQL REQUEST');		
+			$logins = array();
+			$sql = "select ID_DISTRIBUTEUR, TYPE_VIDEO, LOGIN_DIFFUSION LOGIN, PASSWORD_DIFFUSION PASSWORD, video_diffusion.ID_VIDEO, TITLE_DIFFUSION, SITE_DIFFUSION from video_diffusion inner join video on video.id_video=video_diffusion.id_video inner join visite on visite.id_visite=video.id_visite ".$sql_where."  and id_statut_Diffusion='-1' and id_statut_video=1 and password_diffusion!='' and id_statut_visite > 0 and nb_active_image > 0 order by date_modification_diffusion asc";
+	//		$sql = "select LOGIN, PASSWORD, count(*) NB from diffusion_video ".$sql_where." AND LOGIN='blotimmobilier' group by LOGIN, PASSWORD";
+			$result = db_query($sql, $base['name']);
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+				if(!is_array($logins[$r['LOGIN']."/".$r['PASSWORD']])){ $logins[$r['LOGIN']."/".$r['PASSWORD']] = array();}
+				$logins[$r['LOGIN']."/".$r['PASSWORD']][] = $r;
+			}
+			db_close();
+			if(count($logins) > 0){
+				event_log('[DIFFUSION][DB:'.$base['name'].']['.$site.'] START '.count($logins).' accounts found');
+				foreach($logins as $k=>$login){
+					event_log('[DIFFUSION]['.$site.']['.$k.'] START');
+					event_log('[DIFFUSION]['.$site.']['.$k.'] '.count($login).' waiting');
+					$diffusion_done = 0;
+					$do_it = true;
+	//				$sql = "SELECT DIFFUSION_VIDEO.ID_VIDEO FROM DIFFUSION_VIDEO INNER JOIN DETAIL_VIDEO ON DETAIL_VIDEO.ID_VIDEO=DIFFUSION_VIDEO.ID_VIDEO ".$sql_where." AND login='".fix_text($login['LOGIN'])."' and password='".fix_text($login['PASSWORD'])."' and profil_available like '%youtube%' and id_statut_video=1 ORDER BY DATE_MODIFICATION ASC";
+	//				$result = db_query($sql, $base['name']);				
+	//				$list_result = array();
+	//				while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){  $list_result[] = $r;}
+	//				foreach($list_result as $r){
+					foreach($login as $r){
+						if($do_it){
+							$replace = array(
+								'search' => array('#TODO#', '#ID#', '#SITE#', '#LOGIN#', '#PASSWORD#', '#TYPE#', '#NOTIFICATION#', '#TITLE#', '#DISTRIB#'),
+								'replace'=> array('diffusion', $r['ID_VIDEO'], $r['SITE_DIFFUSION'], urlencode($r['LOGIN']), urlencode($r['PASSWORD']), urlencode($r['TYPE_VIDEO']), urlencode(URL_NOTIFICATION), urlencode($r['TITLE_DIFFUSION']), $r['ID_DISTRIBUTEUR'])
+							);
+							$url = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION);
+							$page = file_get_contents($url);
+							$xml = simplexml_load_string($page);
+							if(count($xml) > 0){
+								if($xml->VideoDiffusionResultCode == 0){
+									$diffusion_done++;
+								}else if($xml->VideoDiffusionResultCode == 4 && preg_match('/'.$stop.'/i', $xml->VideoDiffusionResultDescription) > 0){
+									event_log('[DIFFUSION]['.$site.']['.$k.'] ERROR:'.$xml->VideoDiffusionResultCode.'.'.$xml->VideoDiffusionResultDescription);
+									$do_it = false;
+								}
+							}
+						}
+					}
+					if($diffusion_done > 0){
+						event_log('[DIFFUSION]['.$site.']['.$k.'] '.$diffusion_done.' diffusions done');
+					}
+					event_log('[DIFFUSION]['.$site.']['.$k.'] END');
+				}
+				event_log('[DIFFUSION]['.$site.'] END');
+			}
+		}
+		event_log('-');
+//		db_close();
+		break;
+	}
+	event_log('---------');
+}
+event_log(' -- -- -- -- -- -- ');
+
+if(PURGE_PATH_DIFFUSION_TMP){
+	event_log('--PURGE--');
+	for ($i = 0; $i < count($servers_api); $i++) {
+		event_log('Purge on server:'.$servers_api[$i].' START');
+		// supprime tous les fichiers de plus d'un jour
+		// sudo ssh 10.0.4.82 find /var/www/api.previsite.com/tmp/diffusion/* -mtime 1 |sudo ssh 10.0.4.82 xargs rm
+		$cmd = ($servers_api[$i] !== 40 ? "sudo ssh 10.0.4.".$servers_api[$i] : "");
+		$cmd = $cmd." find ".PATH_DIFFUSION_TMP."* -mtime 1 | ".$cmd." xargs rm";
+		event_log('[DEBUG] '.$cmd.' END');
+		exec($cmd); 
+		event_log('Purge on server:'.$servers_api[$i].' END');
+	}
+	event_log('-');
+	event_log('---------');
+}
+event_log(' -- -- -- -- -- -- ');
+
+if(RELAUNCH_DIFFUSION_DELETE){
+	foreach($bases as $base){
+		$db_data['name'] = $base['name'];
+		$obj_conn['dsn'] = $base['dsn'];
+		event_log('[DB] '.$base['name']);
+
+		$logins = array();
+		$sql = "select ID_DISTRIBUTEUR, SITE_DIFFUSION SITE, LOGIN_DIFFUSION LOGIN, PASSWORD_DIFFUSION PASSWORD, VIDEO.ID_VIDEO, TITLE_DIFFUSION, TYPE_VIDEO from video_diffusion 
+		inner join VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO
+		inner join visite on visite.id_visite=video.id_visite
+		where #WHERE#
+		ORDER BY DATE_MODIFICATION_DIFFUSION ASC";
+		
+		$sql_where = array(
+			'Delete error' => "result_code_diffusion='-3' and SITE_DIFFUSION='YOUTUBE' and password_diffusion!='' and id_statut_diffusion=-1", 
+			'Old vids not deleted' => "id_statut_diffusion > 0 and id_statut_visite < 0 and password_diffusion!=''",
+			'To delete' => "id_statut_diffusion='-1' and result_code_diffusion='0' and password_diffusion!=''",
+		);
+		foreach($sql_where as $where_name=>$where){
+			$sql = str_replace('#WHERE#' , $where, $sql);
+			$db_data['name'] = $base['name'];
+			$obj_conn['dsn'] = $base['dsn'];
+			$result = db_query($sql, $base['name']);
+			$count_diffusions = 0;
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ 
+				if(!is_array($logins[$r['SITE']."/".$r['LOGIN']."/".$r['PASSWORD']])){ $logins[$r['SITE']."/".$r['LOGIN']."/".$r['PASSWORD']] = array();}
+				$logins[$r['SITE']."/".$r['LOGIN']."/".$r['PASSWORD']][] = $r;
+				$count_diffusions++;
+			}
+			db_close();
+			if(count($logins) > 0){
+				event_log('--DIFFUSION-DELETE--');
+				event_log('[DELETE]['.$base['name'].'] NAME:'.$where_name);
+				event_log('[DELETE]['.$base['name'].'] NB diffusion to delete: '.$count_diffusions);
+				event_log('[DELETE]['.$base['name'].'] START '.count($logins).' accounts found');
+				$nb_login_done = 0;
+				foreach($logins as $k=>$login){
+					if(($last_checkpoint+count($logins)/5) < $nb_login_done++){
+						event_log(round(($nb_login_done/count($logins))*100).'% done');
+						$last_checkpoint = $nb_login_done;
+					}
+					event_log('[DELETE]['.$base['name'].']['.$k.'] START');
+					event_log('[DELETE]['.$base['name'].']['.$k.'] '.count($login).' waiting');
+					$diffusion_done = 0;
+					$do_it = true;
+					foreach($login as $r){
+						$replace = array(
+							'search' => array('#TODO#', '#ID#', '#SITE#', '#LOGIN#', '#PASSWORD#', '#TYPE#', '#NOTIFICATION#', '#TITLE#', '#DISTRIB#'),
+							'replace'=> array('delete', $r['ID_VIDEO'], $r['SITE'], urlencode($r['LOGIN']), urlencode($r['PASSWORD']), urlencode($r['TYPE_VIDEO']), urlencode(URL_NOTIFICATION), urlencode($r['TITLE_DIFFUSION']), $r['ID_DISTRIBUTEUR'])
+						);
+						$url = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION);
+						$page = file_get_contents($url);
+						$xml = simplexml_load_string($page);
+						if(count($xml) > 0){
+							if($xml->VideoDiffusionResultCode == -1){
+								$diffusion_done++;
+//							}else if($xml->VideoDiffusionResultCode == -3 && preg_match('/too_many_recent_calls/i', $xml->VideoDiffusionResultDescription) > 0){
+							}else if($xml->VideoDiffusionResultCode == -3){
+								$do_it = false;
+								event_log("[ERROR] ".$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText."->".$xml->VideoDiffusionResultDescription.' ('.$r['ID_VIDEO']."/".$r['ID_VISITE'].")" );
+							}else{ event_log("[ERROR] ".$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText."->".$xml->VideoDiffusionResultDescription.' ('.$r['ID_VIDEO']."/".$r['ID_VISITE'].")" );}
+						}else{ event_log('[ERROR] '.$r['ID_VIDEO']."/".$r['ID_VISITE']." (".$url.":".$page.")");}
+						if(!$do_it) break;
+					}
+					
+					if($diffusion_done > 0){
+						event_log('[DELETE]['.$base['name'].']['.$k.'] '.$diffusion_done.' dediffusions done');
+					}
+					event_log('[DELETE]['.$base['name'].']['.$k.'] END');
+				}
+				event_log('---------');
+			}
+		}
+		event_log('-');
+		event_log('END');
+//		db_close();
+	}
+}
+event_log(' -- -- -- -- -- -- ');
+if(LAUNCH_VIDEO_REPROCESS){
+	foreach($bases as $base){
+		$db_data['name'] = $base['name'];
+		$obj_conn['dsn'] = $base['dsn'];
+		$list_videos = array();
+		$sql = "SELECT ID_VIDEO,ID_DISTRIBUTEUR,TYPE_VIDEO FROM VIDEO WHERE ID_STATUT_VIDEO=2";
+		$result = db_query($sql, $base['name']);
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $list_videos[] = $r;}
+		$nb_diffusions = 0;
+		$nb_diffusions_done = 0;
+		$nb_no_diffusion = 0;
+		if(count($list_videos) > 0){
+			$partners = array();
+			event_log('---REPROCESS---');
+			event_log('[DB] '.$base['name']);
+			event_log(count($list_videos).' videos found');
+			foreach($list_videos as $video){
+				//unpublication
+				$video['DIFFUSIONS'] = array();
+				$sql = "SELECT ID_VISITE, SITE_DIFFUSION, TITLE_DIFFUSION, TYPE_VIDEO FROM VIDEO_DIFFUSION INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO WHERE VIDEO.ID_VIDEO='".$video['ID_VIDEO']."' AND ID_STATUT_DIFFUSION_VIDEO > 0";
+				$result = db_query($sql, 'video');
+				while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $video['DIFFUSIONS'][] = $r;}
+				if(count($video['DIFFUSIONS']) > 0){
+					$nb_diffusions_done += count($video['DIFFUSIONS']);
+					foreach($video['DIFFUSIONS'] as $diffusion){
+						if($partners[$diffusion['SITE'].'/'.$video['TYPE_VIDEO']] == ""){
+							$replace = array(
+								'search' => array('#TYPE#', '#SITE#'),
+								'replace' => array(urlencode($video['TYPE_VIDEO']), urlencode($diffusion['SITE']))
+							);
+							$url = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_VIDEO_GET_PARTNER);
+							$partners[$diffusion['SITE'].'/'.$video['TYPE_VIDEO']] = file_get_contents($url);
+						}
+						if(is_guid($partners[$diffusion['SITE'].'/'.$video['TYPE_VIDEO']])){
+							$replace = array(
+								'search' => array('#PARTNER#', '#TOUR#', '#USER#'),
+								'replace' => array(urlencode($partners[$diffusion['SITE'].'/'.$video['TYPE_VIDEO']]), urlencode($diffusion['ID_VISITE']), '')
+							);
+							$url_base = str_replace( $replace['search'], $replace['replace'], URL_UNPUBLISH);
+	//						event_log('[DEBUG] '.$url_base);
+							$result = file_get_contents($url_base);
+							if($result != "true"){
+								event_log('[UNPUBLICATION] Failed tour:'.$video['ID_VIDEO'].' partner:'.$partners[$diffusion['SITE'].'/'.$video['TYPE_VIDEO']].'('.$diffusion['SITE'].'/'.$video['TYPE_VIDEO'].') ('.$url_base.':'.$result.')');
+							}else{
+								//diffusion
+								$replace = array(
+									'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#REF#', '#TITLE#'),
+									'replace' => array(urlencode($partners[$diffusion['SITE'].'/'.$video['TYPE_VIDEO']]), urlencode($video['ID_VIDEO']), '',  urlencode($video['ID_VIDEO']), urlencode($diffusion['TITLE_DIFFUSION']))
+								);
+					
+								$url_base = str_replace( $replace['search'], $replace['replace'], URL_PUBLISH);
+								$result = file_get_contents($url_base);
+								if($result != "true"){
+									event_log('[PUBLICATION] tour:'.$video['ID_VIDEO'].' partner:'.$partners[$diffusion['SITE'].'/'.$video['TYPE_VIDEO']].'('.$diffusion['SITE'].'/'.$video['TYPE_VIDEO'].') ('.$url_base.':'.$result.')');
+								}else{ $nb_diffusions++;}
+							}
+						}else{ event_log('Partners not found for: '.$diffusion['SITE'].'/'.$video['TYPE_VIDEO']);}
+					}
+				}else{ $nb_no_diffusion++;}
+			}
+		}
+		if($nb_no_diffusion > 0){ event_log($nb_no_diffusion.' tours has no diffusion');}
+		event_log($nb_diffusions."/".$nb_diffusions_done.' diffusions done');
+		event_log('---------');
+		db_close();
+	}
+}
+event_log(' -- -- -- -- -- -- ');
+
+if(REPROCESS_UPLOAD_ERROR){
+	event_log('--REPROCESS UPLOAD ERROR--');
+	$db_data['name'] = 'video';
+	$obj_conn['dsn'] = DSN_VIDEO;	
+	$sql = "SELECT DISTINCT DETAIL_VIDEO.ID_VIDEO,PROFIL_AVAILABLE FROM DIFFUSION_VIDEO INNER JOIN DETAIL_VIDEO ON DIFFUSION_VIDEO.ID_VIDEO=DETAIL_VIDEO.ID_VIDEO	WHERE RESULT_CODE='3' AND ID_STATUT_DIFFUSION_VIDEO < 0";
+	$result = db_query($sql, 'video');
+	$count = 0;
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $rows[] = $r;}
+	event_log(count($rows).' video upload error found');
+	foreach($rows as $r){
+		$tmp = explode(",", $r['PROFIL_AVAILABLE']);
+		$new_list = array();
+		foreach($tmp as $tmp_r){ 
+			if($tmp_r != "youtube"){ $new_list[] = $tmp_r;}
+		}
+		$row['PROFIL_AVAILABLE'] = implode(',',$new_list);
+		$sql = "UPDATE DETAIL_VIDEO SET PROFIL_AVAILABLE='".$row['PROFIL_AVAILABLE']."', ID_CRON=1, ID_STATUT_VIDEO=0, DATE_CRON_VIDEO='".date('Y-m-d H:i:s')."', DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+		db_query($sql,'video');
+		$sql = "UPDATE DIFFUSION_VIDEO SET ID_STATUT_DIFFUSION_VIDEO=0, date_modification='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$r['ID_VIDEO']."' AND  RESULT_CODE='3' AND ID_STATUT_DIFFUSION_VIDEO < 0";
+		db_query($sql, 'video');
+		$count++;
+	}
+	event_log($count.' video reprocess');
+	event_log('--------------------------');
+}
+
+if(CHECK_DIFFUSION_ERROR){	
+	event_log('--DIFFUSION-ERROR--');
+	if(count($list_portail) > 0){
+		foreach($bases as $base){
+			$db_data['name'] = $base['name'];
+			$obj_conn['dsn'] = $base['dsn'];
+			foreach($list_portail as $portail){
+				if(count($sites[$portail['ID_PORTAIL']]) > 0){ 
+					$tours = array();		
+					$sql = "SELECT ID_DIFFUSION_PORTAIL,VISITE.ID_VISITE, ID_UTILISATEUR, ID_PORTAIL, ID_DISTRIBUTEUR, DATE_MODIFICATION_VISITE FROM DIFFUSION_PORTAIL INNER JOIN VISITE ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE INNER JOIN SOCIETE ON SOCIETE.ID_SOCIETE=VISITE.ID_SOCIETE
+					WHERE ID_PORTAIL='".$portail['ID_PORTAIL']."' AND ID_STATUT_DIFFUSION > 0 AND ID_STATUT_VISITE > 0 AND LEN(REF_PORTAIL)=36 AND DATE_DIFFUSION < '".$date_reference."'";
+					$result = db_query($sql,$base['name']);
+					while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $tours[] = $r;}
+					if(count($tours) > 0){
+						event_log('['.$base['name'].'] START PORTAIL '.$portail['CODE_PORTAIL']);
+						event_log(count($tours).' tours found');
+						$final = array('finish' => 0, 'diffusion'=> 0, 'error'=>0);
+						foreach($tours as $tour){
+							$sql = "SELECT PREFIXE_PORTAIL LOGIN, PASSWORD_PORTAIL PASSWORD FROM CLIENT_PORTAIL WHERE ID_PORTAIL='".$tour['ID_PORTAIL']."' AND ID_UTILISATEUR='".$tour['ID_UTILISATEUR']."'";
+							$result = db_query($sql, $base['name']);
+							$login = $result->fetchRow(DB_FETCHMODE_ASSOC);
+							$replace = array(
+								'search' => array('#ID#', '#SITE#', '#TYPE#', '#NOTIFICATION#', '#LOGIN#', '#PASSWORD#', '#TITLE#'),
+								'replace' => array(urlencode($tour['ID_VISITE']), urlencode($sites[$portail['ID_PORTAIL']]['SITE']),  urlencode($sites[$portail['ID_PORTAIL']]['TYPE']), '', urlencode($login['LOGIN']), urlencode($login['PASSWORD']), '')
+							);
+							$url = str_replace($replace['search'],$replace['replace'],URL_CHECK_DIFFUSION);
+							$xml = file_get_contents($url);
+							$xml_object = simplexml_load_string($xml);
+							if(count($xml_object) > 0){
+								if($xml_object->VideoDiffusionResultCode == 0){
+									$sql = "UPDATE DIFFUSION_PORTAIL SET REF_PORTAIL='".$xml_object->VideoDiffusionResultId."' WHERE ID_DIFFUSION_PORTAIL='".$tour['ID_DIFFUSION_PORTAIL']."'";
+									db_query($sql, $base['name']);
+									$final['finish']++;
+								}else{
+									if($xml_object->VideoDiffusionResultCode == 10 || $xml->VideoDiffusionResultDetails->VideoDiffusionResultCode == 4){
+										$replace = array(
+											'search' => array('#TODO#', '#ID#', '#SITE#', '#TYPE#', '#REF#', '#LOGIN#', '#PASSWORD#', '#URL#', '#DATE#', '#TITLE#', '#DISTRIB#'),
+											'replace' => array('publication', urlencode($tour['ID_VISITE']),  urlencode($sites[$portail['ID_PORTAIL']]['SITE']),  urlencode($sites[$portail['ID_PORTAIL']]['TYPE']), '', urlencode($login['LOGIN']), urlencode($login['PASSWORD']), urlencode(URL_NOTIFICATION), urlencode($tour['DATE_MODIFICATION_VISITE']), '', $tour['ID_DISTRIBUTEUR'])
+										);
+										$url  = str_replace($replace['search'], $replace['replace'], URL_PUBLICATION);
+										file_get_contents($url);
+										$final['diffusion']++;
+									}else{
+										$sql = "UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION='-1' WHERE ID_DIFFUSION_PORTAIL='".$tour['ID_DIFFUSION_PORTAIL']."'";
+										db_query($sql,$base['name']);
+										$final['error']++;
+									}
+								}
+							}
+						}
+						event_log('RESULT: '.$final['diffusion'].' diffusions / '.$final['finish'].' finish / '.$final['error'].' error');
+						event_log('['.$base['name'].'] END PORTAIL');
+					}
+				}else{
+					event_log('Diffusion site not found.');
+				}
+			}
+			db_close();
+		}
+	}
+	event_log('---------');
+}
+
+if(REMOVE_INCOMPLETE_DIFFUSION){
+	event_log('--INCOMPLETE DIFFUSION--');
+	foreach($bases as $base){
+		event_log('DB:'.$base['name']." START ");
+		$db_data['name'] = $base['name'];
+		$obj_conn['dsn'] = $base['dsn'];
+		$portail_reprocess_sql = array(
+			'YOUTUBE' => array('sql_where'=>"where (result_code_diffusion='4' and site_diffusion='YOUTUBE')"),
+		);
+		foreach($portail_reprocess_sql as $site=>$infos){
+			$sql_where = $infos['sql_where'];
+			$stop = $infos['stop'];
+		
+			$logins = array();
+			$sql = "select DISTINCT LOGIN_DIFFUSION LOGIN, PASSWORD_DIFFUSION PASSWORD, ID_DISTRIBUTEUR from video_diffusion inner join video on video.id_video=video_diffusion.id_video ".$sql_where." AND PASSWORD_DIFFUSION != ''";
+	//		$sql = "select LOGIN, PASSWORD, count(*) NB from diffusion_video ".$sql_where." AND LOGIN='blotimmobilier' group by LOGIN, PASSWORD";
+			$result = db_query($sql, $base['name']);
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $logins[] = $r;}
+	
+			if(count($logins) > 0){
+				event_log('[IMCOMPLETE_DIFFUSION][DB:'.$base['name'].']['.$site.'] START '.count($logins).' accounts found');
+				foreach($logins as $r){
+					event_log('[IMCOMPLETE_DIFFUSION]['.$site.']['.$r['LOGIN'].'] START');
+					$replace = array(
+						'search' => array('#LOGIN#', '#PASSWORD#', '#SITE#', '#DISTRIB#'),
+						'replace' => array(urlencode($r['LOGIN']), urlencode($r['PASSWORD']), urlencode($site), urlencode($r['ID_DISTRIBUTEUR']))
+					);
+					$url = str_replace($replace['search'], $replace['replace'], URL_CHECK_ACCOUNT);
+					$response = file_get_contents($url);
+					event_log('[IMCOMPLETE_DIFFUSION]['.$site.']['.$r['LOGIN'].'] '.$url.' ('.$response.')');
+					event_log('[IMCOMPLETE_DIFFUSION]['.$site.']['.$r['LOGIN'].'] END');
+				}
+				event_log('[IMCOMPLETE_DIFFUSION]['.$site.'] END');
+			}
+		}
+		event_log('-');
+		db_close();
+		event_log('DB:'.$base['name']." END ");
+	}
+	event_log('---------');
+}
+event_log('-----------------------------------');
+event_log('----------------END----------------');
+event_log('-----------------------------------');
+exit;
+?>

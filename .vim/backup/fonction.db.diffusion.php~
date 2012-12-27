@@ -1,0 +1,880 @@
+<?php
+function search_partner($tab_words, $country, $company) {
+	global $_bench;
+	$start_time = microtime(true);
+	$data_array = array();
+	
+	if(is_guid($company) && !empty($tab_words)) {
+		$nb_words = count($tab_words);
+		for($i=0; $i<$nb_words; $i++) {
+			$where_like = '';
+			$word = trim($tab_words[$i]);
+			if(!empty($word)) {
+				if(empty($where_like)) $where_like = " AND ( CODE_PORTAIL+' '+NOM_PORTAIL LIKE '%".fix_text($word)."%'";
+				else				   $where_like .= " OR CODE_PORTAIL+' '+NOM_PORTAIL LIKE '%".fix_text($word)."%'";
+			}
+		}
+
+		if(!empty($where_like)) {
+			$where_like .= ' )';
+			$where_type  = '(p.ID_TYPE_PORTAIL NOT IN(0,2,3,4,7) AND p.ID_TYPE_BUNDLE IN (1,3,5))';
+			$where_country = " AND p.ID_PAYS='".fix_text($country, 2)."'";
+
+			$sql = "SELECT p.ID_PORTAIL, p.ID_TYPE_PORTAIL, p.NOM_PORTAIL, p.CODE_PORTAIL, p.ID_TYPE_INSCRIPTION, p.ID_AUTOPUBLICATION
+				FROM PORTAIL p
+				WHERE p.ID_STATUT_PORTAIL>-1 AND p.ID_VISIBLE=1 AND ".$where_type.$where_like.$where_country."
+				ORDER BY ID_TYPE_PORTAIL DESC, NOM_PORTAIL";
+
+			$res = db_query($sql);
+			while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) { $data_array[] = $row;}
+			if(count($data_array) == 0){
+				$sql = "SELECT p.ID_PORTAIL, p.ID_TYPE_PORTAIL, p.NOM_PORTAIL, p.CODE_PORTAIL, p.ID_TYPE_INSCRIPTION, p.ID_AUTOPUBLICATION
+					FROM PORTAIL p
+					WHERE p.ID_STATUT_PORTAIL>-1 AND p.ID_VISIBLE=1 AND ".$where_type.$where_like."
+					ORDER BY ID_TYPE_PORTAIL DESC, NOM_PORTAIL";
+
+				$res = db_query($sql);
+				while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) { $data_array[] = $row;}
+			}
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $data_array;
+}
+
+function get_unpublished_tours($partner, $user) {
+	global $_bench;
+	$start_time = microtime(true);
+	$data_array = array();
+	if(is_guid($partner) && is_guid($user)) {
+		$sql = 
+			"SELECT ID_VISITE, REF_VISITE
+			FROM VISITE 
+			WHERE 
+				ID_UTILISATEUR='".$user."' AND ID_STATUT_VISITE>0 AND NB_ACTIVE_IMAGE>0 AND NOT EXISTS (
+				SELECT ID_DIFFUSION_PORTAIL
+				FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL='".$partner."' AND DIFFUSION_PORTAIL.ID_VISITE=VISITE.ID_VISITE
+			) AND EXISTS (
+				SELECT ID_PORTAIL
+				FROM CLIENT_PORTAIL
+				WHERE ID_PORTAIL='".$partner."' AND ID_UTILISATEUR='".$user."'
+			)";
+		$res = db_query($sql);
+		while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[] = $row;
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $data_array;
+}
+
+function tour_autopublish($url, $tour, $company, $user, $ref) {
+	$start_time = microtime(true);
+	$result = 'false';
+	if(is_guid($tour) && is_guid($user) && is_guid($company)) {
+		$tab_autopub = check_tour_autopublication($company, $user, $tour);
+		$nb = count($tab_autopub);
+
+		for($i=0; $i<$nb; $i++) {
+			if($tab_autopub[$i]['ID_TYPE_PORTAIL'] == 8) {
+				$ref = $tour;
+			} else if(!empty($tab_autopub[$i]['PREFIXE_DIFFUSION']) && strpos($ref, $tab_autopub[$i]['PREFIXE_DIFFUSION'])===false) {
+				// rajout du prefixe si pas déjà
+				$ref = $tab_autopub[$i]['PREFIXE_DIFFUSION'].$ref;
+			}
+
+			$url_autopub = str_replace(
+				array('%TOUR%', '%USER%', '%PARTNER%', '%REF%'),
+				array(urlencode($tour), urlencode($user), urlencode($tab_autopub[$i]['ID_PORTAIL']), urlencode($ref) ),
+				$url
+			);
+			$result = @file_get_contents($url_autopub);
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result == 'true';
+}
+
+
+function get_partner_registration_type($partner, $company, $user) {
+	global $_bench;
+	$start_time = microtime(true);
+	$data_array = array();
+
+	if(is_guid($partner) && is_guid($company) && is_guid($user)) {
+		$sql = 
+			"SELECT
+				p.ID_TYPE_INSCRIPTION, p.ID_AUTOPUBLICATION,
+				(SELECT cp.PREFIXE_PORTAIL FROM CLIENT_PORTAIL cp WHERE cp.ID_PORTAIL=p.ID_PORTAIL AND cp.ID_SOCIETE='".$company."' AND cp.ID_UTILISATEUR='".$user."') AS PREFIXE_PORTAIL,
+				(SELECT cp.PASSWORD_PORTAIL FROM CLIENT_PORTAIL cp WHERE cp.ID_PORTAIL=p.ID_PORTAIL AND cp.ID_SOCIETE='".$company."' AND cp.ID_UTILISATEUR='".$user."') AS PASSWORD_PORTAIL,
+				(SELECT cp.ID_AUTOPUBLICATION FROM CLIENT_PORTAIL cp WHERE cp.ID_PORTAIL=p.ID_PORTAIL AND cp.ID_SOCIETE='".$company."' AND cp.ID_UTILISATEUR='".$user."') AS ID_AUTOPUBLICATION_USER
+			FROM
+				PORTAIL p 
+			WHERE
+				p.ID_PORTAIL='".$partner."'";
+		$res = db_query($sql);
+		$data_array = $res->fetchRow(DB_FETCHMODE_ASSOC);
+	}
+
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $data_array;
+}
+
+function get_partner_autopublication_type($partner) {
+	global $_bench;
+	$start_time = microtime(true);
+	$result = null;
+	if(is_guid($partner)) {
+		$sql = "SELECT ID_AUTOPUBLICATION FROM PORTAIL WHERE ID_PORTAIL='".$partner."'";
+		$result = (int) db_getOne($sql);
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result;
+}
+
+function insert_partner_user($partner, $company, $user, $code, $pwd = null, $autopub = null) {
+	global $_bench;
+	$start_time = microtime(true);
+	$result = false;
+	if(is_guid($partner) && is_guid($user) && is_guid($company)) {
+		// Recherche si code pas existant pour autre client si portail =/= des mls, syndication realtor
+		$code = fix_text($code);
+		if(empty($code)) $code = $user;
+		$sql =
+			"SELECT COUNT(*)
+			FROM CLIENT_PORTAIL cp
+			WHERE cp.ID_PORTAIL='".$partner."' AND cp.PREFIXE_PORTAIL='".$code."' AND LEN(cp.PREFIXE_PORTAIL)>0";
+
+		$exists = (int)db_getOne($sql) > 0;
+
+		if(!$exists) {
+			$sql = "DELETE FROM CLIENT_PORTAIL WHERE ID_PORTAIL='".$partner."' AND ID_SOCIETE='".$company."'";
+			db_query($sql);
+
+			$sql =
+				"INSERT INTO CLIENT_PORTAIL(ID_PORTAIL, ID_SOCIETE, ID_UTILISATEUR, PREFIXE_PORTAIL, PASSWORD_PORTAIL, ID_AUTOPUBLICATION)
+				VALUES ('".$partner."', '".$company."', '".$user."', '".$code."', ".fix_null(fix_text($pwd, 50), false).", ".fix_null($autopub, false).")";
+			db_query($sql);
+
+			$result = true;
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result;
+}
+
+function remove_user_partner($partner, $company, $user) {
+	global $_bench;
+	$result = 0;
+	$start_time = microtime(true);
+	if(is_guid($partner) && is_guid($company) && is_guid($user)) {
+		$sql = "DELETE FROM CLIENT_PORTAIL WHERE ID_PORTAIL='".$partner."' AND ID_SOCIETE='".$company."'";
+		db_query($sql);
+		$result = db_affectedRows();
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result > 0;
+}
+
+// meme fonction que haut sans check (pour youtube & co => meme code_portail par defaut...)
+function insert_partner_user_no_check($partner, $company, $user, $code, $password = null, $autopub = null) {
+	global $_bench;
+	$result = 0;
+	$start_time = microtime(true);
+	if(is_guid($partner) && is_guid($company) && is_guid($user)) {
+		$sql = "DELETE FROM CLIENT_PORTAIL WHERE ID_PORTAIL='".$partner."' AND ID_SOCIETE='".$company."'";
+		db_query($sql);
+
+		$sql =
+			"INSERT INTO CLIENT_PORTAIL(ID_PORTAIL, ID_SOCIETE, ID_UTILISATEUR, PREFIXE_PORTAIL, PASSWORD_PORTAIL, ID_AUTOPUBLICATION)
+			VALUES ('".$partner."', '".$company."', '".$user."', '".$code."', ".fix_null(fix_text($password, 50), false).", ".fix_null($autopub, false).")";
+		db_query($sql);
+		$result = db_affectedRows();
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result > 0;
+}
+
+function get_partner_type($partner) {
+	global $_bench;
+	$result = null;
+	$start_time = microtime(true);
+	if(is_guid($partner)) {
+		$sql = "SELECT ID_TYPE_PORTAIL FROM PORTAIL WHERE ID_PORTAIL='".$partner."'";
+		$result = (int) db_getOne($sql);
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result;
+}
+
+function get_partner_autopublication($company, $user) {
+	global $_bench;
+	$data_array = array();
+	$start_time = microtime(true);
+	if(is_guid($company) && is_guid($user)) {
+		$sql = 
+			"SELECT
+				p.ID_PORTAIL, p.NOM_PORTAIL, cp.ID_AUTOPUBLICATION
+			FROM
+				PORTAIL p INNER JOIN CLIENT_PORTAIL cp ON p.ID_PORTAIL=cp.ID_PORTAIL
+			WHERE
+				cp.ID_SOCIETE='".$company."' AND cp.ID_UTILISATEUR='".$user."' 
+				AND p.ID_AUTOPUBLICATION>0 -- Portails qui peuvent etre dans autopublication";
+		$res = db_query($sql);
+		while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[] = $row;
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $data_array;
+}
+
+function set_partner_autopublication($company, $user, $tab_partners) {
+	if(is_guid($company) && is_guid($user)) {
+		if(!empty($tab_partners['ON'])) {
+			$all_id = fix_text(implode(",", $tab_partners['ON']));
+			$all_id = str_replace(',', "', '", $all_id);
+			
+			$sql = 
+				"UPDATE CLIENT_PORTAIL SET ID_AUTOPUBLICATION=1 
+				WHERE ID_SOCIETE='".$company."' AND ID_UTILISATEUR='".$user."' AND ID_PORTAIL IN ('".$all_id."')";
+			db_query($sql);
+		}
+		if(!empty($tab_partners['OFF'])) {
+			$all_id = fix_text(implode(",", $tab_partners['OFF']));
+			$all_id = str_replace(',', "', '", $all_id);
+			
+			$sql = 
+				"UPDATE CLIENT_PORTAIL SET ID_AUTOPUBLICATION=NULL
+				WHERE ID_SOCIETE='".$company."' AND ID_UTILISATEUR='".$user."' AND ID_PORTAIL IN ('".$all_id."')";
+			db_query($sql);
+		}
+	}
+}
+
+function get_user_partner_infos($company, $partner = null) {
+	global $_bench;
+	$start_time = microtime(true);
+	$data_array = array();
+	if(is_guid($company)) {
+		$sql =
+			"SELECT ID_PORTAIL, PREFIXE_PORTAIL, PASSWORD_PORTAIL
+			FROM CLIENT_PORTAIL
+			WHERE ID_SOCIETE='".$company."'";
+		if(is_guid($partner)) {
+			$sql .= " AND ID_PORTAIL='".$partner."'";
+		}
+		$res = db_query($sql);
+		while($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array[ $row['ID_PORTAIL'] ] = array(
+				'PREFIX'   => $row['PREFIXE_PORTAIL'],
+				'PASSWORD' => $row['PASSWORD_PORTAIL']
+			);
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $data_array;
+}
+
+function get_user_partner_diff($partner, $company, $tour) {
+	global $_bench;
+	$start_time = microtime(true);
+	$data_array = array();
+	if(is_guid($partner) && is_guid($tour) && is_guid($company)) {
+		$sql = <<<SQL
+SELECT
+	TOP 1 
+	dp.ID_DIFFUSION_PORTAIL, dp.REF_PORTAIL, dp.ID_STATUT_DIFFUSION,
+	cp.PREFIXE_PORTAIL, cp.PREFIXE_DIFFUSION,
+	p.ID_TYPE_RESULTAT, p.NOM_PORTAIL, p.ID_TYPE_PORTAIL, p.CODE_PORTAIL, p.URL_VIEWER, p.EMAIL_PORTAIL,
+	po.VALEUR_OPTION AS SPECIFIC
+FROM
+	CLIENT_PORTAIL cp
+	INNER JOIN PORTAIL p ON cp.ID_PORTAIL=p.ID_PORTAIL AND p.ID_STATUT_PORTAIL > 0
+	LEFT JOIN DIFFUSION_PORTAIL dp ON cp.ID_PORTAIL=dp.ID_PORTAIL AND dp.ID_VISITE='$tour' AND ID_STATUT_DIFFUSION>=0
+	LEFT JOIN PORTAIL_OPTION po ON po.ID_PORTAIL=p.ID_PORTAIL AND po.REF_OPTION='PUBLICATION'
+WHERE
+	cp.ID_PORTAIL='$partner' AND cp.ID_SOCIETE='$company'
+ORDER BY
+	dp.DATE_DIFFUSION DESC
+SQL;
+
+//		$sql =
+//			"SELECT cp.PREFIXE_PORTAIL, cp.PREFIXE_DIFFUSION, p.ID_TYPE_RESULTAT, p.NOM_PORTAIL, p.ID_TYPE_PORTAIL, p.CODE_PORTAIL, p.URL_VIEWER, p.EMAIL_PORTAIL,
+//			(SELECT TOP 1 REF_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=p.ID_PORTAIL AND ID_VISITE='".$tour."' AND ID_STATUT_DIFFUSION>0) AS REF_PORTAIL,
+//			(SELECT TOP 1 ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=p.ID_PORTAIL AND ID_VISITE='".$tour."' AND ID_STATUT_DIFFUSION>0) AS ID_DIFFUSION_PORTAIL,
+//			(SELECT VALEUR_OPTION FROM PORTAIL_OPTION po WHERE po.ID_PORTAIL=p.ID_PORTAIL AND po.REF_OPTION='PUBLICATION') AS SPECIFIC
+//			FROM CLIENT_PORTAIL cp INNER JOIN PORTAIL p ON cp.ID_PORTAIL=p.ID_PORTAIL
+//			WHERE cp.ID_PORTAIL='".$partner."' AND cp.ID_SOCIETE='".$company."' AND p.ID_STATUT_PORTAIL > 0";
+
+		$res = db_query($sql);
+		if($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$data_array = $row;
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $data_array;
+}
+
+function get_partner_tour_url($partner, $ref, $tour) {
+	global $_bench;
+	global $tab_default_user_code;
+	$start_time = microtime(true);
+	$url_tour = '';
+	if(is_guid($partner) && is_guid($tour)) {
+		$sql =
+			"SELECT p.URL_VIEWER, p.CODE_PORTAIL, dp.ID_DIFFUSION_PORTAIL, dp.REF_PORTAIL, cp.PREFIXE_PORTAIL
+			FROM PORTAIL p INNER JOIN DIFFUSION_PORTAIL dp ON p.ID_PORTAIL=dp.ID_PORTAIL
+			INNER JOIN VISITE v ON v.Id_visite=dp.id_visite
+			INNER JOIN CLIENT_PORTAIL cp ON v.id_societe=cp.id_societe
+			WHERE dp.ID_PORTAIL='".$partner."' AND cp.ID_PORTAIL='".$partner."' AND dp.REF_PORTAIL=N'".fix_text($ref, 50)."' AND dp.ID_VISITE='".$tour."' AND dp.ID_STATUT_DIFFUSION>0";
+
+		$res = db_query($sql);
+		if($row = $res->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$tab_pattern = array('#ID#', '#PUB#', '#PORTAL#', '#REF#', '#ID_MLS#', '#USER#');
+			if(isset($tab_default_user_code[$partner]) && empty($row['PREFIXE_PORTAIL'])) {
+				$tab_replace = array($tour, $row['ID_DIFFUSION_PORTAIL'], $row['CODE_PORTAIL'], $row['REF_PORTAIL'], $row['REF_PORTAIL'], $tab_default_user_code[$partner]);
+			} else {
+				$tab_replace = array($tour, $row['ID_DIFFUSION_PORTAIL'], $row['CODE_PORTAIL'], $row['REF_PORTAIL'], $row['REF_PORTAIL'], $row['PREFIXE_PORTAIL']);
+			}
+			$url_tour = str_replace($tab_pattern, $tab_replace, $row['URL_VIEWER']);
+		}
+	}
+	if(USER_NCI) $url_tour = str_replace(parse_url($url_tour, PHP_URL_HOST), "viewer.inviewtours.com", $url_tour);
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $url_tour;
+}
+
+function get_partner_url($partner) {
+	global $_bench;
+	global $tab_default_user_code;
+	$start_time = microtime(true);
+	$url = '';
+	if(is_guid($partner)) {
+		$sql = 
+			"SELECT URL_VIEWER
+			FROM PORTAIL
+			WHERE ID_PORTAIL='".$partner."'";
+		$url = db_getOne($sql);
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $url;
+}
+
+function delete_custom_partner($partner, $company) {
+	global $_bench;
+	$start_time = microtime(true);
+	$affected = 0;
+	if(is_guid($partner) && is_guid($company)) {
+		// Desactivation si de type 3 ou 4 et portail de la societe et societe seule sur le portail
+		$sql =
+			"UPDATE PORTAIL SET ID_STATUT_PORTAIL=-1
+			WHERE ID_PORTAIL='".$partner."' AND ID_TYPE_PORTAIL IN (3, 4) AND ID_PORTAIL IN (
+				SELECT ID_PORTAIL FROM CLIENT_PORTAIL WHERE ID_SOCIETE='".$company."'
+			) AND NOT EXISTS (
+				SELECT ID_SOCIETE FROM CLIENT_PORTAIL WHERE ID_SOCIETE<>'".$company."' AND ID_PORTAIL='".$partner."'
+			)";
+		$res = db_query($sql);
+
+		$affected = (int)db_affectedRows();
+		if($affected > 0) {
+			$sql =
+				"UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=-2, DATE_DIFFUSION=".SQL_NOW."
+				WHERE ID_PORTAIL='".$partner."' AND ID_VISITE IN (
+					SELECT ID_VISITE FROM VISITE WHERE ID_SOCIETE='".$company."'
+				) AND ID_STATUT_DIFFUSION>0";
+			db_query($sql);
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $affected;
+}
+
+function update_custom_partner($partner, $company, $user, $tab_data) {
+	global $_bench;
+	$start_time = microtime(true);
+	$affected = 0;
+	if(is_guid($company) && is_guid($user)) {
+		if(is_guid($partner)) {
+			$sql = "SELECT COUNT(*) FROM PORTAIL WHERE ID_PORTAIL='".$partner."'";
+			$affected = (int) db_getOne($sql);
+		}
+		if(!empty($affected)) {
+			$sql =
+				"UPDATE PORTAIL SET NOM_PORTAIL=N'".fix_text($tab_data['NOM_PORTAIL'], 200)."', EMAIL_PORTAIL='".fix_text($tab_data['EMAIL_PORTAIL'], 150)."', SITEWEB_PORTAIL='".fix_text($tab_data['WEB_PORTAIL'], 200)."'
+				WHERE ID_PORTAIL='".$partner."' AND ID_TYPE_PORTAIL IN (3, 4) AND ID_PORTAIL IN (
+					SELECT ID_PORTAIL FROM CLIENT_PORTAIL WHERE ID_SOCIETE='".$company."'
+				) AND NOT EXISTS (
+					SELECT ID_SOCIETE FROM CLIENT_PORTAIL WHERE ID_SOCIETE<>'".$company."' AND ID_PORTAIL='".$partner."'
+				)";
+			db_query($sql);
+			$affected = (int)db_affectedRows();
+		} else {
+			$sql = "SELECT COUNT(*) FROM PORTAIL WHERE NOM_PORTAIL=N'".fix_text($tab_data['NOM_PORTAIL'], 200)."'";
+			$exists = (int) db_getOne($sql);
+
+			if(!$exists) {
+				$partner = generate_guid();
+				$sql =
+					"INSERT INTO PORTAIL (ID_PORTAIL, ID_STATUT_PORTAIL, CODE_PORTAIL, URL_VIEWER, DATE_CREATION, ID_TYPE_PORTAIL, NOM_PORTAIL, EMAIL_PORTAIL, SITEWEB_PORTAIL, ID_PAYS, ID_LANGUE)
+					VALUES('".$partner."', 1, 'CUSTOM', 'http://tour.previsite.com/p/#PUB#', ".SQL_NOW.", 3, N'".fix_text($tab_data['NOM_PORTAIL'], 200)."', '".fix_text($tab_data['EMAIL_PORTAIL'], 150)."', '".fix_text($tab_data['WEB_PORTAIL'], 200)."', '".fix_text($tab_data['ID_PAYS'], 2)."', '".fix_text($tab_data['ID_LANGUE'], 2)."')";
+				db_query($sql);
+				$affected = (int)db_affectedRows();
+				if($affected>0) {
+					$sql =
+						"INSERT INTO CLIENT_PORTAIL(ID_PORTAIL, ID_SOCIETE, ID_UTILISATEUR)
+						VALUES ('".$partner."', '".$company."', '".$user."')";
+					db_query($sql);
+				}
+			}
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $affected;
+}
+
+function register_and_publish($partner, $company, $user, $usercode, $tab_params = null) {
+	global $_bench;
+	$start_time = microtime(true);
+	if(is_guid($partner) && is_guid($company) && is_guid($user)) {
+		$usercode = fix_text($usercode, 50);
+
+		$sql = "SELECT COUNT(*) FROM CLIENT_PORTAIL WHERE ID_PORTAIL='".$partner."' AND ID_SOCIETE='".$company."'";
+		$found = db_getOne($sql);
+		if(empty($found)) {
+			$sql =
+				"INSERT INTO CLIENT_PORTAIL(ID_PORTAIL, ID_SOCIETE, ID_UTILISATEUR, PREFIXE_PORTAIL)
+				VALUES('".$partner."', '".$company."', '".$user."', '".$usercode."')";
+			db_query($sql);
+		}
+
+		if($tab_params['AUTOPUBLISH']) {
+			$sql =
+				"INSERT INTO DIFFUSION_PORTAIL(ID_PORTAIL, ID_VISITE, REF_PORTAIL, ID_STATUT_DIFFUSION)
+				SELECT '".$partner."', ID_VISITE, CAST(ID_VISITE AS VARCHAR(36)), 1
+				FROM VISITE
+				WHERE ID_UTILISATEUR='".$user."' AND ID_STATUT_VISITE>0 AND NOT EXISTS (
+					-- no multidiffusion
+					SELECT ID_DIFFUSION_PORTAIL
+					FROM DIFFUSION_PORTAIL
+					WHERE ID_PORTAIL='".$partner."' AND ID_STATUT_VISITE>0
+					AND (REF_PORTAIL=VISITE.REF_VISITE OR ID_VISITE=VISITE.ID_VISITE)
+				)";
+
+			// listing us actifs
+//			if($tab_params['TEMPLATE_US']) {
+//				$sql .= "";
+//				if(NEW_TABLE) {
+//					$sql .= " AND ID_VISITE IN (
+//						SELECT VISITE_DETAIL.ID_VISITE FROM VISITE_DETAIL WHERE VISITE_DETAIL.ID_STATUT_LISTING=1
+//					)";
+//				} else {
+//					$sql .= " AND ID_VISITE IN (
+//						SELECT VISITE_TPL_US.ID_VISITE FROM VISITE_TPL_US WHERE VISITE_TPL_US.ID_STATUT_LISTING=1
+//					)";
+//				}
+//			}
+			db_query($sql);
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+}
+
+
+function post_twitter_message($url_twitter, $log, $pwd, $message) {
+	global $_bench;
+	$start_time = microtime(true);
+	require_once 'HTTP/Request.php';
+	$result = false;
+	$http = new HTTP_Request($url_twitter);
+	if(!PEAR::isError($http)) {
+		$http->setMethod(HTTP_REQUEST_METHOD_POST);
+		$http->setBasicAuth($log, $pwd);
+		$http->addPostData("status", $message);
+		$response = $http->sendRequest();
+		if(!PEAR::isError($response) && (int)$http->getResponseCode() === 200) {
+			try {
+				$xml	= new SimpleXMLElement($http->getResponseBody());
+				$result = (string)$xml->id;
+			} catch(Exception $ex) {
+				$result = false;
+			}
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result;
+}
+
+
+///////////////////////////
+// Fn de diffusion Video //
+///////////////////////////
+function update_publication_reference($partner, $tour, $old_ref, $new_ref) {
+	global $_bench;
+	$start_time = microtime(true);
+	$result = false;
+	if(is_guid($partner) && is_guid($tour) && !empty($old_ref) && !empty($new_ref)) {
+		$sql =
+			"UPDATE DIFFUSION_PORTAIL SET REF_PORTAIL=N'".fix_text($new_ref, 50)."', ID_STATUT_DIFFUSION=1
+			WHERE ID_PORTAIL='".$partner."' AND REF_PORTAIL=N'".fix_text($old_ref, 50)."' AND ID_VISITE='".$tour."' AND NOT EXISTS (
+				SELECT ID_VISITE FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL='".$partner."' AND REF_PORTAIL=N'".fix_text($new_ref, 50)."' AND ID_STATUT_DIFFUSION>0
+			)";
+		db_query($sql);
+		$result = db_affectedRows() > 0;
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result;
+}
+
+function notify_publication_error($partner, $tour, $ref, $error_code=null) {
+	global $_bench;
+	$start_time = microtime(true);
+	$result = false;
+	if(is_guid($partner) && is_guid($tour) && !empty($ref)) {
+		$sql =
+			"SELECT ID_DIFFUSION_PORTAIL
+			FROM DIFFUSION_PORTAIL
+			WHERE ID_PORTAIL='".$partner."' AND REF_PORTAIL=N'".fix_text($ref, 50)."' AND ID_VISITE='".$tour."' AND ID_STATUT_DIFFUSION>0";
+		$diff = db_getOne($sql);
+		if(is_guid($diff)) {
+			$sql =
+				"UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=-1, DATE_DIFFUSION=".SQL_NOW."
+				WHERE ID_DIFFUSION_PORTAIL = '".$diff."'";
+			db_query($sql);
+			$result = db_affectedRows() > 0;
+
+			if($result) {
+				// Ajout error code dans DIFFUSION_PORTAIL_OPTION
+				$sql =
+					"INSERT INTO DIFFUSION_PORTAIL_OPTION(ID_DIFFUSION_PORTAIL, REF_OPTION, VALEUR_OPTION)
+					VALUES('".$diff."', 'PUBLICATIONERRORCODE', ".fix_null(fix_text($error_code, 255)).")";
+				db_query($sql);
+			}
+		}
+	}
+	$_bench[__FUNCTION__] = round(1000*(microtime(true)-$start_time), 2);
+	return $result;
+}
+
+/***********************/
+/*** TEST CRAIGSLIST ***/
+/***********************/
+function get_craigslist_form($tour, $transaction, $etat="", $ville="", $quartier="", $category="reb", $step="") {
+	global $tab_states_craigslist;
+	global $tab_tour;
+
+//	if(is_guid($tour)) {
+//		$sql = "SELECT ID_TYPE_TRANSACTION FROM VISITE_TPL_US WHERE ID_VISITE='".$tour."'";
+//		$is_rental = 2===(int)db_getOne($sql);
+//	}
+
+	$is_rental = 2==$transaction;
+
+	$Ref_etat_db = strtoupper($tab_tour['REF_ETAT']);
+	$Ville_db = strtolower($tab_tour['VILLE']);
+	$Pays_db = strtoupper($tab_tour['ID_PAYS']);
+
+	if($Pays_db=="US" || $Pays_db=="CA") {
+		$content_states = "";
+		$match_state = false;
+		foreach($tab_states_craigslist[$Pays_db] as $ref_state => $state) {
+			$nom_state = $state['Name'];
+			$url_state = $state['URL'];
+			if($etat != "") {
+				if($etat == $ref_state) {
+					$Site_state = $url_state;
+					$match_state = true;
+					$content_states .= "<option value=\"".$ref_state."\" selected>".$nom_state."</option>\n";
+				} else {
+					$content_states .= "<option value=\"".$ref_state."\">".$nom_state."</option>\n";
+				}
+			} else if($Ref_etat_db != ""){
+				if($Ref_etat_db == $ref_state) {
+					$Site_state = $url_state;
+					$match_state = true;
+					$content_states .= "<option value=\"".$ref_state."\" selected>".$nom_state."</option>\n";
+				} else {
+					$content_states .= "<option value=\"".$ref_state."\">".$nom_state."</option>\n";
+				}
+			}
+			if(!match_state && $content_states=="") {
+				$Site_state = $url_state;				
+			}
+		}
+	} else {
+		$Site_state = "http://geo.craigslist.org/iso/".strtolower($Pays_db);
+	}
+
+	if($Site_state != "") {
+
+		$filename_state = explode("/", $Site_state);
+		$filename_state = $filename_state[count($filename_state)-1];
+		if(is_file("tmp/craigslist/".$filename_state.".txt") && filemtime("tmp/craigslist/".$filename_state.".txt") > mktime()-86400) {
+			$response = file_get_contents(PATH_TEMP_CRAIGSLIST.$filename_state.".txt");
+		} else {
+			$response = file_get_contents($Site_state);
+			file_put_contents(PATH_TEMP_CRAIGSLIST.$filename_state.".txt", $response);
+		}
+		$skip_zone = false;
+		$pattern = "/<div id=\"list\">((\n|.)*)<\/div>/";
+		if(preg_match($pattern, $response, $result)) {
+
+			$pattern2 = "/<a href=\"(.*)\">(.*)<\/a>.*/m";
+			$tab_zones = preg_replace($pattern2, "$1|$2", explode("\n", $result[1]));
+			$content_site_zones = "";
+			$match_zone = false;
+			foreach($tab_zones as $zone) {
+				$tmp = explode("|", $zone);
+				if($tmp[0] != "") {
+					$url_zone = $tmp[0];
+					$pattern = "/<.*>(.*)<.*>/";
+					$nom_zone = trim(preg_replace($pattern, "$1", $tmp[1]));
+					$selected = "";
+					if($ville != ""){
+						if($ville == $nom_zone) {
+							$Site_zone = $url_zone;
+							$selected = " selected";
+							$match_zone = true;
+						}
+					} else if($Ville_db != "") {
+						if($Ville_db == $nom_zone) {
+							$Site_zone = $url_zone;
+							$selected = " selected";
+							$match_zone = true;
+						}
+					}
+					if(!$match_zone && $content_site_zones=="") $Site_zone = $url_zone;
+					$content_site_zones .= "<option value=\"".$nom_zone."\"".$selected.">".$nom_zone."</option>\n";
+				}
+			}
+		} else {
+			$url = "(((https?|ftp):\/\/)post\.craigslist(\w+-?)*\.([a-z]{2,4}).*)";
+			$pattern = "/.*<li><a href=\"".$url."\">(\w+-? ?)*<\/a>.*/i";
+			if(preg_match($pattern, $response, $url_envoi)) $skip_zone = true;
+		}
+		
+
+		if(!empty($Site_zone) || $skip_zone) {
+			if($Site_zone != "") {
+				$filename = urlencode($Site_zone);
+				if(is_file("tmp/craigslist/".$filename.".txt") && filemtime("tmp/craigslist/".$filename.".txt") > mktime()-86400) {
+					$response = file_get_contents(PATH_TEMP_CRAIGSLIST.$filename.".txt");
+				} else {
+					$Site_zone = strip_tags($Site_zone);
+					$response = file_get_contents($Site_zone);
+					file_put_contents(PATH_TEMP_CRAIGSLIST.$filename.".txt", $response);
+				}
+			}
+
+
+			$url = "(((https?|ftp):\/\/)post\.craigslist(\w+-?)*\.([a-z]{2,4}).*)";
+			$pattern = "/.*<li><a href=\"".$url."\">(\w+-? ?)*<\/a>.*/i";
+
+
+			// RS 2012-08-28 : modif du formulaire de post
+			$pattern = '#<a id="post" href="([^"]+)">[^<]+</a>#';
+//			echo nl2br(htmlspecialchars($response));
+
+			if(preg_match($pattern, $response, $url_envoi)) {
+				if($category!="reo") $category = "reb";
+				$site_post = $url_envoi[1]."/H/".$category;
+#	file_put_contents("/var/www/software.previsite.com/partners/new/test_ant.txt", "\nCategory #".$category."#\nSite zone\n".$Site_zone."\nSite post\n".$site_post."\n", FILE_APPEND);
+			
+				$filename = urlencode($site_post);
+				if(is_file("tmp/craigslist/".$filename.".txt") && filemtime("tmp/craigslist/".$filename.".txt") > mktime()-86400) {
+					$response = file_get_contents(PATH_TEMP_CRAIGSLIST.$filename.".txt");
+				} else {
+					$response = file_get_contents($site_post);
+					file_put_contents(PATH_TEMP_CRAIGSLIST.$filename.".txt", $response);
+				}
+			}
+
+//			file_put_contents('_debug_craig.htm', $response);
+	
+//	echo htmlspecialchars($response);
+	
+			if(preg_match("/choose the (area|site) nearest you/", $response, $result)) {
+				$regex1 = '/<form action="([^"]+)" method="POST">/i';
+				// Fix RS 2011-04-29
+				if(preg_match($regex1, $response, $result)) {
+					$url_post = 'https://post.craigslist.org'.$result[1];
+				} else {
+
+					// marche plus....
+					$tab_response = explode("\n", $response);
+					$pattern = ".*<li><a href=\"(.*)\">(.*)<\/a><br><br>.*";
+					$tab_post = array();
+					$content_quartier = "";
+					$match_quartier = "";
+					foreach($tab_response as $resultat) {
+						if(ereg($pattern, $resultat)) {
+							$selected = "";
+							$data_quartier = ereg_replace($pattern, "\\1|\\2", $resultat);
+							list($url_quartier,$nom_quartier) = explode("|", $data_quartier);
+							if($quartier == $nom_quartier) {
+								$selected = " selected";
+								$url_post = $url_envoi[2].parse_url($url_envoi[1], PHP_URL_HOST).$url_quartier;
+								$match_quartier = true;
+							}
+							if(!$match_quartier && $content_quartier == "") {
+								$url_post = $url_envoi[2].parse_url($url_envoi[1], PHP_URL_HOST).$url_quartier;
+							}
+							$content_quartier .= "<option value=\"".$nom_quartier."\"".$selected.">".$nom_quartier."</option>\n";
+//							echo '.';
+						} else {
+//							echo 'x';
+						}
+					}
+				}
+
+			} else {
+				$url_post = $site_post."/none/x";
+			}
+		}
+	}
+//echo $url_post;
+	if($is_rental) {
+		$tab_pattern = array('/reb/none/x');
+		$tab_replace = array('/apa/none/x');
+//		$url_post = str_replace($tab_pattern, $tab_replace, $url_post);
+	}
+
+	$content = array(
+		'content_states' => $content_states,
+		'content_site_zones' => $content_site_zones,
+		'content_quartier' => $content_quartier,
+		'Nom_etat' => $Nom_etat,
+		'Ville' => $Ville,
+		'url_post' => $url_post
+	);
+
+	return $content;
+}
+
+function get_kijijilist_form($tour) {
+	if(is_guid($tour)) {
+		$sql = "SELECT Ref_etat, Ville, Id_pays FROM VISITE WHERE Id_visite='".$tour."'";
+		$result = db_query($sql);
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$Ref_etat_db = strtoupper($row['Ref_etat']);
+			$Ville_db = strtoupper($row['Ville']);
+			$Pays_db = strtoupper($row['Id_pays']);
+		}
+	}
+	if($Pays_db == "CA") {
+		if(!is_dir("tmp/kijiji/")){ mkdir('tmp/kijiji');}
+			$filename = "kijiji_states_ca";
+		if(!(is_file("tmp/kijiji/".$filename.".txt") && filemtime("tmp/kijiji/".$filename.".txt") > mktime()-86400)){
+			file_put_contents("tmp/kijiji/".$filename.".txt", file_get_contents("http://www.kijiji.ca/"));
+		}
+		$content = file_get_contents("tmp/kijiji/".$filename.".txt");
+
+		$preg = '/<h2 class="homeMetaCatName"[^>]*>(<a[^>]+>)*/im';
+		$result = preg_split($preg, $content);
+		$states = array();
+		for($i=0, $tmp = array();$i < count($result); $i++){
+			if(preg_match('/^([^<]+)(<\/a>)*<\/h2/iU', $result[$i], $state) > 0 && preg_match_all('/<li>.*<a href="http:\/\/(.+)\.kijiji.ca">(.+)<\/a>(.*|[\r\n \t]+<\/ul>)(<\/li>)?/i', $result[$i], $tmp) > 0){
+				$substates = array();
+				for($k=0; $k < count($tmp[1]); $k++){
+					$substates[$tmp[1][$k]] = $tmp[2][$k];
+				}
+				asort($substates);
+				$states[$state[1]] = $substates;
+			}
+		}
+		ksort($states);
+		if(count($states) > 0){
+			$return = $states;
+			$replace = array(			
+				'search' => array('Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland', 'Nova Scotia', 'Ontario', 'Prince Edward Island', 'Québec', 'Saskatchewan', 'Territories'),
+				'replace'=> array('AB', 'BC', 'MB', 'NW', 'NL', 'NS', 'ON', 'PE', 'QC', 'SK', 'NT')
+			);
+			$states = "";
+			$towns = array();
+			ksort($return);
+			$readyToPublish = false;
+			foreach($return as $k => $v){
+				$current_state = str_replace($replace['search'], $replace['replace'], $k);
+				if($current_state == $Ref_etat_db){
+					$state = $current_state;
+					$selected = "selected";
+				}
+				$states .= "<option value=\"".$current_state."\" ".(strtoupper($current_state) == $Ref_etat_db ? "selected" : "").">".$k."</option>\n";
+				ksort($v);
+				$towns[$current_state] .= "<option value=\"\" ></option>\n";
+				foreach($v as $url=>$town){
+					$selected = "";
+					if(strtoupper($town) == $Ville_db){
+						$selected =	"selected";
+						$readyToPublish = true;
+					}
+					$towns[$current_state] .= "<option value=\"".$url."\" ".$selected.">".$town."</option>\n";
+				}
+			}
+			$return = array('states' => $states, 'towns' => $towns, 'state' => $state, 'readyToPublish' => $readyToPublish);
+		}
+	}else{ $return = false;}
+	return $return;
+}
+
+function get_viadeolist_form($tour) {
+	$return = array();
+	if(is_guid($tour)) {
+		$sql = "SELECT Id_pays,Id_langue,ID_TEMPLATE FROM VISITE WHERE Id_visite='".$tour."'";
+		$result = db_query($sql);
+		if($row = $result->fetchRow(DB_FETCHMODE_ASSOC)) {
+			$Pays_db = strtoupper($row['Id_pays']);
+			$Langue_db = strtoupper($row['Id_langue']);
+		}
+	}
+
+	$tmp_dir = "tmp/viadeo/";
+	if(!is_dir($tmp_dir)){ mkdir($tmp_dir);}
+	$filename = "viadeo_country_".strtolower($Langue_db);
+	if(!(is_file($tmp_dir.$filename.".txt") && filemtime($tmp_dir.$filename.".txt") > mktime()-86400)){
+		$content = file_get_contents("http://".(SERVER_DEV ? "dev." : "")."api.previsite.com/viadeo?todo=get_country&lang=".$Langue_db);
+		if($content != ""){
+			file_put_contents($tmp_dir.$filename.".txt", $content);
+		}
+	}
+	$content = @file_get_contents("tmp/viadeo/".$filename.".txt");
+	$content = json_decode($content);
+	$selected_country = false;
+	if(count($content->country) > 0){
+		$tmp = "";
+		foreach($content->country as $k=>$v){
+			$tmp .= "<option value=\"".$k."\" ".(strtolower($k) == strtolower($Pays_db) ? "selected" : "").">".$v."</option>";
+			if(strtolower($k) == strtolower($Pays_db)){ $selected_country = true;}
+		}
+		$return['country'] = $tmp;
+	}
+	if($selected_country){
+//		$filename = "viadeo_details_".$Pays_db.$Langue_db.$Type_transaction_db;
+		$filename = "viadeo_details_".strtolower($Pays_db.$Langue_db);
+		if(!(is_file($tmp_dir.$filename.".txt") && filemtime($tmp_dir.$filename.".txt") > mktime()-86400)){
+//			$content = file_get_contents("http://".(SERVER_DEV ? "dev." : "")."api.previsite.com/viadeo?todo=get_details&lang=".$Langue_db."&country=".$Pays_db."&type_transaction=".$Type_transaction_db);
+			$content = file_get_contents("http://".(SERVER_DEV ? "dev." : "")."api.previsite.com/viadeo?todo=get_details&lang=".$Langue_db."&country=".$Pays_db);
+			if($content != ""){ file_put_contents($tmp_dir.$filename.".txt", $content);}
+		}
+		$content = file_get_contents("tmp/viadeo/".$filename.".txt");
+		$content = json_decode($content);
+		if(count($content->county) > 0){
+			$tmp = "";
+			foreach($content->county as $v){ $tmp .= "<option value=\"".$v->key."\">".$v->value."</option>";}
+			$return['county'] = $tmp;
+		}
+		if(count($content->category) > 0){
+			$tmp = "";
+			foreach($content->category as $v){ 
+				if($v->key < 0){ $tmp .= ($tmp != "" ? "</optgroup>" : "")."<optgroup label=\"".$v->value."\">";}
+				else{ $tmp .= "<option value=\"".$v->key."\">".$v->value."</option>";}
+			}
+			$return['category'] = $tmp."</optgroup>";
+		}
+	}
+//	$return['more_details'] = "http://".(SERVER_DEV ? "dev." : "")."api.previsite.com/viadeo?todo=get_details&lang=".$Langue_db."&type_transaction=".$Type_transaction_db."&country=";
+	$return['more_details'] = "http://".(SERVER_DEV ? "dev." : "")."api.previsite.com/viadeo?todo=get_details&lang=".$Langue_db."&country=";
+	return $return;
+}
+
+?>

@@ -1,0 +1,488 @@
+<?php
+
+function get_server_name(){
+	global $list_srv;
+	$return = "";
+	$ip = $_SERVER['SERVER_ADDR'];
+	if($ip != ""){ $ip = str_replace('195.154.160', '10.0.4', $ip);}
+	else{
+		exec("sudo ifconfig eth0", $result);
+		if(preg_match('/inet addr:([\d\.]+).*/i',$result[1], $result) > 0){
+			$ip = $result[1];
+		}
+	}
+	if($ip == "10.0.4.40"){ $return = "dev";}
+	else if(array_search($ip,$list_srv) !== false){ $return = array_search($ip,$list_srv);}
+	return $return;
+}
+
+function getConfigExport( $script, $debug = false){
+	$return = array();
+	$return = getExportInfos( $script, $debug);
+	if(count($return) > 0){
+		$return['PARTNERS'] = array_keys(getExportPortails( $script, false, $debug));
+		$not_opt = array('DEBUG', 'DNS', 'USE_CACHE', 'CODE_REQUETTE', 'ACTION', 'REPS', 'FORCE_UPDATE', 'DELETE_TOURS', 'FORCE_UPDATE_CACHE');
+		$return['OPT_DETAILS'] = array('FIELDS' => array());
+		$options = getExportOptions( $script, $debug);		
+		if(count($options['EXPORT']) > 0){
+			foreach($options['EXPORT'] as $option){
+				switch($option['REF_EXPORT_OPTION']){
+					case "DNS":
+						if($option['VALEUR_EXPORT_OPTION'] == ""){ continue;}
+						$option['VALEUR_EXPORT_OPTION'] = explode( ';', $option['VALEUR_EXPORT_OPTION']);
+						for($i=0;$i < count($option['VALEUR_EXPORT_OPTION']); $i++){
+							if($option['VALEUR_EXPORT_OPTION'][$i] != "11"){
+								$option['VALEUR_EXPORT_OPTION'][$i] = "odbtp(mssql)://previsite_account:travel001@10.0.4.".$option['VALEUR_EXPORT_OPTION'][$i]."/PREVISITE_SOFTWARE?unicode=yes";
+							}else{
+								$option['VALEUR_EXPORT_OPTION'][$i] = "odbtp(mssql)://previsite_account:travel001@10.0.4.11/PREVISITE_REALESTATE?unicode=yes";
+							}
+						}
+						break;
+					case "FIELDS_TOUR_CPT":
+					case "ID_UTILISATEURS":
+					case "ID_VISITES":
+					case "PAYS":
+					case "FIELDS_TOUR_CPT":
+					case "STATUT_DIFFUSION":
+					case "REPS":
+						if($option['VALEUR_EXPORT_OPTION'] != ""){
+							$option['VALEUR_EXPORT_OPTION'] = explode( ';', $option['VALEUR_EXPORT_OPTION']);
+						}
+						break;
+					case "ACTION":
+						if($option['VALEUR_EXPORT_OPTION'] != ""){
+							$option['VALEUR_EXPORT_OPTION'] = json_decode($option['VALEUR_EXPORT_OPTION'], true);
+						}
+						break;
+					default:
+						if($option['VALEUR_EXPORT_OPTION'] === "0"){ $option['VALEUR_EXPORT_OPTION'] = false;}
+						else if($option['VALEUR_EXPORT_OPTION'] === "1"){ $option['VALEUR_EXPORT_OPTION'] = true;}
+						break;
+				}
+				if(in_array($option['REF_EXPORT_OPTION'], $not_opt)){
+					$return[$option['REF_EXPORT_OPTION']] = $option['VALEUR_EXPORT_OPTION'];
+				}else if(preg_match('/^FIELDS_/i', $option['REF_EXPORT_OPTION']) > 0){
+					$return['OPT_DETAILS']['FIELDS'][preg_replace('/^FIELDS_/', '', $option['REF_EXPORT_OPTION'])] = $option['VALEUR_EXPORT_OPTION'];
+				}else{
+					$return['OPT_DETAILS'][$option['REF_EXPORT_OPTION']] = $option['VALEUR_EXPORT_OPTION'];
+				}
+			}
+		}
+	}
+	return $return;	
+}
+
+function getConfigImport($script, $debug = false){
+	$return = array();
+	$return = getImportInfos($script, $debug);
+	if(count($return) > 0){
+		$options = getImportOptions($script, $debug);
+		$return['OPTIONS'] = array();
+		$return['STEPS'] = array();
+		$fields = array('STEPS' => 'STEPS', 'IMPORT' => 'OPTIONS');
+		if(count($options) > 0){
+			foreach($options as $tab){
+				if(count($tab) > 0){
+					foreach($tab as $r){
+						$return[$fields[$r['REF_CATEGORIE_IMPORT_OPTION']]][$r['REF_IMPORT_OPTION']] = $r['VALEUR_IMPORT_OPTION'];
+					}
+				}
+			}
+		}
+		$diffusions = getScriptDiffusions($script, false, true, $debug);
+		if(count($diffusions) > 0){
+			foreach($diffusions as $id => $r){
+				if(count($r['OPTIONS']) > 0){
+					foreach($r['OPTIONS'] as $k => $v){
+						if($k == "FILTERS"){ $v = json_decode($v, true);}
+						$diffusions[$id][$k] = $v;
+					}
+				}
+				unset($diffusions[$id]['OPTIONS']);
+				if(count($r['USERS']) > 0){
+					foreach($r['USERS'] as $usercode=>$user){
+						if(count($user['OPTIONS']) > 0){
+							if($user['OPTIONS']['FILTERS'] != ""){ 
+								$user['OPTIONS']['FILTERS'] = json_decode($user['OPTIONS']['FILTERS'], true);
+							}
+							foreach($user['OPTIONS'] as $ref_option => $option){
+								$diffusions[$id]['USERS'][$usercode][$ref_option] = $option;
+							}
+						}
+						unset($diffusions[$id]['USERS'][$usercode]['OPTIONS']);
+					}
+				}
+			}
+		}
+		$return['DIFFUSIONS'] = $diffusions;
+		
+		$return['USERS'] = getScriptUsers($script, true, true, $debug);
+	}
+	return $return;
+}
+
+/**
+* cron
+**/
+function get_cron_file_log($srv, $type, $hour = ""){
+	global $list_srv;
+	if($hour == "") $hour = date('YmdH');
+	$output = "";
+	if($type != "import") $srv .= "_export";
+	$cmd = "cat ".str_replace( array('#NAME#', '#DATE#'), array($srv, $hour), CRON_LOG_FILE);
+	//if($srv != get_server_name() && $list_srv[$srv] != ""){ $cmd = "sudo ssh root@".$list_srv[$srv]." ".$cmd;}
+	exec( $cmd, $file);
+	$output = implode("\n", $file);
+	return $output;
+}
+
+function is_cron_import($code_import, $debug = false, $mktime = ""){
+	$return = true;
+	if($code_import != ""){
+		$cron = getImportInfos($code_import, $debug);
+		$return = is_cron($cron, 'IMPORT', $debug, $mktime);
+	}
+	return $return;
+}
+
+function is_cron_export($code_export, $debug = false, $mktime = ""){
+	$return = true;
+	if($code_export != ""){
+		$cron = getExportInfos($code_export, $debug);
+		$return = is_cron($cron, 'EXPORT', $debug, $mktime);
+	}
+	return $return;
+}
+
+function is_cron($cron, $type, $debug = false, $mktime = ""){
+	$return = true;
+	if($mktime == "") $mktime = mktime();
+	$is_recurrent = (preg_match('/\*/i',$cron['PERIODE_'.$type]) > 0);
+	if(!$is_recurrent){ $cron['PERIODE_'.$type] = explode(';', $cron['PERIODE_'.$type]);}
+	if(count($cron) > 0 && count($cron['PERIODE_'.$type]) > 0){
+		if(($cron['ID_STATUT_CRON_EXECUTION'] > -1 && $cron['ID_STATUT_CRON_EXECUTION'] < 3) || $cron['ID_STATUT_CRON_EXECUTION'] == 4){
+			//si l'import est en cours
+			$return = false;
+		}else{
+			//si une date de fin et de début renseignée
+			if($is_recurrent){
+				$return = false;
+				if($cron['PERIODE_'.$type] == "*"){
+					$return = true;
+				}else if(preg_match('/^\*\/([1-9][0-9]?)$/i', $cron['PERIODE_'.$type], $recurrence) > 0){
+					if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $cron['DATE_FIN_CRON'], $date_start) > 0){
+						$time_since_last_exec = (mktime() - mktime($date_start[4], $date_start[5], $date_start[6], $date_start[2], $date_start[3], $date_start[1]));
+						if($time_since_last_exec > $recurrence[1]*60*60){
+							$return = true;
+						}
+					}else{ $return = true;}
+				}
+			}else if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $cron['DATE_DEBUT_CRON'], $date_start) > 0 && mktime(0,0,0, date("n", $mktime), date("j", $mktime),date("Y", $mktime)) == mktime(0,0,0,$date_start[2],$date_start[3],$date_start[1])){
+				//si la date du jour est la même que la date de dernier lancement.
+				foreach($cron['PERIODE_'.$type] as $period){
+					if($period != ""){
+						if(strpos($period, "-") !== false){
+							list($min,$max) = explode( "-", $period);
+							if(!($date_start[4] >= $min) && (date('G', $mktime) >= $min && date('G', $mktime) <= $max)){ return true;	}
+						}else{
+							if(!($date_start[4] >= $period) && date('G', $mktime) == $period){ return true;}
+						}
+					}
+				}
+				$return = false;
+			}else{
+				// si on est dans la bonne période
+				foreach($cron['PERIODE_'.$type] as $period){
+					if($period != ""){
+						if(strpos($period, "-") !== false){
+							list($min, $max) = explode("-",$period);
+							$date_g = date('G', $mktime); 
+							echo ($max == 0 ? "true": "false")." && ".($min < $max ? "true" : "false")." && ".($date_g >= $min ? "true" : "false")." || ".($date_g <= $max ? "true" : "false"); 
+							if(($date_g >= $min && $date_g <= $max)) return true;
+							else if($max == 0 && $min > $max && ($date_g >= $min || $date_g <= $max)) return true;
+						}else{
+							if(date('G', $mktime) == $period) return true;
+						}
+					}
+				}
+				$return = false;
+			}
+		}
+	}
+	return $return;
+}
+
+function debug_start($script, $infos, $type, $debug = true){
+	$id = "";
+	if($infos['CODE_IMPORT'] != ""){
+		$sql = "SELECT TOP 1 ID_STATUT_CRON_EXECUTION FROM CRON_EXECUTION WHERE CODE_SCRIPT='".$script."' AND ID_TYPE_SCRIPT='".$type."' ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+		$status = sql_getOne($sql, 'gateway', $script, $debug);
+		if($status < 0 || $status ==3){
+			$id = generate_guid();
+			$sql = "INSERT INTO CRON_EXECUTION(ID_CRON_EXECUTION, CODE_SCRIPT, SERVER_CRON, ID_STATUT_CRON_EXECUTION, DATE_DEBUT_CRON, DATE_MODIFICATION_CRON_EXECUTION, OPTIONS_CRON, ETAPES_CRON, ID_TYPE_SCRIPT, PID_CRON) VALUES('".$id."', '".fix_text($infos['CODE_IMPORT'], 50)."', '".fix_text($infos['SERVEUR_IMPORT'], 50)."',4, '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".fix_text($options, 255)."', '".fix_text($steps, 255)."', '".$type."','".getmypid()."')";
+		}
+		sql_query($sql, 'gateway', $script, $debug);
+	}
+	return $id;
+}
+
+function debug_end($id_cron, $script, $debug = true){
+	if(is_guid($id_cron)){
+		$sql = "DELETE FROM CRON_EXECUTION WHERE ID_CRON_EXECUTION='".$id_cron."'";
+		sql_query($sql, 'gateway', $script, $debug);
+	}
+}
+
+function debug_start_import($script, $debug = true){
+	$id = "";
+	if($script != ""){
+		$infos = getImportInfos($script, $debug);
+		$id = debug_start($script, $infos, 0,$debug);
+	}
+	return $id;
+}
+
+function debug_start_export($script, $debug = true){
+	$id = "";
+	if($script != ""){
+		$infos = getExportInfos($script, $debug);
+		$id = debug_start($script, $infos, 1, $debug);
+	}
+	return $id;
+}
+
+function debug_end_import($id_cron, $script, $debug = true){
+	debug_end($id_cron, $script, $debug = true);
+}
+
+function debug_end_export($id_cron, $script, $debug = true){
+	debug_end($id_cron, $script, $debug = true);
+}
+
+function update_cron_parse_start($script, $options = "", $steps = "", $debug){
+	$id = "";
+	$array = array('options', 'steps');
+	foreach($array as $f){
+		$tmp = "";
+		if(count($$f) > 0){
+			foreach($$f as $k => $v){ $tmp .= $k."=".$v.'§';}
+		}
+		$$f = $tmp;
+	}	
+	if($script != ""){
+		$infos = getImportInfos($script, $debug);
+		if($infos['CODE_IMPORT'] != ""){
+			$sql = "SELECT TOP 1 ID_CRON_EXECUTION FROM CRON_EXECUTION WHERE CODE_SCRIPT='".$script."' AND ID_TYPE_SCRIPT='0' AND ID_STATUT_CRON_EXECUTION=-1 ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+			$id = sql_getOne($sql, 'gateway', $script, $debug);
+			if(is_guid($id)){
+				$sql = "UPDATE CRON_EXECUTION SET SERVER_CRON='".$infos['SERVEUR_IMPORT']."', DATE_MODIFICATION_CRON_EXECUTION='".date('Y-m-d H:i:s')."', ID_STATUT_CRON_EXECUTION=0, DATE_DEBUT_CRON=NULL, DATE_FIN_CRON=NULL, OPTIONS_CRON='".fix_text($options, 255)."', ETAPES_CRON='".fix_text($steps, 255)."', PID_CRON='".getmypid()."' WHERE ID_CRON_EXECUTION='".$id."'";
+			}else{
+				$id = generate_guid();
+				$sql = "INSERT INTO CRON_EXECUTION(ID_CRON_EXECUTION, CODE_SCRIPT, SERVER_CRON, ID_STATUT_CRON_EXECUTION, DATE_MODIFICATION_CRON_EXECUTION, OPTIONS_CRON, ETAPES_CRON, ID_TYPE_SCRIPT, PID_CRON) VALUES('".$id."', '".fix_text($infos['CODE_IMPORT'], 50)."', '".fix_text($infos['SERVEUR_IMPORT'], 50)."',0, '".date('Y-m-d H:i:s')."', '".fix_text($options, 255)."', '".fix_text($steps, 255)."', '0', '".getmypid()."')";
+			}
+			sql_query($sql, 'gateway', $script, $debug);
+		}
+	}
+	return $id;
+}
+
+function update_cron_parse_end($id, $script, $debug){
+	if(is_guid($id)){
+		$sql = "UPDATE CRON_EXECUTION SET DATE_MODIFICATION_CRON_EXECUTION='".date('Y-m-d H:i:s')."', ID_STATUT_CRON_EXECUTION='1' WHERE ID_CRON_EXECUTION='".$id."'";
+		sql_query($sql, 'gateway', $script, $debug);
+	}
+}
+
+function update_cron_start($id , $script, $start, $debug){
+	if(is_guid($id)){
+		$sql = "UPDATE CRON_EXECUTION SET DATE_MODIFICATION_CRON_EXECUTION='".date('Y-m-d H:i:s')."', ID_STATUT_CRON_EXECUTION='2', DATE_DEBUT_CRON='".$start."' WHERE ID_CRON_EXECUTION='".$id."'";
+		sql_query($sql, 'gateway', $script, $debug);
+	}
+}
+
+function update_cron_end($id, $script, $resume = "", $users = array(), $debug){
+	global $db_data;
+	if(is_guid($id)){
+		$sql = "UPDATE CRON_EXECUTION SET DATE_MODIFICATION_CRON_EXECUTION='".date('Y-m-d H:i:s')."', ID_STATUT_CRON_EXECUTION='3', DATE_FIN_CRON='".date('Y-m-d H:i:s')."', RESUME_CRON='".fix_text( $resume, 255)."' WHERE ID_CRON_EXECUTION='".$id."'";
+		sql_query($sql, 'gateway', $script, $debug);
+
+		if(count($users) > 0){
+			$in_user = "";
+			foreach($users as $user){
+				if($user != ""){ $in_user .= "'".fix_text($user)."', ";}
+			}
+			$in_user = preg_replace('/, $/i', '', $in_user);
+			if($in_user != ""){	
+				$sql = "UPDATE IMPORT_USER SET ID_FORCE_UPDATE='0' WHERE ID_FORCE_UPDATE='1' AND USERCODE IN (".$in_user.") AND CODE_IMPORT='".$script."'";
+				//			import_log('SQL: '.$sql, $script);
+				sql_query($sql, 'gateway', $script, $debug);
+
+				$sql = "UPDATE IMPORT_USER_DIFFUSION SET ID_STATUT_IMPORT_USER_DIFFUSION=1, DATE_MODIFICATION_IMPORT_USER_DIFFUSION='".date('Y-m-d H:i:s')."' WHERE ID_STATUT_IMPORT_USER_DIFFUSION='2'  AND CODE_IMPORT='".$script."' AND USERCODE IN (".$in_user.")";
+				//import_log('SQL: '.$sql, $script);
+				sql_query($sql, 'gateway', $script, $debug);
+			}
+		}
+		
+		//enlever les portails en force update
+		$sql = "UPDATE IMPORT_DIFFUSION SET ID_STATUT_IMPORT_DIFFUSION=1, DATE_MODIFICATION_IMPORT_DIFFUSION='".date('Y-m-d H:i:s')."' WHERE ID_STATUT_IMPORT_DIFFUSION='2'  AND CODE_IMPORT='".$script."'";
+		sql_query($sql, 'gateway', $script, $debug);
+		
+		$sql = "DELETE FROM CRON_EXECUTION WHERE ID_CRON_EXECUTION IN (SELECT ID_CRON_EXECUTION FROM (SELECT ROW_NUMBER() OVER(ORDER BY DATE_DEBUT_CRON DESC) ROW, ID_CRON_EXECUTION, DATE_DEBUT_CRON FROM CRON_EXECUTION WHERE CODE_SCRIPT='".$script."' AND ID_TYPE_SCRIPT='0' AND DATE_DEBUT_CRON < '".date('Y-m-d H:i:s', mktime()-24*60*60)."') AS TAB WHERE ROW > 5)";
+		sql_query($sql, 'gateway', $script, $debug);
+	}
+}
+
+function update_cron_error($id, $script, $debug = false){
+	global $db_data;
+	if(is_guid($id)){
+		$sql = "UPDATE CRON_EXECUTION SET DATE_MODIFICATION_CRON_EXECUTION='".date('Y-m-d H:i:s')."', ID_STATUT_CRON_EXECUTION='-1', DATE_FIN_CRON='".date('Y-m-d H:i:s')."', RESUME_CRON='reset' WHERE ID_CRON_EXECUTION='".$id."'";
+		sql_query($sql, 'gateway', $script, $debug);
+	}
+}
+
+function update_cron_end_width_error($id, $script, $resume, $debug = false){
+	global $db_data;
+	if(is_guid($id)){
+		$sql = "UPDATE CRON_EXECUTION SET ID_STATUT_CRON_EXECUTION='-1', DATE_FIN_CRON='".date('Y-m-d H:i:s')."', RESUME_CRON='".fix_text( $resume, 255)."' WHERE ID_CRON_EXECUTION='".$id."'";
+		sql_query($sql, 'gateway', $script, $debug);
+	}
+}
+
+function update_cron_end_width_parseError($id, $script, $debug = false){
+	update_cron_end_width_error($id, $script, 'error in data array', $debug);
+}
+
+function update_cron_end_width_nodata($id, $script, $debug = false){
+	update_cron_end_width_error($id, $script, 'end with no data', $debug);
+}
+
+
+function update_cron_export_start($script, $debug){
+	$id = "";
+	if($script != ""){
+		$infos = getExportInfos($script, $debug);
+		$steps = $infos;
+		$options = getExportOptions($script, $debug);
+		$tmp = array();
+		foreach($options['EXPORT'] as $option){ $tmp[$option['REF_EXPORT_OPTION']] = $option['VALEUR_EXPORT_OPTION'];}
+		$options = $tmp;
+		$array = array('options', 'steps');
+		foreach($array as $f){
+			$tmp = "";
+			if(count($$f) > 0){
+				foreach($$f as $k => $v){ $tmp .= $k."=".$v.'§';}
+			}
+			$$f = $tmp;
+		}	
+		if($infos['CODE_EXPORT'] != ""){
+			$sql = "SELECT TOP 1 ID_CRON_EXECUTION FROM CRON_EXECUTION WHERE CODE_SCRIPT='".$script."' AND ID_TYPE_SCRIPT='1' AND ID_STATUT_CRON_EXECUTION=-1 ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+			$id = sql_getOne($sql, 'gateway', $script, $debug, "export");
+			if(is_guid($id)){
+				$sql = "UPDATE CRON_EXECUTION SET SERVER_CRON='".$infos['SERVEUR_EXPORT']."', DATE_MODIFICATION_CRON_EXECUTION='".date('Y-m-d H:i:s')."', ID_STATUT_CRON_EXECUTION=0, DATE_DEBUT_CRON='".date('Y-m-d H:i:s')."', DATE_FIN_CRON=NULL, OPTIONS_CRON='".fix_text($options, 255)."', ETAPES_CRON='".fix_text($steps, 255)."', PID_CRON='".getmypid()."' WHERE ID_CRON_EXECUTION='".$id."'";
+			}else{
+				$id = generate_guid();
+				$sql = "INSERT INTO CRON_EXECUTION(ID_CRON_EXECUTION, CODE_SCRIPT, SERVER_CRON, ID_STATUT_CRON_EXECUTION, DATE_DEBUT_CRON, DATE_MODIFICATION_CRON_EXECUTION, OPTIONS_CRON, ETAPES_CRON, ID_TYPE_SCRIPT, PID_CRON) VALUES('".$id."', '".fix_text($infos['CODE_EXPORT'], 50)."', '".fix_text($infos['SERVEUR_EXPORT'], 50)."', 0, '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".fix_text($options, 255)."', '".fix_text($steps, 255)."', '1','".getmypid()."')";
+			}
+			sql_query($sql, 'gateway', $script, $debug, "export");
+		}
+	}
+	return $id;
+}
+
+function update_cron_export_end($id, $script, $resume = "", $debug){
+	global $db_data;
+	if(is_guid($id)){
+		$sql = "UPDATE CRON_EXECUTION SET DATE_MODIFICATION_CRON_EXECUTION='".date('Y-m-d H:i:s')."', ID_STATUT_CRON_EXECUTION='3', DATE_FIN_CRON='".date('Y-m-d H:i:s')."', RESUME_CRON='".fix_text( $resume, 255)."' WHERE ID_CRON_EXECUTION='".$id."'";
+		sql_query($sql, 'gateway', $script, $debug, "export");
+		
+		$sql = "DELETE FROM CRON_EXECUTION WHERE ID_CRON_EXECUTION IN (SELECT ID_CRON_EXECUTION FROM (SELECT ROW_NUMBER() OVER(ORDER BY DATE_DEBUT_CRON DESC) ROW, ID_CRON_EXECUTION, DATE_DEBUT_CRON FROM CRON_EXECUTION WHERE CODE_SCRIPT='".$script."' AND ID_TYPE_SCRIPT='1' AND DATE_DEBUT_CRON < '".date('Y-m-d H:i:s', mktime()-24*60*60)."') AS TAB WHERE ROW > 5)";
+		sql_query($sql, 'gateway', $script, $debug, "export");
+	}
+}
+
+
+function update_cron($script , $pos){
+	$sql = "SELECT TOP 1 ID_CRON_EXECUTION FROM CRON_EXECUTION WHERE ID_TYPE_SCRIPT='-1' AND CODE_SCRIPT='".$script."'";
+	$id = sql_getOne($sql, 'gateway', $script, $debug);
+	if($pos == "start"){
+		$statut = 0;
+		$date_end = "NULL";
+		$date_start = "'".date('Y-m-d H:i:s')."'";
+	}else{
+		$statut = 3;
+		$date_end = "'".date('Y-m-d H:i:s')."'";
+		$date_start = "";
+	}
+	
+	if(!is_guid($id)){
+		$id = generate_guid();
+		$sql = "INSERT INTO CRON_EXECUTION(ID_CRON_EXECUTION, CODE_SCRIPT, SERVER_CRON, ID_STATUT_CRON_EXECUTION, DATE_DEBUT_CRON, DATE_FIN_CRON, DATE_MODIFICATION_CRON_EXECUTION, OPTIONS_CRON, ETAPES_CRON, ID_TYPE_SCRIPT) VALUES('".$id."', '".fix_text($script, 50)."', '".fix_text('dev', 50)."', 0, ".$date_start.", ".$date_end.", '".date('Y-m-d H:i:s')."', '', '', '-1')";
+	}else{
+		$sql = "UPDATE CRON_EXECUTION SET ".($date_start != "" ? "DATE_DEBUT_CRON=".$date_start."," : "")." DATE_FIN_CRON=".$date_end.", ID_STATUT_CRON_EXECUTION='3' WHERE ID_CRON_EXECUTION='".$id."'";
+	}
+	sql_query($sql, 'gateway', $script, $debug);
+	return $id;
+}
+
+
+function parse_execution_infos($cron){
+	$return = array( "start" => "-", "end" => "-", "duration" => "-", "parse" => '0');	
+	if(count($cron) > 0){
+		$return['parse'] = ($cron['ID_STATUT_CRON_EXECUTION'] == 0 ? 1 : 0);
+		if($cron['DATE_DEBUT_CRON'] != ""){ $return['start'] = $cron['DATE_DEBUT_CRON'];}
+		if($cron['DATE_FIN_CRON'] != ""){ $return['end'] = $cron['DATE_FIN_CRON'];}
+		if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $cron['DATE_DEBUT_CRON'], $date_start) > 0 
+		&& preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $cron['DATE_FIN_CRON'], $date_end) > 0 ){
+			$duration =	mktime($date_end[4],$date_end[5],$date_end[6],$date_end[2],$date_end[3],$date_end[1]) - mktime($date_start[4],$date_start[5],$date_start[6],$date_start[2],$date_start[3],$date_start[1]);
+			$return['duration_seconde'] = $duration;
+			$return['duration'] = convert_duration_for_print($duration);
+		}
+	}
+	return $return;
+}
+
+function get_cron_infos($script, $type = "import"){
+	$return = array( "start" => "-", "end" => "-", "duration" => "-", "parse" => '0');
+	$function = "get".ucFirst($type)."Infos";
+	$cron = $function($script);
+	$return = parse_execution_infos($cron);
+	return $return;
+}
+
+function getCronInfos($script){
+	if($script != ""){
+		$sql = "SELECT TOP 1 DATE_DEBUT_CRON, DATE_FIN_CRON, ID_STATUT_CRON_EXECUTION, ID_CRON_EXECUTION FROM CRON_EXECUTION WHERE CODE_SCRIPT='".fix_text($script)."' AND ID_TYPE_SCRIPT='-1' ORDER BY DATE_MODIFICATION_CRON_EXECUTION DESC";
+		$result = sql_query($sql, 'gateway', $script, $debug, "export");
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+			return $r;
+		}
+	}
+}
+
+function duration_between($start, $end){
+	$return = "";
+	if(preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $start, $date_start) > 0 
+	&& preg_match('/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/i', $end, $date_end) > 0 ){
+		$duration =	mktime($date_end[4],$date_end[5],$date_end[6],$date_end[2],$date_end[3],$date_end[1]) - mktime($date_start[4],$date_start[5],$date_start[6],$date_start[2],$date_start[3],$date_start[1]);
+		$return = convert_duration_for_print($duration, " ");
+	}
+	return $return;
+}
+
+function convert_duration_for_print($duration, $separator = ""){
+	$return =  ($duration%60)."s";
+	$duration = floor($duration/60);
+	if($duration > 0){
+		$return =  ($duration%60)."m".$separator.$return;
+		$duration = floor($duration/60);			
+		if($duration > 0){
+			$return =  ($duration%24)."h".$separator.$return;				
+			$duration = floor($duration/24);
+			if($duration > 0){
+				$return =  $duration."d".$separator.$return;
+			}
+		}
+	}
+	return $return;
+}
+?>

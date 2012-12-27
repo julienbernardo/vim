@@ -1,0 +1,273 @@
+<?php
+
+class DescriptionManager{
+	var $pathDico = '/var/www/api.previsite.com/clean_description/dico/';
+	var $pathClean = 'clean/';
+	var $pathTrad = 'trad/';
+	var $lang = "";
+	var $error_code = 0;
+	var $error_desc = array(
+		0 => 'OK',
+		1 => 'ID_VISITE NOT FOUND',
+	);
+	
+	private function loadDicoClean($lang){
+		return $this->loadDico($lang, $this->pathClean);
+	}
+	
+	protected function loadDicoTrad($lang){
+		return $this->loadDico($lang, $this->pathTrad);
+	}
+	
+	private function loadDico($lang, $path){
+		$_dico = array();
+		$path = $this->pathDico.$path.strtolower($lang).".php";
+		if(file_exists($path)){
+			require_once($path);
+		}
+		return $_dico;
+	}
+	
+	function getTranslationLang(){
+		$path = $this->pathDico.$this->pathTrad;
+		$lang = array();
+		$files = glob($path."*.php");
+		sort($files);
+		for($i=0;$i < count($files); $i++){
+			$lang[] = basename( $files[$i], '.php');
+		}
+		return implode( ';', $lang);
+	}
+	
+	/** Clean description **/
+	private function enleve_caracSpec($text){
+		$replace = array(
+		    'search' => array('\\','/','^','$','.','[',']','|','(',')','?','*','+','{','}','-'),
+		    'replace' => array('\\\\','\/','\\^','\\$','\\.','\\[','\\]','\\|','\\(','\\)','\\?','\\*','\\+','\\{','\\}','\\-')
+		);
+		    
+		$text = str_replace($replace['search'], $replace['replace'], $text);
+		return $text;
+	}
+	
+	/* Fonction de diminution automatique de la taille des annonces */
+	function clean( $text, $lang){
+		if($text != "" && $lang != ""){
+			$_dico = $this->loadDicoClean($lang);
+			if(count($_dico) > 0){
+				$text = strip_tags($text);
+				$text = html_entity_decode($text,ENT_COMPAT,"UTF-8");
+				$preg_replace = array(
+					array('search' =>'/(\d)([€A-Z])/i', 'replace' => '$1 $2'),
+					array('search' =>'/[~]/i', 'replace' => ''),
+					array('search' =>'/([,!\?\.])([^ ,!\?\.\d])/i', 'replace' => '$1 $2'),
+					array('search' =>'/[ ]+([,!\?\.])/i', 'replace' => '$1'),
+					array('search' =>'/[\r\n_]/i', 'replace' => ' '),
+					array('search' =>'/(www\.) ([0-9A-Z-]+\.) (com|fr)/i', 'replace' => '$1$2$3'),
+					array('search' =>'/([0-9]{2})[.-]([0-9]{2})[.-]([0-9]{2})[.-]([0-9]{2})[.-]([0-9]{2})/i', 'replace' => '$1 $2 $3 $4 $5'),
+					array('search' =>'/(0[16])(\d{2})(\d{2})(\d{2})(\d{2})/i', 'replace' => '$1.$2.$3.$4.$5'),
+					array('search' =>'/([-\*]) ([-\*])/i', 'replace' => '$1$2'),
+					array('search' =>'/([-\*]{2,})/i', 'replace' => ''),
+					array('search' =>'/([\']{2,})/i', 'replace' => '\''),
+					array('search' =>'/([^ ]):/i', 'replace' => '$1 :'),
+					array('search' =>'/:([^ ])/i', 'replace' => ': $1'),
+				);
+		
+				foreach($preg_replace as $v){  
+					$text = preg_replace($v['search'], $v['replace'], $text);
+			   	}
+
+				if(count($_dico) > 0){
+					foreach($_dico as $key => $val) {
+						$value = $val;
+						$more_sep = "";
+						$no_other = false;
+						if(is_array($val)){
+							$value = $val['replace'];
+							$more_sep = $val['separator'];
+							$no_other = $val['no_other'];
+							if($val['search'] != ""){ $key = $val['search'];}
+							if(count($val['regexp']) == 2){
+								$text = preg_replace('/'.$val['regexp']['search'].'/i',''.$val['regexp']['replace'], $text);
+								continue;
+							}
+						}
+
+						if($no_other && $more_sep != ""){ $sep = "([".$more_sep."])";}
+						else{ $sep = "([".$more_sep."\. ;\,!\?\)'\"])";}
+						$preg_replace = array(
+							array('search' => '/(.*)'.$sep.$this->enleve_caracSpec($key).'$/i', 'replace' => '$1$2'.$value),
+							array('search' => '/^'.$this->enleve_caracSpec($key).$sep.'(.*)/i', 'replace' => $value.'$1$2'),
+							array('search' => '/'.$sep.$this->enleve_caracSpec($key).$sep.'/i', 'replace' => '$1'.$value.'$2')
+						);		
+						foreach($preg_replace as $preg){
+							$text = preg_replace( $preg['search'], $preg['replace'], $text);
+						}
+					}
+				}
+			}
+		}
+		return $text;
+	}
+
+	/** Generate description **/
+	private function getDescriptionInfos($description, $lang){
+		$return = array();
+		if($description != ""){
+			$url_base = str_replace( array('%TEXT%', '%LANG%'), array(urlencode($description), urlencode($lang)), URL_CLEANDESC);
+			$description = file_get_contents($url_base);
+			if(count($this->dico['KEYWORD']) > 0){
+				foreach($this->dico['KEYWORD'] as $k=>$v){
+					if(preg_match('/'.$v['search'].'/i', $description) > 0){
+						$return[$k] = $v['value'];
+					}
+				}
+			}
+		}
+		return $return;
+	}
+	
+	private function getInfos($json){
+		$infos = array();
+		if($json['SQUARE_FEET'] > 0){ $infos['SQUARE_FEET'] = $json['SQUARE_FEET']." ".$json['NOM_UNITE_SURFACE'];}
+		if($json['PRIX_BIEN'] > 0){
+			if($lang = "fr"){
+				$infos['PRICE'] = number_format($json['PRIX_BIEN'], 0, ',', ' ').$json['SYMBOLEBRUT_DEVISE'];
+			}else{
+				$infos['PRICE'] = $json['SYMBOLEBRUT_DEVISE'].number_format($json['PRIX_BIEN'], 0, '.', ',');
+			}
+		}
+		$descriptionInfos = $this->getDescriptionInfos($json['DESCRIPTION'], $json['ID_LANGUE']);
+		for($i=0; $i < count($this->dico['INFOS']); $i++){
+			$key = $this->dico['INFOS'][$i];
+			$json[$key] == trim($json['key']);
+			if($json[$key] === "") $json[$key] = $descriptionInfos[$key];
+
+			if(count($this->dico[$key]) > 0 && $this->dico[$key][$json[$key]] != ""){
+				$infos[$key] = $this->dico[$key][$json[$key]];
+				$json[$key] = $infos[$key];
+			}
+
+			if($json[$key] != "" ){
+				if(count($this->dico['LIST']['FIELDS'][$key]) > 0){
+					if(!is_array($infos['LIST'])) $infos['LIST'] = array();
+					if(is_array($this->dico['LIST']['FIELDS'][$key])){
+						$tmp = $json[$key]." ".($json[$key] > 1 ? $this->dico['LIST']['FIELDS'][$key]['MORE'] : $this->dico['LIST']['FIELDS'][$key]['SINGLE']);
+					}else{
+						$tmp = str_replace( '#'.strtoupper($key).'#', $json[$key], $this->dico['LIST']['FIELDS'][$key]);
+					}
+					if($tmp != ""){ 
+						$infos['LIST'][$key] = $tmp;
+						$infos[$key] = $infos['LIST'][$key];
+					}
+				}
+				
+				if(count($this->dico['ADJ']['FIELDS'][$key]) > 0){
+					if(!is_array($infos['ADJ'])) $infos['ADJ'] = array();
+					
+					if(is_array($this->dico['ADJ']['FIELDS'][$key])){
+						$tmp = $this->dico['ADJ']['FIELDS'][$key][rand(0, count($this->dico['ADJ']['FIELDS'][$key]))];
+					}else{
+						$tmp = $this->dico['ADJ']['FIELDS'][$key];
+					}
+					if($tmp != ""){ 
+						$infos['ADJ'][$key] = $tmp;
+					}
+				}
+			}
+		}
+		return $infos;
+	}
+	
+	private function getInfos2($json){
+		$return = array();
+		if(!empty($json['DESCRIPTION'])){
+			$return = $this->getDescriptionInfos($json['DESCRIPTION'], $json['ID_LANGUE']);
+		}
+		$json = array_map('trim', $json);
+		for( $i=0; $i < count($this->dico['INFOS']); $i++){
+			$key_source = $key_final = $this->dico['INFOS'][$i];
+			if($key_final == "PRIX_BIEN") $key_final = "PRICE";
+			if(!empty($json[$key_source])){
+				if($key_source == "SQUARE_FEET") $json[$key_source] .= " ".$json['NOM_UNITE_SURFACE'];
+				$return[$key_final] = $json[$key_source];
+			}
+		}
+		return $return;
+	}
+
+	function translate($id, $lang){
+		$return = "";
+		$this->dico = $this->loadDicoTrad($lang);
+		if(count($this->dico) > 0 && is_guid($id)){
+			$url_base = str_replace('#TOUR#', $id, URL_GET_TOUR_INFOS);
+			$content = file_get_contents($url_base);
+			if($content != ""){
+				$json = json_decode($content, true);
+				if(is_guid($json['TOUR']['ID_VISITE'])){
+					//récupération des infos
+					$infos = $this->getInfos2($json['TOUR']);
+					//création des phrases
+					do{
+						$sentences = array();
+						$max_count = 0;
+						foreach($this->dico['catch'] as $i=>$catch){
+							if(preg_match_all('/#([^#]*)#/i', $this->dico['catch'][$i], $result) > 0){
+								$count = 0;
+								foreach($result[1] as $v){
+									if($infos[$v] != ""){ $count++;}
+								}
+								if($count == count($result[1])){ 
+									if($count > 4){ $count = 4;}
+									if(!is_array($sentences[$count])){ $sentences[$count] = array();}
+									$sentences[$count][] = $i;
+									if($count > $max_count){ $max_count = $count;}
+								}
+							}
+						}
+						if($max_count > 0){
+							$key = $sentences[$max_count][rand( 0, (count($sentences[$max_count])-1))];
+							$sentence = $this->dico['catch'][$key];
+							unset($this->dico['catch'][$key]);
+							if(preg_match_all('/#([^#]*)#/i', $sentence, $result) > 0){
+								foreach($result[1] as $v){
+									$sentence = str_replace( '#'.$v.'#', $infos[$v], $sentence);
+									if($v != 'ID_TYPE_BIEN'){ 
+										unset($infos[$v]);
+										unset($infos['LIST'][$v]);
+									}
+								}
+								$return .= Ucfirst($sentence)." "; 
+							}
+						}else{ break;}
+					}while( count($this->dico['catch']) > 0);
+			
+					//complément avec des listes 
+					$complements = array('ADJ', 'LIST');
+					foreach($complements as $complement){
+						if( count($infos[$complement]) > 0){
+							$sentence = "";
+							$infos[$complement] = array_values($infos[$complement]);
+							for( $i=0; $i < count($infos[$complement]); $i++){
+								$sentence .= $this->dico[$complement]['TEXT'][($i < count($infos[$complement])-1 ? 'SEPARATOR' : 'LAST')].$infos[$complement][$i];
+							}
+							$sentence = preg_replace('/^('.$this->dico[$complement]['TEXT']['SEPARATOR'].'|'.$this->dico[$complement]['TEXT']['LAST'].')/i', '', $sentence);
+							$sentence = str_replace( '#'.$complement.'#', $sentence, $this->dico[$complement]['SENTENCE'][rand(0, (count($this->dico[$complement]['SENTENCE'])-1))]);
+			
+							if(preg_match_all('/#([^#]*)#/i', $sentence, $result) > 0){
+								foreach($result[1] as $v){
+									$sentence = str_replace( '#'.$v.'#', $infos[$v], $sentence);
+								}
+							}
+							$return .= ucfirst($sentence)." ";
+						}
+					}
+					$return = $this->clean($return, $lang);
+				}
+			}
+		}else{  $this->error = 1;}
+		return $return;
+	}
+}
+
+?>

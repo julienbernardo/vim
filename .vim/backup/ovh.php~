@@ -1,0 +1,189 @@
+<?php
+//https://www.ovh.com/cgi-bin/sms/http2sms.cgi?smsAccount=sms-xxxx-1&login=monUserSms&password=leMotDePasse&from=0033612345678&to=0033665432100,003369876543&contentType=text/xml&message=Hello World.
+
+//https://www.ovh.com/cgi-bin/sms/http2sms.cgi?smsAccount=sms-cc78426-1&login=previsite&password=prevprev&from=Previsite&to=0033613142259&contentType=text/xml&message=Hello%20World.
+
+//http://dev.sms.previsite.net/ovh.php?numero=0033613142259&id=62AEE050-1DFF-5F1F-76C9-42103B8D8ACA&tour=261ACDF7-64AC-5450-A4D6-57F064F076C9&country=fr
+//test roomorama
+//http://dev.sms.previsite.net/ovh.php?numero=0033613142259&id=8A380B40-7034-88C0-C5C7-F5B6BA6A4BBC&texte=essai&country=fr
+
+DEFINE('TYPE_MSG', 'MT');
+DEFINE('COUNTRY', 'OTHER');
+
+require_once('DB.php');
+require_once('HTTP/Request.php');
+require_once('include/fonctions.php');
+require_once('include/fonction.db.php');
+require_once('include/sms.php');
+require_once('include/global.php');
+require_once('phpmailer/class.phpmailer.php');
+require_once('include/config_sms.php');
+require_once('previsite/GetDsn.php');
+
+$numero 	= str_replace('(','',str_replace(')','',$_REQUEST['numero']));
+$url 		= $_REQUEST['url'];
+$tour		= $_REQUEST['tour'];
+$titre		= $_REQUEST['titre'];
+$wap		= ($_REQUEST['wap'] == "true");
+$reload 	= $_REQUEST['reload'];
+$lang		= $_REQUEST['lang'];
+$country	= strtoupper($_REQUEST['country']);
+$id_utilisateur = $_REQUEST['id'];
+$type		= $_REQUEST['type'];
+$from 		= ucfirst(strtolower($_REQUEST['from']));
+//if($from == ""){ $from = "+33146257575";}
+$jsonResponse = (strtolower($_REQUEST['response']) == 'json');
+
+if($reload == "limit"){ $texte = $config_sms[COUNTRY][TYPE_MSG]['RELOAD_PACKAGE'];}
+else if($reload == "unlimit"){ $texte = $config_sms[COUNTRY][TYPE_MSG]['RELOAD_UNLIMIT'];}
+else{ $texte	=	$_REQUEST['texte'];}
+//if(array_search($operator, $http_restrict) !== false){ $url = preg_replace('/http\:\/\//','',$url);}
+
+$dsn = $dsn_sms;
+//$request_log = " ----------------------------\n";
+//$request_log .= " date:".date('Y-m-d H:i:s')."\n";
+foreach($_REQUEST as $k=> $v){ $request_log .= $k." => ".$v."\n";}
+//$request_log .= " ----------------------------\n";
+//file_put_contents("tmp/ovh.log", $request_log, FILE_APPEND);
+$error_code_header = 0;
+$tab_error = Array(
+	0 => "OK",
+	1 => "MISSING NUMBER",
+	2 => "MISSING URL OR TITRE",
+	3 => "MISSING TEXTE",
+	4 => "MISSING ID",
+	5 => "USER NOT FOUND",
+	6 => "NO CREDITS",
+	7 => "ERROR WHILE SEND REQUEST",
+	8 => "ERROR MALFORMED NUMBER",
+	9 => "ERROR INCOMING ADDRESS",
+	10 => "ERROR SUBSCRIBER RESULT",
+	11 => "MISSING TOUR",
+	12 => "ERROR UNVALIDATED CARRIER",
+	13 => "ERROR NUMBER STOPPED"
+);
+$details_sms = array();
+if(preg_match('/^10\.0\.4\.(\d{1,3})/',$_SERVER['REMOTE_ADDR']) > 0){
+	if(is_guid($id_utilisateur)){
+		$credits = getCredits($id_utilisateur);
+		if(is_array($credits)){
+			if( $credits['DATE_LIMITE_VALIDITE'] == NULL){
+				if(($credits['TOTAL_CREDITS']-$credits['TOTAL_CONSO']) < 1){
+					$error_code_header = 6;
+				}
+			}else if($credits['DATE_LIMITE_VALIDITE'] < date('Y-m-d H:i:s')){
+				$error_code_header = 6;
+			}
+		}else{ $error_code_header = 5;}
+
+		if(is_guid($tour) || $texte != ""){
+//			if($operator == ""){ $operator = getOperator($numero,'US');}
+			$country_text = (preg_match('/^(US|FR)$/i', $country) > 0 ? $country : "OTHER");
+			$numero = formatNumber($numero, $country);
+			$number_statut = checkNumber($numero, $operator, $country, $tour, false);
+			if($number_statut < 0){ $error_code_header = 13;}
+			if(is_guid($tour)){
+				db_close();
+				$tour_sent = getVideoId($tour, $type);
+				$tour_sent = convertTourToShortCode($tour_sent);
+				if($country_text != "OTHER"){
+					$texte = str_replace("#ID#", $tour_sent, $config_sms[$country_text][TYPE_MSG]['URL_VIDEO_MOBILE']);
+				}else{
+					$texte = str_replace("#ID#", $tour_sent, $config_sms[$country_text][TYPE_MSG]['MESSAGE'][(strtoupper($lang) == 'FR' ? 'FR' : 'US')]['URL_VIDEO_MOBILE']);
+				}
+			}
+			
+			$texte .= $config_sms[$country_text][TYPE_MSG]['END_MESSAGE'];
+			if($numero!=""){ 
+				if($numero != false){
+					if($url == "" && $texte == ""){ $error_code_header = 3;}
+					if($error_code_header == 0){
+						$is_sent = false;
+//						$response = sendOVHSMS(formatNumber($numero, $country), $texte);
+						$from = "+33146257575";
+						$numero = preg_replace('/^[0]*/i', '+', $numero);
+						$params = array(
+							'smsAccount' => OVH_SMSACCOUNT,
+							'login' => "Previsite",
+							'password' => OVH_PASSWORD,
+							'from' => $from,
+							'to' => $numero,
+							'message' => $texte,
+							//option
+						//	'deferred' => // au format hhmmjjMMAAAA (pour un envoi le 25/08/2011 à 12h30 : 123025082011)
+						//	'class' => Type de classe du SMS, au format N (1 chiffre) parmi les 4 disponibles (classe 1 par défaut) :
+						//	'tag' => $id,//Une chaîne de maximum 20 caractères vous permettant de marquer les messages envoyés.
+							'contentType' => 'text/json',
+						);
+						$url_params = "?";
+						foreach($params as $k=>$v){ $url_params .= $k."=".urlencode($v)."&";}
+						$url = preg_replace('/&$/i', '', OVH_SEND_SMS.$url_params);
+						$response = file_get_contents($url);
+						if($response != "" && $json = json_decode($response, true)){
+							$is_sent = ($json['status']  == 100);
+							if(!$is_sent){ $messageInfos = $json['message'];}
+						}						
+						if($is_sent){ 
+							$statut_error = "0";
+							if($json['creditLeft'] <= OVH_ALERT && $json['creditLeft']%10 == 0){
+								$body = "------ OVH ALERTE -------<br />\n";
+								$body .= "Credit left:<b>".$json['creditLeft']."</b>";
+								@send_email(array('address' =>"sms@previsite.com", 'name'=>'SMS Alerte'), array("mobile@previsite.com"), "Alert credits limit", $body, strip_tags($body));
+							}
+						}else{
+							$error_code_header = 7;
+							$statut_error = "-1";
+						}
+						$details_sms = array(
+							'id' => generate_guid(),
+							'phone' => $numero,
+							'texte' => $texte,
+							'title' => $titre,
+							'operator' => '',
+							'destination' => ''
+						);
+						if(is_guid($details_sms['id'])){
+							$sql = "INSERT INTO MT(ID_MT, NUMERO, TEXTE, TITRE, WAP_PUSH , XML_REQUEST_MT, XML_RESPONSE_MT, DATE_CREATION_MT, ID_STATUT_MT, REF_PAYS, ID_UTILISATEUR, ID_OPERATOR, SHORTCODE, RESULT_CODE, RESULT_TEXT, ID_VISITE) VALUES('".$details_sms['id']."' ,'".fix_text($details_sms['phone'])."' ,'".fix_text(utf8_encode($details_sms['texte']))."', '".$details_sms['title']."', '0', '".fix_text($request_log."\n\n".$url_params)."','".fix_text($response)."', '".date('Y-m-d H:i:s')."' , '".($is_sent ? "1" : "-1")."','".fix_text($country)."', ".(is_guid($id_utilisateur) ? "'".$id_utilisateur."'" : "NULL" ).", '".$details_sms['operator']."','".$details_sms['destination']."', '".$statut_error."', '".fix_text($tab_error[$error_code_header])."', ".(is_guid($tour) ? "'".$tour."'" : "NULL" ).")";
+						}
+						db_query($sql);
+						if($statut_error == "0"){ 
+							$details_sms['type'] 	= TYPE_MSG;
+							$details_sms['country']	= $country;
+							updateTotalConso( $id_utilisateur, $details_sms);
+						}
+					}
+				}else{ $error_code_header = 8;}
+			}else{ $error_code_header = 1;}
+		}else{ $error_code_header = 11;}
+	}else{ $error_code_header = 4;}
+}else{ $error_code_header = 9;}
+db_close();
+
+if($error_code_header != 0){
+	$body = array();
+	$body[] = " - Type: ovh";
+	$body[] = " - ID: ".$details_sms['id'];	
+	$body[] = " - Country: ".$country;	
+	$body[] = " - Phone: ".$numero;
+	$body[] = " - From: ".$from;
+	$body[] = " - Content: ".$texte;
+	$body[] = " - Error: ".$error_code_header.". ".$tab_error[$error_code_header];
+	if($messageInfos != ""){ $body[] = " - Detail: ".$messageInfos;}
+	
+	@send_email(array('name'=> 'SMS', 'address'=>EMAIL_FROM_NOTIFICATION), array(EMAIL_ENVOI_NOTIFICATION), "SMS MT ERROR", implode("<br />", $body), implode("\n", $body));
+}
+
+if($jsonResponse == true){
+	$xml = array('code' => $error_code_header, 'description' => $tab_error[$error_code_header]);
+	if(is_guid($details_sms['id'])){ $xml['id'] = $details_sms['id'];}
+	if($messageInfos != ""){ $xml['details'] = $messageInfos;}
+	$xml = json_encode($xml);
+}else{
+	$xml = "<RequestResult>\n";
+	$xml .= "	<RequestResultCode>".$error_code_header."</RequestResultCode>\n";
+	$xml .= "	<RequestResultDescription>".$tab_error[$error_code_header]."</RequestResultDescription>\n";
+	$xml .= "</RequestResult>\n";
+}
+echo $xml;
+exit;
+?>

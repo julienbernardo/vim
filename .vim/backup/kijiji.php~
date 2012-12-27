@@ -1,0 +1,52 @@
+<?php
+
+require_once 'HTTP/Client.php';
+require_once 'HTTP/Request.php';
+require_once 'HTTP/Client/CookieManager.php';
+
+function kijiji($scriptName, $workPath, $config, $debug = false){
+	$return= array('DONE' => 0, 'FAILED' => 0, 'TOTAL' => 0, 'WAITING' => 0);
+	$logs = array();
+	$export = new PrevisiteExport();
+	$tours = $export->getPartnerTours($config['PARTNERS'], $config['OPT_DETAILS']);	
+	$return['TOTAL'] = count($tours);
+	for($i=0, $last_checkpoint = 0; $i < $return['TOTAL']; $i++){
+		kijiji_checkPercent( $i, $nb_tours_found, $last_checkpoint, $scriptName);
+		$replace = array(
+			'search' => array('#TOUR#', '#USER#', '#REF#', '#TITLE#', '#PARTNER#', '#MODE#', '#NEW#', '#NO_TTS#', '#REDIFFUSE#'),
+			'replace' => array($tours[$i]['ID_VISITE'], $tours[$i]['ID_UTILISATEUR'], urlencode($tours[$i]['REF_PORTAIL']), '', $tours[$i]['ID_PORTAIL'], 'export', '', '', ''),
+		);
+		$url = str_replace($replace['search'], $replace['replace'], URL_PUBLISH);
+		if(is_array($tours[$i]['DIFFUSIONS'][$tours[$i]['ID_PORTAIL']]['OPTIONS_DIFFUSION']) && $tours[$i]['DIFFUSIONS'][$tours[$i]['ID_PORTAIL']]['OPTIONS_DIFFUSION']['CITY'] != ""){
+			$url .= "&city=".urlencode($tours[$i]['DIFFUSIONS'][$tours[$i]['ID_PORTAIL']]['OPTIONS_DIFFUSION']['CITY']);
+		}
+		$url = str_replace( '/api','/dev.api', $url);
+		$response = file_get_contents($url);
+		if($response != 'true'){
+			import_log('[ERROR] '.$tours[$i]['ID_VISITE'].':'.$response.' ('.$url.')', $scriptName);
+			$logs[$response]++;
+			$return['FAILED']++;
+		}else{
+			if($config['DEBUG']  > 0) import_log('[DEBUG] '.$tours[$i]['ID_VISITE'].':'.$response.' ('.$url.')', $scriptName);
+			$return['DONE']++;
+		}
+	}
+	if(count($logs) > 0){
+		import_log('---------------------------------', $scriptName);
+		import_log('----------[RECAP ERROR]----------', $scriptName);
+		foreach ($logs as $k => $v) {
+			import_log($v.' errors like: "'.$k.'"', $scriptName);
+		}
+		import_log('---------------------------------', $scriptName);
+	}
+	return $return;
+}
+
+function kijiji_checkPercent( $pos, $total, &$last_checkpoint, $scriptName){
+	if($last_checkpoint+($total/5) < $pos){
+		import_log(round($pos/$total*100).'% done', $scriptName);
+		$last_checkpoint = $pos;
+	}
+}
+
+?>

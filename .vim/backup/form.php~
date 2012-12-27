@@ -1,0 +1,118 @@
+<!DOCTYPE html> 
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=0, width=device-width;">
+	<title>Kaufman & Broad</title>
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.0/jquery.mobile-1.0.min.css" />
+	<link rel="stylesheet" href="/greenpark/css/touchcarousel.css">
+	<link rel="stylesheet" href="/greenpark/css/minimal-light-skin.css">
+	<link rel="stylesheet" href="/greenpark/css/style.css">
+	
+	<script src="http://code.jquery.com/jquery-1.6.4.min.js"></script>
+	<script src="js/plugins.js"></script>
+	<script src="http://code.jquery.com/mobile/1.0/jquery.mobile-1.0.min.js"></script>
+	
+</head>
+<body>
+
+<div data-role="page">
+	<div data-role="header" id="header">
+		<div id="logo">Kaufman & Broad</div>
+	</div><!-- /header -->
+
+	<div data-role="content">
+		<div id="homeGallery" class="moduleGallery touchcarousel minimal-light">
+			<ul class="touchcarousel-container">
+		        <li class="touchcarousel-item">
+		            <img src="/greenpark/img/m/pers1.jpg" width="320" height="160" />
+		        </li>
+		        <li class="touchcarousel-item">
+		            <img src="/greenpark/img/m/pers2.jpg" width="320" height="160" />
+		        </li>
+		        <li class="touchcarousel-item">
+		            <img src="/greenpark/img/m/pers3.jpg" width="320" height="160" />
+		        </li>
+		    </ul>
+		</div><!-- /gallery -->
+		
+		<div id="nomProg">
+			<h2>St Raphaël (83)<br />
+		  Green Park</h2>
+		</div><!-- /nomProg -->
+		
+		<div id="contact">
+		<div class="argus" style="width:100%; text-align:center; margin-top:10px;">
+        		<br/>   
+					 <?php            
+                $adresse="kbweb1@marketing-lab.com, webmaster@ketb.com, scaron@previsite.com";
+                $sujet="Formulaire de contact mobile - St Raphaël";
+                $from="From: $prenom $nom<$email>\r\n";
+                $from.="Reply-To: $prenom $nom <$email>\n";
+                $from.="X-priority:3\n";
+                $texte.="Nom: $nom\n";
+                $texte.="Prénom: $prenom\n";
+                $texte.="Téléphone: $telephone\n";
+                $texte.="Email: $email\n";
+                $texte.="Commentaire: $commentaire\n";
+                $from.="MIME-Version: 1.0\r\n";
+                $from.='Content-Type: text/plain; charset="utf-8"';
+                 
+                if (mail($adresse,$sujet,$texte,$from))
+                echo("<h2>Formulaire envoyé !</h2><br/><br/>Nous vous répondrons dans les  plus bref délais.");
+                else
+                echo("<h2>Nous ne pouvons actuellement traiter votre demande!</h2><br/><br/>Contactez nous directement par ce <a href=mailto:".$adresse.">lien</a>");
+                
+            ?>
+		</div>
+
+		</div><!-- /contact -->
+		
+		<p>&nbsp;</p>
+
+	</div><!-- /content -->
+
+	<div class="footer">
+		<ul class="nav">
+			<li class="btn-start"><a href="/greenpark/index.php" data-ajax="false">
+				<span class="ico">icon</span>
+				<span class="text">accueil</span>
+			</a></li>
+			<li class="btn-video"><a href="/greenpark/video.php" data-ajax="false">
+				<span class="ico">icon</span>
+				<span class="text">video</span>
+			</a></li>
+			<li class="btn-contact active"><a href="/greenpark/form.php" data-ajax="false">
+				<span class="ico grise">icon</span>
+				<span class="text grise">contact</span>
+			</a></li>
+		</ul>
+	</div><!-- /footer -->
+</div><!-- /page -->
+
+<script>
+	$(document).ready(function() {
+		$("#homeGallery").touchCarousel({
+			itemsPerMove:1,
+			pagingNav: 1,
+			scrollbar: 0,
+			directionNav: 0,
+			itemFallbackWidth: 320,
+			itemLikeWindowWidth: 1,
+			pagingNavControls: true
+	    });
+
+	});
+</script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+

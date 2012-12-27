@@ -1,0 +1,70 @@
+<?php
+
+//main function
+/***
+*	Create xml for template "tv"
+*
+***/
+function create_stupeflix_xml_TEMPLATE_TV($options){	
+	$tab_tour 	= $options['INFOS']['TOUR'];
+	$tab_user 	= $options['INFOS']['USER'];
+
+	$text_template = loadDicoTemplate( $options['COUNTRY'], "tv");
+	
+	$title = "";
+	if($tab_tour['ID_TYPE_BIEN'] > 0){ $title .= ($title != "" ? " " : "").($tab_tour['TYPE_BIEN'] == '' ? $text_template['type_bien'][$tab_tour['ID_TYPE_BIEN']] : $tab_tour['TYPE_BIEN']);}
+	if($tab_tour['NB_ROOM'] > 0){ $title .= ($title != "" ? " " : "").$tab_tour['NB_ROOM']." ".$text_template['room'].($tab_tour['NB_ROOM'] > 1 ? "s" : "");}
+	
+	if($tab_tour['VILLE'] != "" || $tab_tour['CODE_POSTAL'] != ""){
+		$city = "".$tab_tour['VILLE'];
+		if($tab_tour['CODE_POSTAL'] != ""){ $city .= ($tab_tour['VILLE'] != "" ? " " : "")."(".$tab_tour['CODE_POSTAL'].")";}
+	}
+	$surface = "";
+	if($tab_tour['SQUARE_FEET'] != ""){ $surface .= number_format($tab_tour['SQUARE_FEET'], 0, ".", ",")." ".($tab_tour['NOM_UNITE_SURFACE'] == "" ? " sqft" : $tab_tour['NOM_UNITE_SURFACE'] );}
+/*	if($tab_tour['PRIX_BIEN'] != ""){ 
+		if($country == "US"){
+			$subtitle .= ($subtitle != "" ? " - " : "" ).$tab_tour['SYMBOLEBRUT_DEVISE'].number_format($tab_tour['PRIX_BIEN'], 0, '.', ',');
+		}else{
+			$subtitle .= ($subtitle != "" ? " - " : "" ).number_format($tab_tour['PRIX_BIEN'], 0, ',', ' ').$tab_tour['SYMBOLEBRUT_DEVISE'];
+		}
+	}
+*/	
+//	$phone = ($tab_user['TELEPHONE'] != "" ? $tab_user['TELEPHONE'] : $tab_user['TELEPHONE_UTILISATEUR']);
+
+	$contact = array();
+	if($tab_user['TELEPHONE_UTILISATEUR'] != "" || $tab_user['TELEPHONE'] != ""){
+		$contact[] = $text_template['contact_question'];
+		$contact[] = $text_template['contact_do']." ".$text_template['contact_phone'];
+		$contact[] = ($tab_user['TELEPHONE_UTILISATEUR'] != "" ? $tab_user['TELEPHONE_UTILISATEUR'] : $tab_user['TELEPHONE']);
+	}
+	if($tab_user['EMAIL_UTILISATEUR'] != ""){
+		if(count($contact) > 0){
+			$contact[] = $text_template['contact_or']." ".$text_template['contact_mail'];
+			$contact[] = $tab_user['EMAIL_UTILISATEUR'];
+		}else{
+			$contact[] = $text_template['contact_question'];
+			$contact[] = $text_template['contact_do']." ".$text_template['contact_mail'];
+			$contact[] = $tab_user['EMAIL_UTILISATEUR'];
+		}
+	}
+	
+	$options['TEXT'] = array(
+		//intro
+		'intro_title' => $text_template['intro_title'],
+		'intro_agency' =>  $tab_user['NOM_SOCIETE'],
+		//'intro_agency' =>  "Agence immobillière Previsite parisienne du douzième du fond du trou à gauche puis à droite au troisième poto",
+		'intro_subtitle' => $text_template['intro_subtitle'],
+		//infos
+		'infos_transaction' => strtoupper($text_template['type_transaction'][$tab_tour['ID_TYPE_TRANSACTION']]),
+		'infos_description' => $tab_tour['DESCRIPTION'],
+		'infos_title' => $title,
+		'infos_surface' =>  $surface,
+		'infos_city' => $city,
+		'ref' => ($tab_tour['REF_VISITE'] != "" ? $text_template['ref'].": ".$tab_tour['REF_VISITE'] : ""),
+		'contact' => $contact,
+		'dpe_marker' => ($tab_tour['DPE_VALEUR'] != "" ? $tab_tour['DPE_VALEUR'] : $tab_tour['DPE_LETTRE'] ),
+		'ges_marker' => ($tab_tour['GES_VALEUR'] != "" ? $tab_tour['GES_VALEUR'] : $tab_tour['GES_LETTRE'] ),
+	);
+	return write_stupeflix_xml_content_tv($options);
+}
+?>

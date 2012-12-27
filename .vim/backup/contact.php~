@@ -1,0 +1,200 @@
+<?php
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('../../include/global.php');
+require_once('../include/header.php');
+
+$todo = $_REQUEST['todo'];
+$mail_sent = false;
+if(preg_match('/^[^@]+@[^@]+\.[^@]+$/i', $_REQUEST['email']) >0 && $_REQUEST['commentaire'] != ""){
+	$phpmail = new PHPMailer();
+	$phpmail->IsSMTP();
+	$phpmail->IsHTML(true);
+	$phpmail->Host      = SMTP_MAIL;
+	$phpmail->From      = "no-reply@previsite.com";
+	$phpmail->FromName  = "Formulaire contact mobile";
+	$phpmail->WordWrap  = 70;
+	$phpmail->Subject   = "Formulaire de contact mobile - St Raphaël";
+
+	$texte = array();
+	$texte[] = " - Nom: <b>".$_REQUEST['nom']."</b>";
+	$texte[] = " - Prénom: <b>".$_REQUEST['prenom']."</b>";
+    $texte[] = " - Téléphone: <b>".$_REQUEST['telephone']."</b>";
+    $texte[] = " - Email: <b>".$_REQUEST['email']."</b>";
+    $texte[] = " - Commentaire: <b>".$_REQUEST['commentaire']."</b>";
+ 
+	$phpmail->Body      = implode("<br />",$texte);
+	$emails = array("kbweb1@marketing-lab.com", "webmaster@ketb.com", "scaron@previsite.com");
+	$emails = array('julien@previsite.com');
+	foreach($emails as $email){
+		$phpmail->AddAddress($email,"");
+	}
+	$phpmail->Send();
+	$mail_sent = true;
+	echo "true";
+	exit;
+}
+
+?>
+<!DOCTYPE html> 
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=0, width=device-width;">
+	<title>Kaufman & Broad</title>
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.0/jquery.mobile-1.0.min.css" />
+	<link rel="stylesheet" href="/greenpark/css/touchcarousel.css" />
+	<link rel="stylesheet" href="/greenpark/css/minimal-light-skin.css" />
+	<link rel="stylesheet" href="/greenpark/css/style.css" />
+	
+	<script src="http://code.jquery.com/jquery-1.6.4.min.js"></script>
+	<script src="/greenpark/js/plugins.js"></script>
+<script src="http://code.jquery.com/mobile/1.0/jquery.mobile-1.0.min.js"></script>
+<style>
+	.error{ background-color:#ffdddd;}
+</style>
+</head>
+<body>
+<div data-role="page">
+	<div data-role="header" id="header">
+		<div id="logo">Kaufman & Broad</div>
+	</div><!-- /header -->
+
+	<div data-role="content">
+		<div id="homeGallery" class="moduleGallery touchcarousel minimal-light">
+			<ul class="touchcarousel-container">
+		        <li class="touchcarousel-item">
+		            <img src="/greenpark/img/m/pers1.jpg" width="320" height="160" />
+		        </li>
+		        <li class="touchcarousel-item">
+		            <img src="/greenpark/img/m/pers2.jpg" width="320" height="160" />
+		        </li>
+		        <li class="touchcarousel-item">
+		            <img src="/greenpark/img/m/pers3.jpg" width="320" height="160" />
+		        </li>
+		    </ul>
+		</div><!-- /gallery -->
+		
+		<div id="nomProg">
+			<h2>St Raphaël (83)<br />
+		  Green Park</h2>
+		</div><!-- /nomProg -->
+		
+		<div id="contact">	
+			<div id="content" class="argus" style="width:100%; text-align:<?=($mail_sent ? "center" : "left");?>;margin-top:10px;">
+<?php
+if($mail_sent){
+              echo("<h2>Formulaire envoyé !</h2><br/><br/>Nous vous répondrons dans les  plus bref délais.");
+}else{
+?>
+                 <h2>Formulaire de contact</h2>
+               <FORM method="post" action="./contact.php" id="form"><br/>
+					Nom : <INPUT id="nom" NAME="nom" TYPE="text" value="<?=$_REQUEST['nom'];?>" /> <br/>
+                    Prénom : <INPUT id="prenom" NAME="prenom" TYPE="text"  value="<?=$_REQUEST['prenom'];?>" /> <br/>
+                    Téléphone : <INPUT id="telephone" NAME="telephone" TYPE="text"  value="<?=$_REQUEST['telephone'];?>" /> <br/>
+					Email : <INPUT <?=($error_email ? 'class="error"' : "");?> id="email" NAME="email" TYPE="text"  value="<?=$_REQUEST['email'];?>" /><br/>
+                    <br/>
+                    Commentaires :<br/>
+                    <TEXTAREA id="commentaire" <?=($error_email ? 'class="error"' : "");?> NAME="commentaire" COLS="30" ROWS="10"><?=$_REQUEST['commentaire'];?></TEXTAREA><br/>
+                    <INPUT TYPE="button" VALUE="Validation" onclick="sendEmail();"/><br/>
+                    <INPUT TYPE="hidden" name="todo" VALUE="send" /><br/>
+				</FORM>          
+<?php
+}
+?>
+              </div>
+              
+	        <br/>
+		  
+          <div style="width:100%; text-align:center; margin-top:10px;">
+			<h2><a href="http://www.ketb.com/" style="color:#e2007a; text-decoration:none;">KetB.com</a></h2>
+			<h1>0 800 544 000</h1>
+			<p>Numéro vert</p>
+			</div>
+			
+			<div id="exemplePrix"><a href="http://www.ketb.com/contact/se-faire-rappeler.aspx" data-ajax="false" class="bouton">SE FAIRE APPELER</a></div>
+			
+			
+			<div id="appstore"><a href="http://itunes.apple.com/fr/app/k-b/id407739432?mt=8"><img src="img/m/pixel.png" width="210" height="40" border="0"></a></div>
+			
+			<p><strong>&nbsp;</strong></p>
+		</div><!-- /contact -->
+		
+		<p>&nbsp;</p>
+
+	</div><!-- /content -->
+
+	<div class="footer">
+		<ul class="nav">
+			<li class="btn-start"><a href="/greenpark/index.php" data-ajax="false">
+				<span class="ico">icon</span>
+				<span class="text">accueil</span>
+			</a></li>
+			<li class="btn-video"><a href="/greenpark/video.php" data-ajax="false">
+				<span class="ico">icon</span>
+				<span class="text">video</span>
+			</a></li>
+			<li class="btn-contact active"><a href="/greenpark/contact.php" data-ajax="false">
+				<span class="ico grise">icon</span>
+				<span class="text grise">contact</span>
+			</a></li>
+		</ul>
+	</div><!-- /footer -->
+</div><!-- /page -->
+
+<script>
+function sendEmail(){
+		var no_error = true;
+		var isEmail = /^[^@]+@[^@]+\.[^@]+$/i;
+		if($('#commentaire').val() == ""){
+			no_error = false;
+			$('#commentaire').addClass('error');
+			$('#commentaire').focus();
+		}else{
+			$('#commentaire').removeClass('error');
+		}
+
+		if(!isEmail.test($('#email').val())){
+			no_error = false;
+			$('#email').addClass('error');
+			$('#email').focus();
+		}else{
+			$('#email').removeClass('error');
+		}
+		if(!no_error){
+			return;
+		}
+	    // fire off the request to /form.php
+		var serializedData = $('#form').serialize();
+		$.ajax({
+			url: "./contact.php",
+				type: "post",
+				data: serializedData,
+				// callback handler that will be called on success
+				success: function(response, textStatus, jqXHR){
+					// log a message to the console
+					$('#content').css('text-align', 'center');
+					if(response == 'true'){
+						$('#content').html("<h2>Formulaire envoyé !</h2><br/><br/>Nous vous répondrons dans les  plus bref délais.");
+					}else{
+              			$('#content').html('<h2>Nous ne pouvons actuellement traiter votre demande!</h2><br/><br/>Contactez nous directement par ce <a href="mailto:kbweb1@marketing-lab.com, webmaster@ketb.com, scaron@previsite.com">lien</a>');
+					}
+				}
+		});
+	}
+	$(document).ready(function() {
+		$("#homeGallery").touchCarousel({
+			itemsPerMove:1,
+			pagingNav: 1,
+			scrollbar: 0,
+			directionNav: 0,
+			itemFallbackWidth: 320,
+			itemLikeWindowWidth: 1,
+			pagingNavControls: true
+	    });
+
+	});
+</script>
+
+</body>
+</html>
+

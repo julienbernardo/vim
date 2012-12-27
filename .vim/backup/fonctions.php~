@@ -1,0 +1,491 @@
+<?php
+function write_log($action,$content) {	
+	$handle_log = fopen(LOG_FILE,"a+");
+	fwrite($handle_log, date('Y-m-d H:i:s')." (".$action.") : ".$content."\n");
+	fclose($handle_log);
+}
+
+function write_file($filename,$content) {	
+	$fh = fopen($filename,"w");
+	fwrite($fh, $content);
+	fclose($fh);
+}
+
+function parse_array($data,$sep=';'){
+	$tab = explode($sep,$data);
+	$ret = array();
+	for($i=0;$i <count($tab);$i++){
+		$ret[$tab[$i]] = true;
+	}
+	return $ret;
+}
+
+function is_url($url) {
+	$UrlElements = parse_url($url);
+	if ((empty($UrlElements)) or (!$UrlElements)) {
+		return false;
+	}
+
+	if ((!isset($UrlElements['host'])) || (empty($UrlElements['host']))) {
+		return false;
+	}
+	return true;
+}
+
+
+function is_true($value){
+	switch($value){
+		case "0":
+			return false;
+		case "1":
+			return true;
+		case "yes":
+			return true;	
+		case "no":
+			return false;	
+		case "on":
+			return true;
+		case "off":
+			return false;	
+		case "true":
+			return true;
+		case "false":
+			return false;	
+	}
+	return false;		
+}
+
+/* Exec 2 */
+function exec2($cmd, &$code) {
+   $pipes= array();
+   $process = proc_open($cmd, array(0 => array("pipe", "r"), 1 => array("pipe", "w"), 2 => array("pipe", "w") ), $pipes);
+   $output= "";
+   if (!is_resource($process)) return false;
+   fclose($pipes[0]);
+   stream_set_blocking($pipes[1],false);
+   stream_set_blocking($pipes[2],false);
+   $todo= array($pipes[1],$pipes[2]);
+   while(true) {
+       $read= array();
+       if(!feof($pipes[1])) $read[]= $pipes[1];
+       if(!feof($pipes[2])) $read[]= $pipes[2];
+       if(!$read) break;
+       $ready= stream_select($read, $write=NULL, $ex=NULL, 2);
+       if ($ready === false) break; 
+       foreach ($read as $r) {
+           $s= fread($r,1024);
+           $output.= $s;
+       }
+   }
+   fclose($pipes[1]);
+   fclose($pipes[2]);
+   $code= proc_close($process);
+   return $output;
+}
+
+function get_mp3_duration($file_mp3){
+	$reponse = array();
+	$reponse['time']['h'] = 0;
+	$reponse['time']['m'] = 0;
+	$reponse['time']['s'] = 0;
+	$reponse['time']['ms'] = 0;
+	if($exe_result = exec2("/usr/bin/ffmpeg -i ".$file_mp3,$h)){
+		if(!eregi("Duration: ", $exe_result)) {
+	    	$duration = "no";
+		}else {
+		    list(,$duration) = explode("Duration: ",  $exe_result);
+		    list($duration)  = explode(",",  $duration);
+		    list($reponse['time']['h'],$reponse['time']['m'],$reponse['time']['s']) = explode(":",  $duration);
+		    list($reponse['time']['s'],$reponse['time']['ms']) = explode(".",$reponse['time']['s']);
+		    $reponse['duration'] = (int)$reponse['time']['s'] + (int)$reponse['time']['m'] * 60;
+		}
+	}	
+	return $reponse;
+}
+
+/*fonction flash*/
+function write_flash($id,$path,$param,$width,$height,$color,$fs=2,$ver="8"){
+	if($param!="") $path.="?".$param;
+	if($fs==0){
+		$reponse = "<script type=\"text/javascript\">\n";
+		$reponse.= "myprintln('<object classid=\"clsid:d27cdb6e-ae6d-11cf-96b8-444553540000\" codebase=\"http://fpdownload.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=".$ver.",0,0,0\" width=\"".$width."\" height=\"".$height."\" id=\"swf".$id."\" align=\"middle\">');\n";
+		$reponse.= "myprintln('<param name=\"allowScriptAccess\" value=\"sameDomain\" />');\n";
+		$reponse.= "myprintln('<param name=\"movie\" value=\"http://".$_SERVER["HTTP_HOST"].$path."\" /><param name=\"quality\" value=\"high\" /><param name=\"bgcolor\" value=\"#ffffff\" /><embed src=\"http://".$_SERVER["HTTP_HOST"].$path."\" quality=\"high\" bgcolor=\"#ffffff\" width=\"".$width."\" height=\"".$height."\" name=\"swf".$id."\" align=\"middle\" allowScriptAccess=\"sameDomain\" type=\"application/x-shockwave-flash\" pluginspage=\"http://www.macromedia.com/go/getflashplayer\" />');\n";
+		$reponse.= "myprintln('</object>');\n";
+		$reponse.= "</script>";
+	}else if($fs==1){
+		$reponse = "<div id=\"content".$id."\" style=\"width: ".$width."px; height: ".$height."px\">";
+		if($disp_msg){
+			$reponse.= "<strong>You need to upgrade your Flash Player</strong>
+			This is replaced by the Flash content.
+			Place your alternate content here and users without the Flash plugin or with
+			Javascript turned off will see this. Content here allows you to leave out <code>noscript</code>
+			tags. Include a link to <a href=\"#\">bypass the detection</a> if you wish.";
+		}
+		$reponse.= "</div>
+		<script type=\"text/javascript\">
+			var fo = new SWFObject(\"http://".$_SERVER["HTTP_HOST"].$path."\", \"swf".$id."\", \"".$width."\", \"".$height."\", \"".$ver."\", \"".$color."\",false);
+			fo.addParam(\"allowScriptAccess\", \"sameDomain\");
+			fo.addParam(\"quality\", \"high\");
+			fo.addParam(\"scale\", \"noscale\");
+			fo.addParam(\"allowFullScreen\", \"true\");
+			fo.addParam(\"loop\", \"false\");
+			fo.write(\"content".$id."\");
+		</script>";
+	}else if($fs==2){
+		$reponse = "<object classid=\"clsid:d27cdb6e-ae6d-11cf-96b8-444553540000\" codebase=\"http://fpdownload.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=".$ver.",0,0,0\" width=\"".$width."\" height=\"".$height."\" id=\"swf".$id."\" align=\"middle\">\n";
+		$reponse.= "<param name=\"allowScriptAccess\" value=\"sameDomain\" />\n";
+		$reponse.= "<param name=\"allowFullScreen\" value=\"true\" />\n";
+		$reponse.= "<param name=\"movie\" value=\"http://".$_SERVER["HTTP_HOST"].$path."\" /><param name=\"quality\" value=\"high\" /><param name=\"bgcolor\" value=\"#ffffff\" /><embed src=\"http://".$_SERVER["HTTP_HOST"].$path."\" quality=\"high\" bgcolor=\"#ffffff\" width=\"".$width."\" height=\"".$height."\" name=\"swf".$id."\" align=\"middle\" allowScriptAccess=\"sameDomain\" type=\"application/x-shockwave-flash\" pluginspage=\"http://www.macromedia.com/go/getflashplayer\" />\n";
+		$reponse.= "</object>\n";
+	}else if($fs==3){
+		$reponse = "<script type=\"text/javascript\">
+		if (AC_FL_RunContent == 0) {
+			alert(\"This page requires AC_RunActiveContent.js.\");
+		} else {
+
+					AC_FL_RunContent(
+						'codebase', 'http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=".$ver.",0,0,0',
+						'width', '".$width."',
+						'height', '".$height."',
+						'src', '".str_replace(".swf","",$path)."',
+						'quality', 'high',
+						'pluginspage', 'http://www.macromedia.com/go/getflashplayer',
+						'align', 'middle',
+						'play', 'true',
+						'loop', 'true',
+						'scale', 'showall',
+						'wmode', 'transparent',
+						'devicefont', 'false',
+						'id', 'swf".$id."',
+						'bgcolor', '#ffffff',
+						'name', 'swf".$id."',
+						'menu', 'true',
+						'allowFullScreen', 'true',
+						'allowScriptAccess','sameDomain',
+						'movie', '".str_replace(".swf","",$path)."',
+						'salign', ''
+						); //end AC code
+				}
+		</script>
+		<noscript>
+			<object classid=\"clsid:d27cdb6e-ae6d-11cf-96b8-444553540000\" codebase=\"http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=8,0,0,0\" width=\"".$width."\" height=\"".$height."\" id=\"swf".$id."\" align=\"middle\">
+			<param name=\"allowScriptAccess\" value=\"sameDomain\" />
+			<param name=\"allowFullScreen\" value=\"true\" />
+			<param name=\"movie\" value=\"http://".$_SERVER["HTTP_HOST"].$path."\" /><param name=\"quality\" value=\"high\" /><param name=\"bgcolor\" value=\"#ffffff\" />	<embed src=\"http://".$_SERVER["HTTP_HOST"].$path."\" quality=\"high\" bgcolor=\"#ffffff\" width=\"".$width."\" height=\"".$height."\" name=\"swf".$id."\" align=\"middle\" allowScriptAccess=\"sameDomain\" allowFullScreen=\"false\" type=\"application/x-shockwave-flash\" pluginspage=\"http://www.macromedia.com/go/getflashplayer\" />
+			</object>
+		</noscript>";
+	}
+	return $reponse;
+}
+
+
+
+function imageresize($img, $width, $height,$force=true){
+	$org_width = imagesx($img);
+	$org_height = imagesy($img);
+	$xoffset = 0;
+	$yoffset = 0;
+	if($force){
+		if ($org_width / $width > $org_height/ $height){
+			$xtmp = $org_width;
+			$xratio = 1-((($org_width/$org_height)-($width/$height))/2);
+			$org_width = $org_width * $xratio;
+			$xoffset = ($xtmp - $org_width)/2;
+		}else if ($org_height/ $height > $org_width / $width){
+			$ytmp = $org_height;
+			$yratio = 1-((($width/$height)-($org_width/$org_height))/2);
+			$org_height = $org_height * $yratio;
+			$yoffset = ($ytmp - $org_height)/2;
+		}
+	} else {
+		$xtmp = $org_width/$width;
+		$new_width = $width;
+		$new_height = $org_height/$xtmp;
+		if ($new_height > $height){
+			$ytmp = $org_height/$height;
+			$new_height = $height;
+			$new_width = $org_width/$ytmp;
+		}
+		$width = round($new_width);
+		$height = round($new_height);
+	}
+	$img_n=imagecreatetruecolor ($width, $height);
+	$white = imagecolorallocate($img_n, 255, 255, 255 );
+	imagefill($img_n, 0, 0,$white);
+	imagecopyresampled($img_n, $img, 0, 0, $xoffset, $yoffset, $width, $height, $org_width, $org_height);
+	return $img_n;
+}
+
+function event_log($data,$fichier='event.log'){
+	write_log($fichier,$data,10000000);
+}
+
+
+/* Fonctions de traitement d'erreurs pour PHP */
+function php_error_handler($errno, $errstr, $errfile, $errline) {
+    switch($errno) {
+        case E_PARSE:
+        case E_USER_PARSE:
+        case E_ERROR:
+        case E_USER_ERROR:
+            if(EMAIL_DEV != "") {
+                $s = "Error ".date('YmdHis').": ".$errstr;
+                $c = "Error [$errno] $errstr\r\nFatal error in line $errline of file $errfile";
+                @mail(EMAIL_DEV, $s, $c."\r\n\r\nGET:\r\n".var_export($_GET, true)."\r\n\r\nPOST:\r\n".var_export($_POST, true)."\r\n\r\nCOOKIE:\r\n".var_export($_COOKIE, true)."\r\n\r\nSERVER:\r\n".var_export($_SERVER, true)."\r\n\r\nFILES:\r\n".var_export($_FILES, true)."\r\n\r\nSESSION:\r\n".var_export($_SESSION, true)."\r\n\r\nENV:\r\n".var_export($_ENV, true), "From: \"".$_SERVER['SERVER_ADDR']."\" <bug@previsite.com>\nDate: ".date('r')."\n.X-Priority: 1\n");
+            }
+            exit(1);
+            break;
+        case E_NOTICE:
+        case E_USER_NOTICE:
+        //    if(EMAIL_DEV != "") {
+        //        $s = "Notice ".date('YmdHis').": ".$errstr;
+        //        $c = "Notice [$errno] $errstr\r\Notice in line $errline of file $errfile";
+        //        @mail(EMAIL_DEV, $s, $c."\r\n\r\nGET:\r\n".var_export($_GET, true)."\r\n\r\nPOST:\r\n".var_export($_POST, true)."\r\n\r\nCOOKIE:\r\n".var_export($_COOKIE, true)."\r\n\r\nSERVER:\r\n".var_export($_SERVER, true)."\r\n\r\nFILES:\r\n".var_export($_FILES, true)."\r\n\r\nSESSION:\r\n".var_export($_SESSION, true)."\r\n\r\nENV:\r\n".var_export($_ENV, true), "From: \"".$_SERVER['SERVER_ADDR']."\" <bug@previsite.com>\nDate: ".date('r')."\n.X-Priority: 1\n");
+        //    }
+            break;
+        case E_WARNING:
+        case E_USER_WARNING:
+        default:
+            if(EMAIL_DEV != "") {
+                $s = "Warning ".date('YmdHis').": ".$errstr;
+                $c = "Warning [$errno] $errstr\r\nWarning in line $errline of file $errfile";
+                @mail(EMAIL_DEV, $s, $c."\r\n\r\nGET:\r\n".var_export($_GET, true)."\r\n\r\nPOST:\r\n".var_export($_POST, true)."\r\n\r\nCOOKIE:\r\n".var_export($_COOKIE, true)."\r\n\r\nSERVER:\r\n".var_export($_SERVER, true)."\r\n\r\nFILES:\r\n".var_export($_FILES, true)."\r\n\r\nSESSION:\r\n".var_export($_SESSION, true)."\r\n\r\nENV:\r\n".var_export($_ENV, true), "From: \"".$_SERVER['SERVER_ADDR']."\" <bug@previsite.com>\nDate: ".date('r')."\n.X-Priority: 1\n");
+            }
+            break;
+    }
+}
+
+/* Fonction de création de MS GUID */
+function generate_guid() {
+	$cle = strtoupper(md5(uniqid(rand(), true)));
+	$cle2 = "";
+	for($i=0; $i<strlen($cle); $i++) {
+		if($i==8)  $cle2 .= "-";
+		if($i==12) $cle2 .= "-";
+		if($i==16) $cle2 .= "-";
+		if($i==20) $cle2 .= "-";
+		$cle2 .= $cle[$i];
+	}
+	return $cle2;
+}
+
+
+/* Fonction de benchmark */
+function getmicrotime(){
+   list($usec, $sec) = explode(" ", microtime(true));
+   return ((float)$usec + (float)$sec);
+}
+
+/* Fonction de benchmark et de stat serveur */
+function benchmark($bench = array()) {
+    $first   = "";
+    $last    = "";
+    $return  = "<table align=center border=0 cellspacing=0 cellpadding=0 name=benchmark>";
+    if(is_array($bench) && count($bench) > 0) {
+        foreach($bench as $key => $val) {
+            if($first == "") $first = $val;
+            if($last  == "") $last  = $first;
+            $return .= "<tr><td>".$key.":</td><td align=right>".(round(($val - $last)*10000)/10000)."s</td><td align=right>".(round(($val - $first)*10000)/10000)."s</td></tr>";
+            $last = $val;
+        }
+    }
+    $return .= "<tr><td>srv:</td><td colspan=2 align=right>".$_SERVER['SERVER_ADDR']."</td></tr>";
+    $load = @file_get_contents("/proc/loadavg");
+    if($load != "") $return .= "<tr><td>load:</td><td colspan=2 align=right>".trim($load)."</td></tr>";
+    $return .= "</table>";
+    return $return;
+}
+
+function deep_in_array($value, $array, $case_insensitive = true){
+	if(is_array($array)){
+		foreach($array as $item){
+			if(is_array($item)) $ret = deep_in_array($value, $item, $case_insensitive);
+			else $ret = ($case_insensitive) ? strtolower($item)==strtolower($value) : $item==$value;
+			if($ret)return $ret;
+		}
+	}
+	return false;
+}
+
+function fix_xml($input){
+	return str_replace('&','&amp;',str_replace('&amp;','&',$input));
+}
+
+/* Fonction de creation d'image miniature */
+function createthumbnail($imgold, $imgnew, $fwidth, $fheight, $quality = 75) {
+    $im_old = imagecreatefromjpeg($imgold);
+    $size   = getimagesize($imgold);
+    $im_new = imagecreatetruecolor($fwidth, $fheight);
+    imagecopyresampled($im_new, $im_old, 0, 0, 0, 0, $fwidth, $fheight, ($size[1] * (4/3)), $size[1]);
+    imagejpeg($im_new, $imgnew, $quality);
+	imagedestroy($im_old);
+	imagedestroy($im_new);
+}
+
+/* Fonction de fixation de texte */
+function fix_text($chaine, $taille = "") {
+	if($taille != "") $chaine = substr($chaine, 0, $taille);
+	$chaine = str_replace("'", "''", $chaine);
+	$chaine = str_replace(chr(231).chr(8),chr(44), $chaine);
+	return trim($chaine);
+}
+
+/* Fonction de fixation de numerique */
+function fix_int($chaine, $taille = "", $trim = true) {
+	if($taille != "") $chaine = substr($chaine, 0, $taille);
+	$chaine = str_replace(" ", "", str_replace("&nbsp;", "", $chaine));
+	if(ereg("-", $chaine)) $chaine = -1 * (preg_replace("/[^0-9]/i",'', $chaine));
+	else $chaine = preg_replace("/[^0-9]/i",'', $chaine);
+	if($trim) $chaine = trim($chaine);
+	return (int)$chaine;
+}
+
+/* Fonction de fixation de guid */
+function fix_guid($chaine, $trim = true) {
+	$chaine = str_replace("{", "", str_replace("}", "", $chaine));
+	if($trim) $chaine = trim($chaine);
+    $pattern = "^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$";
+    if(ereg($pattern, $chaine)) return $chaine;
+	return "";
+}
+
+/* Fonction de fixation des valeurs NULL */
+function fix_null($chaine){
+	if($chaine != "") return "'".$chaine."'";
+	else return "NULL";
+}
+
+/* Verifie le GUID */
+function guidCheck($guid) {
+    //$pattern = "^\{[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}\}$";
+    $pattern = "^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$";
+    if(ereg($pattern, $guid)) return true;
+    return false;
+}
+
+/* Fonction d'affichage de pixel */
+function pix($w,$h) {
+	return "<img src=\"/images/spacer.gif\" width=\"".$w."\" height=\"".$h."\" border=0>";
+}
+
+/* Verifie le GUID */
+function is_guid($guid) {
+    return guidCheck($guid);
+}
+
+/* Choix de l'option par défaut */
+//function get_options($data_defaut_option, $data_partner_option) {
+function get_options($data_option) {
+	foreach($data_option as $option => $value) {
+//		$data_array[$option] = ($data_partner_option[$option]['VALEUR_OPTION'] != "") ? $data_partner_option[$option]['VALEUR_OPTION'] : $value['VALEUR_OPTION'];
+		$data_array[$option] = $value['VALEUR_OPTION'];
+	}
+	return $data_array;
+}
+
+/* Redirection en gardant les parametres */
+function redirect($location,$additional=''){
+	$tab_param = array();
+	foreach($_REQUEST as $key => $value){
+		if($key!="PREVSESSID" && strpos($key,"__")===false) $tab_param[] = $key."=".$value;
+	}
+	if($additional!='') $tab_param[] = $additional;
+	$url_param = implode("&",$tab_param);
+	if($url_param!="") $url_param = "?".$url_param;
+	header("Location:".$location.$url_param);
+	exit;
+}
+
+/**
+ * send_http()
+ *
+ * @param   string  $url        Url to use
+ * @param   array   $headers    Headers in associative array User-agent, Accept-Language..
+ * @param   string  $return     Choose what to return: body, header, all
+ * @param   int     $port       Port to use
+ * @param   int     $timeout    Connect timeout
+ * @param   string  $errstr     Connexion string error
+ * @return  mixed               Return value
+ */
+function send_http($url, $headers = array(), $return = "body", $port = 80, $timeout = 30, &$errstr = "") {
+    $url = parse_url($url);
+    // add header
+    $head = "";
+    foreach($headers as $key => $val) $head .= $key.":".$val."\r\n";
+    // send
+    $handle = @fsockopen($url['host'], $port, $errno, $errstr, $timeout);
+    if(!$handle) return false;
+    @fwrite($handle, "GET ".$url['path']." HTTP/1.0\r\nHost: ".$url['host']."\r\n".$head."Connection: Close\r\n\r\n");
+    // fetch head
+    $header = "";
+    while(!@feof($handle)) {
+        if(fgets($handle, 4096) == "\r\n") break;
+        else $header .= fgets($handle, 4096);
+    }
+    // fetch body
+    $body = "";
+    while(!@feof($handle)) $body .= fgets($handle, 4096);
+    if($return == "body")        return $body;
+    else if($return == "header") return $header;
+    else if($return == "all")    return $header."\r\n".$body;
+    return true;
+} 
+
+function generateVideo($id, $ref="", $type="", $distrib = "", $onlyMobile = false){
+	$replace = array(
+		'search' => array( '#ID#', '#REF#', '#TYPE#', '#DISTRIB#'),
+		'replace' => array( $id, $ref, $type, $distrib)
+	);
+	$url = str_replace($replace['search'], $replace['replace'], URL_VIDEO_GENERATION);
+	echo $url;
+	if($onlyMobile){
+		$url .= "&forceprofiles=true&profiles=mobile";
+	}
+	$response = file_get_contents($url);
+	$xml = simplexml_load_string($response);
+	return ($xml->VideoResultCode=='0');
+}
+
+function send_email($from,$to,$subject,$html,$brut){
+	$email = new PHPMailer();
+	if($html!=""){
+		$email->IsHTML(true);
+		//$email->$CharSet("iso-8859-1");
+		//$email->$CharSet("shift-jis");
+	}
+	foreach($to as $address){ $email->AddAddress($address);}
+	$email->From     = $from['address'];
+ 	$email->FromName = $from['name'];
+ 	$email->Subject  = $subject;
+ 	if($html!=""){
+  		$email->Body     = $html;
+		$email->AltBody  = $brut;
+	}else{
+		$email->Body     = $brut;
+	}
+	$email->Host     = SMTP_MAIL;
+ 	$email->IsSMTP();
+ 	return $email->Send();
+}
+
+function clean_url($url) {
+    $tab_url     = explode('?', $url);
+    $final_url   = $tab_url[0];
+    $first_param = true;
+    $tab_params  = explode('&', $tab_url[1]);
+    $len         = count($tab_params);
+    for($i=0; $i<$len; $i++) {
+        list($param, $value) = explode('=', $tab_params[$i]);
+        if($value != '') {
+            if($first_param) {
+                $first_param = false;
+                $final_url  .= '?'.$param.'='.$value;
+            } else {
+                $final_url  .= '&'.$param.'='.$value;
+            }
+        }
+    }
+    return $final_url;
+}
+?>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<movie service="craftsman-1.0">
+	<body>
+		<stack>
+			<sequence>
+				<!-- DPE/GES START -->
+				<stack>
+					<overlay duration="7"  top="0" left="0" height="1" width="1" >
+						<image color="#FFFFFF" />
+					</overlay>
+					<!-- DPE START -->
+					<stack>
+						<overlay top="0.039" height="0.002" left="-0.05" width="0.05" duration="7">
+							<image color="#000000" />
+						</overlay>
+						<overlay top="0" height="0.08" left="0" width="0.09" duration="..">
+							<image filename="http://dev.video.previsite.net/images/template/DEFAULT/dpe_marker.png" />
+						</overlay>
+						<text type="zone" vector="true" top="-0.012" height="0.1" left="-0.017" width="0.15" align="center,center" duration=".." weight="bold" fontcolor="#FFFFFF" ><![CDATA[788]]></text>
+						<animator type="custom">
+							<key pos="1,-1.267,0" time="0"/>
+						</animator>
+					</stack>
+					<!-- DPE END -->
+					<!-- GES START -->
+					<stack>
+						<overlay top="0.039" height="0.002" left="-0.25" width="0.25" duration="7">
+							<image color="#000000" />
+						</overlay>
+						<overlay top="0" height="0.08" left="0" width="0.09" duration="..">
+							<image filename="http://dev.video.previsite.net/images/template/DEFAULT/dpe_marker.png" />
+						</overlay>
+						<text type="zone" vector="true" top="-0.012" height="0.1" left="-0.017" width="0.15" align="center,center" duration=".." weight="bold" fontcolor="#FFFFFF" ><![CDATA[800]]></text>
+						<animator type="custom">
+							<key pos="3.05,-1.267,0" time="0"/>
+						</animator>
+					</stack>
+					<!-- GES END -->
+					<overlay duration=".."  top="0" left="0" height="1" width="1" >
+						<image filename="http://dev.video.previsite.net/images/template/DEFAULT/dpe_bg_mobile.png" />
+					</overlay>
+ 					<text type="legend" height="0.15"><![CDATA[DPE / GES]]></text>
+				</stack>
+ 			</sequence>
+
+		</stack>	</body>
+</movie>

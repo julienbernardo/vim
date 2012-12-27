@@ -1,0 +1,151 @@
+<?php
+function video_blocked($scriptName, $workPath, $config, $debug = false){
+	global $db_data;
+	global $_REQUEST;
+
+	$logs_global = array('DONE' => 0, 'FAILED' => '0', 'TOTAL' => '0');
+	$site_is_block = array(
+		'YOUTUBE' => array(
+			'too_many_recent_calls',
+			'Error writing request to server',
+			'CAPTCHA challenge issued by server',
+			'Service Unavailable',
+			'Authentication with Google failed',
+			'disabled_in_maintenance_mode',
+		),
+		'DAILYMOTION' => array(
+			'Platform abuse suspected \(account block for 24h\)',
+			'You reached your upload rate limit',
+			'403. You reached your upload rate limit, please slow down. \(access_forbidden\)', 
+			'Login failed',
+		),
+	);
+	//debug
+	$isTest = ($_REQUEST['test'] != "");
+	if($isTest || $debug ){
+		$debug =true;
+		$config['DNS'] = array($config['DNS'][0]);
+		//$config['PARTNERS'] = array('59C4948B-DB6D-FDAF-E15D-CD67B8347126');
+		$debug_id = $_REQUEST['id'];
+	}
+	
+	//get blocked diffusions
+	$logs = array();
+	$site_authorized = array('DAILYMOTION', 'YOUTUBE');
+	for($k=0; $k < count($config['DNS']) && count($site_authorized) > 0; $k++){
+		sql_disconnect("video", $scriptName, $debug);
+		$dsn = preg_replace('/.+@\d+.\d+.\d+.([^\/]+).+/i', '$1', $config['DNS'][$k]);
+		$db_data['pool']['video'] = array('STATUS'=>'normal','NAME'=>'video','DSN'=> $config['DNS'][$k]); 
+		//on récupère les vidéos qui sont en attente de diffusions ou en erreur
+		// 0 -> attente
+		// 2 -> video not found
+		// 3 -> download video issue
+		// 4 -> upload video (problème lors de la diffusion sur le site)
+		// 6 -> missing login information
+		// 14 -> tour infos error //Mauvaise mise en prod sur video
+		//$sql = "SELECT VIDEO.ID_VIDEO, VISITE.ID_VISITE, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, SITE_DIFFUSION, TITLE_DIFFUSION, TYPE_VIDEO, ID_STATUT_DIFFUSION 
+		$sql = "SELECT VIDEO.ID_VIDEO, VISITE.ID_VISITE, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, SITE_DIFFUSION, TYPE_VIDEO, ID_STATUT_DIFFUSION 
+				FROM VIDEO_DIFFUSION 
+				INNER JOIN VIDEO ON VIDEO.ID_VIDEO=VIDEO_DIFFUSION.ID_VIDEO 
+				INNER JOIN VISITE ON VISITE.ID_VISITE=VIDEO.ID_VISITE 
+				WHERE ((ID_STATUT_DIFFUSION in (-1,0) AND RESULT_CODE_DIFFUSION IN (0, 2, 3, 4, 6, 14)) OR ID_STATUT_DIFFUSION=1) AND DATE_MODIFICATION_DIFFUSION > '2012-09-01 12:00:00' and login_diffusion != ''
+				AND ID_STATUT_VIDEO > 0 AND DATE_MODIFICATION_VIDEO < '".date('Y-m-d H:i:s', mktime()-2*60*60)."' AND ID_CRON IN (0,2)
+				AND SITE_DIFFUSION IN ('".implode("', '", $site_authorized)."')
+				".(is_guid($debug_id) ? " AND VISITE.ID_VISITE='".$debug_id."'" : "")."
+				ORDER BY SITE_DIFFUSION, LOGIN_DIFFUSION, TYPE_VIDEO";
+		//video_blocked_log('[DEBUG] '.$sql, $scriptName, $isTest);
+		$rows = video_blocked_sqlQuery($sql, $scriptName, $debug);
+		//sql_disconnect("video", $scriptName, $debug);
+		if(count($rows) > 0){
+			video_blocked_log('---------------------------------------', $scriptName, $isTest);
+			video_blocked_log("[".$dsn."][WAITING][VIDEO][START] ".count($rows)." Diffusions waiting", $scriptName, $debug);
+			for($i=0, $last_blocked_login = "", $nb_done= "", $last_checkpoint = ""; $i < count($rows); $i++){
+				$url_check = str_replace( '#ID#', $rows[$i]['ID_VIDEO'], URL_VIDEO_CRON_CHECK);
+				$content = file_get_contents($url_check);
+				if($content == 'true') continue;
+				if(!is_array($logs[$rows[$i]['SITE_DIFFUSION']])){
+					$logs[$rows[$i]['SITE_DIFFUSION']] = array( 'DONE' => 0, 'TOTAL' => 0, 'WAITING' => 0);
+				}
+				if(($last_checkpoint+count($rows)/5) < ++$nb_done){
+					video_blocked_log(round(($nb_done/count($rows))*100).'% done', $scriptName, $isTest);
+					$last_checkpoint = $nb_done;
+				}
+				if($last_blocked_login == $rows[$i]['LOGIN_DIFFUSION']){
+					$logs[$rows[$i]['SITE_DIFFUSION']]['WAITING']++;
+					$logs[$rows[$i]['SITE_DIFFUSION']]['TOTAL']++;
+					continue;
+				}
+				$replace = array(
+					'search' => array('#TOUR#', '#LOGIN#', '#PASSWORD#', '#SITE#', '#TITLE#', '#TYPE#'),
+					'replace' => array( urlencode($rows[$i]['ID_VISITE']), urlencode($rows[$i]['LOGIN_DIFFUSION']), urlencode($rows[$i]['PASSWORD_DIFFUSION']), urlencode($rows[$i]['SITE_DIFFUSION']), urlencode($rows[$i]['TITLE_DIFFUSION']), urlencode($rows[$i]['TYPE_VIDEO'])),
+				);
+				$url_base = str_replace( $replace['search'], $replace['replace'], URL_PUBLISH_VIDEO);
+				if($rows[$i]['ID_STATUT_DIFFUSION'] > 0) $url_base = str_replace('force=&', 'force=true&', $url_base);
+				if($isTest){
+					echo $url_base." <br />";
+					$response = '<?xml version="1.0" encoding="utf-8"?><VideoDiffusionRequestResult Version="1.0"><VideoDiffusionResultCode>0</VideoDiffusionResultCode><VideoDiffusionResultText>OK</VideoDiffusionResultText></VideoDiffusionRequestResult>';
+				}else{
+					$response = file_get_contents($url_base);
+				}
+				$xml = simplexml_load_string($response);
+				if($xml->VideoDiffusionResultCode != 0){ 
+					video_blocked_log('[PUBLICATION] tour:'.$rows[$i]['ID_VISITE'].' ('.$url_base.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})', $scriptName, $isTest);
+					if($xml->VideoDiffusionResultCode == 4){
+						$isBlocked = false;
+						for($j =0;$j < count($site_is_block[$rows[$i]['SITE_DIFFUSION']]); $j++){
+							$isBlocked |= (preg_match('/'.$site_is_block[$rows[$i]['SITE_DIFFUSION']][$j].'/i', $xml->VideoDiffusionResultDescription.'') > 0);
+						}
+						if($isBlocked){ 
+							$last_blocked_login = $rows[$i]['LOGIN_DIFFUSION'];
+							video_blocked_log('[DIFFUSION][BLOCKED] '.$last_blocked_login, $scriptName, $isTest);
+						}
+					}
+					$logs[$rows[$i]['SITE_DIFFUSION']]['FAILED']++;
+				}else{ 
+					$logs[$rows[$i]['SITE_DIFFUSION']]['DONE']++;
+					if($debug) video_blocked_log('[PUBLICATION] tour:'.$rows[$i]['ID_VISITE'].' ('.$url_base.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})', $scriptName, $isTest);
+				}
+				$logs[$rows[$i]['SITE_DIFFUSION']]['TOTAL']++;
+			}
+			video_blocked_log("[".$dsn."][WAITING][VIDEO][END] ", $scriptName, $debug);
+		}
+	}
+	if(count($logs) > 0){
+		foreach ($logs as $site=>$log) {
+			video_blocked_log('-----------------', $scriptName, $isTest);
+			video_blocked_log('[RESUME][WAITING] '.$site.':'.$log['DONE'].'/'.$log['TOTAL'].' tours diffused and '.$log['WAITING'].' waiting', $scriptName, $isTest);
+			$logs_global['WAITING'] += $log['TOTAL'];
+			$logs_global['WAITING_DONE'] += $log['WAITING'];
+			$logs_global['TOTAL'] += $log['TOTAL'];
+			$logs_global['DONE'] += $log['DONE'];
+			$logs_global['FAILED'] += $log['FAILED'];
+			video_blocked_log('---------------------------------------', $scriptName, $isTest);
+		}
+	}
+ 
+	return $logs_global;
+}
+
+function video_blocked_sqlQuery($sql, $script_name, $debug, $r=0){
+	global $_REQUEST;
+	$return = array();
+	$result = sql_query( $sql, 'video', preg_replace('/^export_/i', '',$script_name), $debug, "export", $r, ($_REQUEST['test'] != "" ? 1000 : 0));
+	if($r == 0){
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+	}else{ $return = $result;}
+	return $return;	
+}
+
+function video_blocked_sqlGetOne($sql, $script_name, $debug){
+	$return = video_sqlQuery($sql, $script_name, $debug, 1);
+	return $return;	
+}
+
+function video_blocked_log($text, $scriptName, $isTest = false){
+	if($isTest){
+		echo $text."<br />";
+	}else{
+		import_log($text, $scriptName, $isTest);
+	}
+}
+?>

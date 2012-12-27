@@ -1,0 +1,216 @@
+<?php
+
+function json_get_options($tab) {
+	$tab_final = array();
+	foreach($tab as $opt => $val) {
+		$tab_final[strtolower($opt)] = $val;
+	}
+	return json_encode($tab_final);
+}
+
+function json_operation_result($success, $tab_mess = array()) {
+	$success = !empty($success) ? 'true' : 'false';
+	$errorMess = !empty($tab_mess) ? $tab_mess[0] : '';
+	$result = array(
+		'success' => $success,
+		'errorMess' => $errorMess
+	);
+	return json_encode($result);
+}
+
+function json_get_tour_images($tab_images) {
+	$tab_res = array();
+	$nb = count($tab_images);
+	$xml = "<ArrayOfImage>\n";
+	for($i=0; $i<$nb; $i++) {
+		$url_image = str_replace(
+			array('%PATH%', '%SIZE%', '%ID%', '%EXT%'),
+			array('still', SIZE_STILL, $tab_images[$i]['ID_IMAGE'], 'jpg'),
+			URL_MEDIA
+		);
+		$tab_res[] = array(
+			'name' => $tab_images[$i]['NOM_IMAGE'],
+			'language' => $tab_images[$i]['ID_LANGUE'],
+			'url' => $url_image
+		);
+	}
+	return json_encode($tab_res);
+}
+
+function json_get_user($tab_user) {
+	$photo_agent = $logo_company = '';
+
+	if(!empty($tab_user)) {
+		$tab_pattern = array('%PATH%', '%SIZE%', '%ID%', '%EXT%');
+		if(is_guid($tab_user['LOGO_USER'])) {
+			$tab_replace = array('agent', '', $tab_user['LOGO_USER'], $tab_user['LOGO_USER_EXT']);
+			$photo_agent = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+		if(is_guid($tab_user['LOGO_COMPANY'])) {
+			$tab_replace = array('agency', '', $tab_user['LOGO_COMPANY'], $tab_user['LOGO_COMPANY_EXT']);
+			$logo_company = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+	}
+	$latitude = $tab_user['LATITUDE'];
+	$longitude = $tab_user['LONGITUDE'];
+	if(!is_numeric($latitude) || !is_numeric($longitude)) {
+		$latitude = $longitude = '';
+	}
+
+	$tab_res = array(
+		'userID' => $tab_user['ID_UTILISATEUR'],
+		'userCode' => $tab_user['PREFIXE_PORTAIL'],
+		'userFirstName' => $tab_user['PRENOM_UTILISATEUR'],
+		'userLastName' => $tab_user['NOM_UTILISATEUR'],
+		'userPhone' => $tab_user['TELEPHONE_UTILISATEUR'],
+		'userEmail' => $tab_user['EMAIL_UTILISATEUR'],
+		'companyName' => $tab_user['NOM_SOCIETE'],
+		'companyWebSite' => $tab_user['SITEWEB_SOCIETE'],
+		'companyAddress' => $tab_user['ADRESSE'],
+		'companyCity' => $tab_user['VILLE'],
+		'companyZip' => $tab_user['CODE_POSTAL'],
+		'companyState' => $tab_user['ETAT'],
+		'companyCountry' => $tab_user['ID_PAYS'],
+		'companyLatitude' => $latitude,
+		'companyLongitude' => $longitude,
+		'language' => $tab_user['ID_LANGUE'],
+		'photoAgent' => $photo_agent,
+		'logoCompany' => $logo_company
+	);
+	return json_encode($tab_res);
+}
+
+
+function json_get_users($tab_users) {
+	$tab_res = array();
+	$nb = count($tab_users);
+
+	$tab_pattern = array('%PATH%', '%SIZE%', '%ID%', '%EXT%');
+
+	for($i=0; $i<$nb; $i++) {
+		$xml .= "<User>\n";
+		$photo_agent = $logo_company = '';
+		if(is_guid($tab_user['LOGO_USER'])) {
+			$tab_replace = array('agent', '', $tab_users[$i]['LOGO_USER'], $tab_users[$i]['LOGO_USER_EXT']);
+			$photo_agent = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+		if(is_guid($tab_users[$i]['LOGO_COMPANY'])) {
+			$tab_replace = array('agency', '', $tab_users[$i]['LOGO_COMPANY'], $tab_users[$i]['LOGO_COMPANY_EXT']);
+			$logo_company = str_replace($tab_pattern, $tab_replace, URL_MEDIA_FULL);
+		}
+
+		$latitude = $tab_users[$i]['LATITUDE'];
+		$longitude = $tab_users[$i]['LONGITUDE'];
+		if(!is_numeric($latitude) || !is_numeric($longitude)) {
+			$latitude = $longitude = '';
+		}
+
+		$tab_res[] = array(
+			'userID' => $tab_users[$i]['ID_UTILISATEUR'],
+			'userCode' => $tab_users[$i]['PREFIXE_PORTAIL'],
+			'userFirstName' => $tab_users[$i]['PRENOM_UTILISATEUR'],
+			'userLastName' => $tab_users[$i]['NOM_UTILISATEUR'],
+			'userPhone' => $tab_users[$i]['TELEPHONE_UTILISATEUR'],
+			'userEmail' => $tab_users[$i]['EMAIL_UTILISATEUR'],
+			'companyName' => $tab_users[$i]['NOM_SOCIETE'],
+			'companyWebSite' => $tab_users[$i]['SITEWEB_SOCIETE'],
+			'companyAddress' => $tab_users[$i]['ADRESSE'],
+			'companyCity' => $tab_users[$i]['VILLE'],
+			'companyZip' => $tab_users[$i]['CODE_POSTAL'],
+			'companyState' => $tab_users[$i]['ETAT'],
+			'companyCountry' => $tab_users[$i]['ID_PAYS'],
+			'companyLatitude' => $latitude,
+			'companyLongitude' => $longitude,
+			'language' => $tab_users[$i]['ID_LANGUE'],
+			'photoAgent' => $photo_agent,
+			'logoCompany' => $logo_company
+		);
+	}
+
+	return json_encode($tab_res);
+}
+
+
+function json_get_tour($tab_tour) {
+	$url_tour = '';
+	if(!empty($tab_tour)) {
+		$url_tour = str_replace(
+			array('#ID#', '#PORTAL#', '#REF#', '#PUB#'), 
+			array($tab_tour['ID_VISITE'], urlencode($tab_tour['CODE_PORTAIL']), urlencode($tab_tour['REF_PORTAIL']), $tab_tour['ID_DIFFUSION_PORTAIL']), 
+			$tab_tour['URL_VIEWER']
+		);
+	}
+	$tab_res = array(
+		'images' => $tab_tour['NB_ACTIVE_IMAGE'],
+		'reference' => $tab_tour['REF_PORTAIL'],
+		'created' => $tab_tour['DATE_CREATION_VISITE'],
+		'updated' => $tab_tour['DATE_MODIFICATION_VISITE'],
+		'url' => $url_tour
+	);
+	return json_encode($tab_res);
+}
+
+
+function json_get_listing($tab_tour) {
+	$lock = (int)$tab_tour['VERROU_ANNONCE'];
+	// Modif 2010-12-03 : Si verrou complet et 1ere remontee, modifier annonce
+	if($tab_tour['NB_REMONTEES']==0 && $lock==2) $lock = 1;
+	$tab_res = array(
+		'tourID' => $tab_tour['ID_VISITE'],
+		'userID' => $tab_tour['ID_UTILISATEUR'],
+		'lock' => $lock,
+		'lock_tts' => (int)$tab_tour['LOCK_TTS'],
+		'image' => (int)$tab_tour['NB_ACTIVE_IMAGE'],
+		'desc' => $tab_tour['DESCRIPTION']
+	);
+	return json_encode($tab_res);
+}
+
+function json_get_listings($tab_tour) {
+	return json_encode($tab_tour);
+}
+
+function json_get_tour_info($tab_tour) {
+	$tab_res = array(
+		'tourID' => $tab_tour['ID_VISITE'],
+		'userID' => $tab_tour['ID_VISITE'],
+		'created' => $tab_tour['DATE_CREATION_VISITE'],
+		'updated' => $tab_tour['DATE_MODIFICATION_VISITE']
+	);
+	return json_encode($tab_res);
+}
+
+function json_get_tours($tab_tours) {
+	$tab_res = array();
+	$nb = count($tab_tours);
+	for($i=0; $i<$nb; $i++) {
+		$url_tour = str_replace(
+			array('#ID#', '#PORTAL#', '#REF#', '#PUB#'), 
+			array($tab_tours[$i]['ID_VISITE'], urlencode($tab_tours[$i]['CODE_PORTAIL']), urlencode($tab_tours[$i]['REF_PORTAIL']), $tab_tours[$i]['ID_DIFFUSION_PORTAIL']), 
+			$tab_tours[$i]['URL_VIEWER']
+		);
+
+		$tab_res[] = array(
+			'images' => $tab_tours[$i]['NB_ACTIVE_IMAGE'],
+			'reference' => $tab_tours[$i]['REF_PORTAIL'],
+			'created' => $tab_tours[$i]['DATE_CREATION_VISITE'],
+			'updated' => $tab_tours[$i]['DATE_MODIFICATION_VISITE'],
+			'url' => $url_tour
+		);
+	}
+
+	return json_encode($tab_res);
+}
+
+function json_get_user_light($tab_user) {
+	$tab_res = array(
+		'userID' => $tab_user['ID_UTILISATEUR'],
+		'distribID' => $tab_user['ID_DISTRIBUTEUR']
+	);
+	return json_encode($tab_res);
+}
+
+function json_get_tour_publication($tab_pub) {
+	return json_encode($tab_pub);
+}
+?>

@@ -1,0 +1,744 @@
+<?php
+require_once 'DB.php';
+require_once 'HTTP/Request.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once '/var/www/cron.previsite.net/include/global.php';
+require_once '/var/www/cron.previsite.net/include/fonctions.php';
+//require_once '/var/www/cron.previsite.net/include/fonction.db.php';
+require_once '/var/www/cron.previsite.net/include/fonction.cron.php';
+//require_once '/var/www/cron.previsite.net/include/fonction.import.partner.php';
+require_once '/var/www/cron.previsite.net/include/fonction.ftp.php';
+require_once '/var/www/cron.previsite.net/include/storage.php';
+
+//ini_set('memory_limit', -1);
+//ini_set('max_execution_time', '0');
+
+DEFINE('CRON_GENERATION_LIMIT', 5);
+DEFINE('URL_SOUND_GENERATE_TEXT', URL_SOUND_GENERATE.'&text=#TEXT#');
+DEFINE('URL_SOUND_PRIORITY', 'http://gateway.previsite.net/tts.php?todo=priority&ids=#ID#&noredir=true');
+DEFINE('URL_GENERATION_VIDEO',	'http://video.previsite.net/generate.php?id=#ID#&type=#TYPE#&ref=#REF#&distrib=#DISTRIB#&mode=auto');
+DEFINE('URL_PUBLISH_VIDEO', 'http://video.previsite.net/diffusion.php?debug=&force=&tour=#TOUR#&login=#LOGIN#&mode=auto&notification=http%3A%2F%2Fapi.previsite.com%2Fpublication%2Fnotification.php&password=#PASSWORD#&site=#SITE#&title=#TITLE#&todo=diffusion&type=#TYPE#');
+DEFINE('URL_UNPUBLISH_VIDEO', 'http://video.previsite.net/diffusion.php?debug=&force=true&tour=#TOUR#&login=#LOGIN#&mode=auto&notification=http%3A%2F%2Fapi.previsite.com%2Fpublication%2Fnotification.php&password=#PASSWORD#&site=#SITE#&title=&todo=delete&type=#TYPE#');
+DEFINE('URL_DIFFUSION', 'http://video.previsite.net/publication.php?id=#ID#&site=#SITE#&type=#TYPE#&ref=#REF#&notification=http%3A%2F%2Fapi.previsite.com%2Fpublication%2Fnotification.php&login=#LOGIN#&password=#PASSWORD#&date=#DATE#&title=#TITLE#&distrib=#DISTRIB#&mode=auto');
+DEFINE('URL_REPROCESS_VIDEO',	'http://video.previsite.net/reprocess.php?ids=#ID#&distrib=#DISTRIB#');
+DEFINE('URL_EDIT_VIDEO', 'http://video.previsite.net/diffusion.php?debug=&force=&tour=#TOUR#&login=#LOGIN#&mode=auto&notification=http%3A%2F%2Fapi.previsite.com%2Fpublication%2Fnotification.php&password=#PASSWORD#&site=#SITE#&title=#TITLE#&todo=edit&type=#TYPE#&id=#ID#&distrib=#DISTRIB#');
+DEFINE('URL_CHECK_VIDEO', 'http://video.previsite.net/diffusion.php?debug=&force=&tour=#TOUR#&login=#LOGIN#&mode=auto&notification=&password=#PASSWORD#&site=#SITE#&title=#TITLE#&todo=check&type=#TYPE#');
+
+DEFINE('DEBUG', 			false); //limite le script à la première visite et affiche l'id de la visite
+DEFINE('ONLY_COUNT', 		false); // compte le nombre de résultat trouvé
+DEFINE('CHECK_VIDEO',	 	false); // regarde le statut la vidéo
+DEFINE('CHECK_CONTINUE_VIDEO_ACTIVE', false); //passe si la vidéo est active
+DEFINE('PUBLISH_VIDEO', 	false); // publication vidéo sur video en direct (pas de génération) 
+DEFINE('UNPUBLISH_VIDEO', 	false); //unpublication sur video 
+DEFINE('NO_NOTIFICATION',	false); // retire la notification de vidéo vers software
+
+DEFINE('TTS_GENERATE', 		false);  //générate tts
+DEFINE('TTS_PRIORITY', 		false); // passe en priorité les tts des visites
+
+DEFINE('PUBLISH_ON_DEV',	false); //se servir du server de dev
+DEFINE('PUBLISH', 			false); // publication vidéo sur software_publish
+DEFINE('UNPUBLISH', 		false);// unpublication vidéo sur software_unpublish
+
+DEFINE('REDIFFUSE',			false); // rediffuse la vidéo (regénération)
+DEFINE('REPROCESS', 		false); // marque la vidéo comme à regénérée
+DEFINE('EDIT_VIDEO', 		true); //modifie les données de la diffusion (titre, description, tags)
+DEFINE('NO_PLAYLIST',		true); // no playlist diffusion
+
+DEFINE('ADD_IN_CRON',		false); //ajout dans la liste d'attente cron
+DEFINE('DELETE_IN_CRON',	false);//delete la video de la liste d'attente
+
+DEFINE('UPDATE_DIFFUSION_TITLE', false); //titre diffusion = nom visite
+
+DEFINE('DELAY_BETWEEN_DIFFUSION', 0); //delai entre deux diffusions
+
+if(!checkScriptAlone()){ exit;}
+
+$date_reference = date('Y-m-d H:i:s');
+//fix immovente
+$db_data['name'] = 'video';
+$obj_conn['dsn'] = DSN_VIDEO;
+//$db_data['name'] = 'REALESTATE';
+//$obj_conn['dsn'] = DSN_SOFTWARE_EXPLORIMMO;
+$db_list = array(	
+	//'10'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.10/PREVISITE_VIDEO?unicode=yes', 
+	//'11'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.11/PREVISITE_REALESTATE?unicode=yes', 
+	'17'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_SOFTWARE?unicode=yes', 
+	//'19'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.19/PREVISITE_SOFTWARE?unicode=yes', 
+	//'21'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.21/PREVISITE_SOFTWARE?unicode=yes', 
+	//'211'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.211/PREVISITE_SOFTWARE?unicode=yes', 
+	//'213'=> 'odbtp(mssql)://previsite_account:travel001@10.0.4.213/PREVISITE_SOFTWARE?unicode=yes', 
+);
+
+//Mettre la correspondance entre portail vidéo (youtube,dailymotion) et software id_portail
+$partners = array(
+	'YOUTUBE' => '59C4948B-DB6D-FDAF-E15D-CD67B8347126', 
+	'YOUTUBE_CORP' => '1876B6F8-6894-1335-44C5-D984D5C8E04E', 
+	'DAILYMOTION'=>'38429EA1-8BAD-1795-807E-B46BCF131567', 
+	'DAILYMOTION_CORP'=>'812F1D71-043D-282E-640E-2B3F66072949'
+);
+function convertTourToShortCode($data){
+	if(preg_match('/^([0-9A-F]{7})/i', $data, $result) > 0){
+		$replace = array(
+		 	'search' => explode(',','Q,R,S,T,U,V,W,X,Y,Z'),
+		 	'replace' => explode(',','0,1,2,3,4,5,6,7,8,9')
+		 );
+		 $data = 'P'.str_replace($replace['replace'], $replace['search'], $result[1]);
+	}
+	return $data;
+}
+
+event_log("---------START--------");
+
+if(DEBUG) event_log("DEBUG");
+if(ONLY_COUNT) event_log("ONLY_COUNT");
+if(CHECK_VIDEO) event_log("CHECK_VIDEO");
+if(CHECK_CONTINUE_VIDEO_ACTIVE) event_log("CHECK_CONTINUE_VIDEO_ACTIVE");
+if(PUBLISH_VIDEO) event_log("PUBLISH_VIDEO");
+if(UNPUBLISH_VIDEO) event_log("UNPUBLISH_VIDEO");
+if(NO_NOTIFICATION) event_log("NO_NOTIFICATION");
+if(NO_PLAYLIST) event_log("NO_PLAYLIST");
+if(TTS_GENERATE) event_log("TTS_GENERATE");
+if(TTS_PRIORITY) event_log("TTS_PRIORITY");
+if(PUBLISH_ON_DEV) event_log("PUBLISH_ON_DEV");
+if(PUBLISH) event_log("PUBLISH");
+if(UNPUBLISH) event_log("UNPUBLISH");
+if(REDIFFUSE) event_log("REDIFFUSE");
+if(REPROCESS) event_log("REPROCESS");
+if(EDIT_VIDEO) event_log("EDIT_VIDEO");
+if(ADD_IN_CRON) event_log("ADD_IN_CRON");
+if(DELETE_IN_CRON) event_log("DELETE_IN_CRON");
+if(UPDATE_DIFFUSION_TITLE) event_log("UPDATE_DIFFUSION_TITLE");
+
+if(!checkScriptAlone()){ exit;}
+$list_id = array();
+foreach($db_list as $db_name=>$dsn){
+	//db_close();
+	event_log("START DB: ".$db_name."-----------------");
+	$db = array('name' => $db_name, 'dsn'=>$dsn);
+
+	//diffusion on video
+	$sql = "select NOM_UTILISATEUR, ID_DISTRIBUTEUR, VIDEO.ID_VIDEO, TYPE_VIDEO, LOGIN_DIFFUSION, PASSWORD_DIFFUSION, URL_NOTIFICATION_DIFFUSION, SITE_DIFFUSION, TITLE_DIFFUSION, VISITE.ID_VISITE, TYPE_VIDEO, VISITE.ID_LANGUE, REF_VOICE, ID_STATUT_VISITE, DESCRIPTION, DESCRIPTION_VIDEO, NOM_VISITE
+from video_diffusion 
+inner join video on video.id_video=video_diffusion.id_Video
+inner join visite on visite.id_visite=video.id_visite
+inner join utilisateur on utilisateur.id_utilisateur=visite.id_utilisateur
+LEFT JOIN VISITE_TEXTE VT ON Visite.ID_VISITE=VT.ID_VISITE AND Visite.ID_LANGUE COLLATE French_CI_AS=VT.ID_LANGUE COLLATE French_CI_AS 
+";
+	//$sql .= "where utilisateur.id_utilisateur='875BA1CB-42D6-C7A5-27AD-B3FE734A9992' and id_statut_diffusion > 0 and date_modification_diffusion > '2012-10-31 00:00:00' and site_diffusion='DAILYMOTION'";
+	//$sql .= " where utilisateur.id_utilisateur='C5200CF7-7647-73E9-AD2F-CD3EF8885A98' and id_statut_diffusion > 0 and id_statut_visite < 0 order by date_modification_diffusion asc";
+	$sql .= "where  type_video='TV_PARISATTITUDE' and site_diffusion='YOUTUBE' and id_statut_diffusion='2' and date_modification_diffusion between '2012-10-16 19:30:00' and '2012-10-30 04:16:43.303' and login_diffusion='parisattitude.fr@gmail.com' order by date_modification_diffusion desc";
+/*	$sql = "SELECT 'YOUTUBE_CORP' SITE_DIFFUSION, VISITE.ID_VISITE, ID_UTILISATEUR, VISITE.ID_VISITE ID_VIDEO, NOM_VISITE TITLE_DIFFUSION, ID_STATUT_VISITE 
+		from visite
+		LEFT JOIN VISITE_TEXTE VT ON Visite.ID_VISITE=VT.ID_VISITE AND Visite.ID_LANGUE COLLATE French_CI_AS=VT.ID_LANGUE COLLATE French_CI_AS
+		inner join visite_tpl_eu on visite_tpl_eu.id_visite=visite.id_visite
+		left outer join video on video.id_visite= visite.id_visite
+		where id_statut_visite > 0 and nb_active_image > 0
+		and id_exclusivite=1
+		and id_video is null
+		order by date_modification_visite desc";
+ */
+
+
+	$list_id = array();
+	$result = sql_query($sql , $db);	
+	
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+		//$forceTitle =	str_replace(', Ltd.',' Ltd',$r['NOM_UTILISATEUR']).': '.$r['ADRESSE'].' '.($tour['VILLE'] !='' ? $tour['VILLE'].' ':'').$tour['REF_ETAT'].' '.$tour['CODE_POSTAL'] 
+		//$r['TITLE_DIFFUSION'] = str_replace(', Ltd.',' Ltd',$r['NOM_UTILISATEUR']).': '.$r['ADRESSE'].' '.$r['VILLE'].' '.$r['REF_ETAT'].' '.$r['CODE_POSTAL']; // correct US TITLE
+		$list_id[] = $r;
+	}
+	sql_disconnect($db);
+	/*echo "<pre>";
+print_r($list_id);die();*/
+	event_log(count($list_id)." vids found");
+	if(ONLY_COUNT) continue;
+	if(ADD_IN_CRON === true || DELETE_IN_CRON === true){
+		db_close();
+		$db_data['name'] = '10'; 
+		$obj_conn['dsn'] = 'odbtp(mssql)://previsite_account:travel001@10.0.4.10/PREVISITE_VIDEO?unicode=yes';
+	}
+	$logs = array('publish' => array(), 'unpublish' => array(), 'publish_video' => array(), 'unpublish_video' => array(), 'edit' => array(), 'reprocess' => array(), 'generation' => array(), 'add_in_cron' => array(), 'delete_in_cron' => array());
+	$nb_done = 0;
+	$last_checkpoint = 0;
+//	foreach($list_id as $r){
+	for($i=0; $i < count($list_id); $i++){
+		$r = $list_id[$i];
+		if($r['TITLE_DIFFUSION'] == "" || UPDATE_DIFFUSION_TITLE){ 
+			$r['TITLE_DIFFUSION'] = $r['NOM_VISITE'];
+		}
+		if(DEBUG){ event_log('[DEBUG] Tour:'.$r['ID_VISITE']. "(".$r['TITLE_DIFFUSION'].")");}
+					
+		if(($last_checkpoint+count($list_id)/5) < ++$nb_done){
+			event_log(round(($nb_done/count($list_id))*100).'% done');
+			$last_checkpoint = $nb_done;
+		}
+		if(ADD_IN_CRON === true){
+			$sql = "SELECT ID_VIDEO, ID_STATUT_CRON FROM VIDEO_CRON WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+			$result = db_query($sql, $db_data['name']);
+			$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+			if(!isset($row['ID_STATUT_CRON']) || $row['ID_STATUT_CRON']  < 0){
+				if(!is_guid($row['ID_VIDEO'])){
+					$sql = "INSERT INTO VIDEO_CRON(ID_VIDEO,ID_VISITE,ID_DISTRIBUTEUR,ID_STATUT_CRON,DATE_DERNIER_CRON,DATE_MODIFICATION_CRON,DATE_CREATION_CRON) values('".$r['ID_VIDEO']."','".$r['ID_VISITE']."', '".$r['ID_DISTRIBUTEUR']."', '0', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."')";
+					$logs['add_in_cron']['insert in cron']++;
+				}else{
+					$sql = "UPDATE VIDEO_CRON SET ID_STATUT_CRON='0' WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+					$logs['add_in_cron']['activate']++;
+				}
+				db_query($sql, $db_data['name']);
+			}else{ $logs['add_in_cron']['already in cron']++;}
+			if(DEBUG){ break;}
+			continue;
+		}else if(DELETE_IN_CRON === true){
+			$sql = "SELECT ID_VIDEO, ID_STATUT_CRON FROM VIDEO_CRON WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+			$result = db_query($sql, $db_data['name']);
+			$row = $result->fetchRow(DB_FETCHMODE_ASSOC);
+			if(isset($row['ID_STATUT_CRON']) && $row['ID_STATUT_CRON'] == 0){
+				$sql = "UPDATE VIDEO_CRON SET ID_STATUT_CRON='-3', date_modification_cron='".date('Y-m-d H:i:s')."' WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+				db_query($sql, $db_data['name']);
+				$logs['delete_in_cron']['desactivate']++;
+			}else{
+				$logs['delete_in_cron']['not in cron']++;
+			}
+			if(DEBUG) break;
+			continue;
+		}
+		if(TTS_GENERATE === true){
+			$description = preg_replace("/<br *\/>/i", '', $r['DESCRIPTION'.($r['DESCRIPTION_VIDEO'] != "" ? '_VIDEO' : '')]);
+			$description = str_replace('\'\'', '\'', $description);
+			$replace = array(
+				'search' => array('#LANG#', '#TEXT#', '#VOICE#'),
+				'replace'=> array(urlencode($r['ID_LANGUE']), urlencode($description), urlencode($r['REF_VOICE']))
+			);
+			$url_post_tts = str_replace($replace['search'], $replace['replace'], URL_CLEANDESC);
+			$r['DESCRIPTION_VIDEO'] = file_get_contents($url_post_tts);
+			
+			$replace = array(
+				'search' => array('#ID#', '#TEXT#', '#VOICE#'),
+				'replace'=> array(urlencode($r['ID_VISITE']), urlencode($r['DESCRIPTION_VIDEO']), urlencode($r['REF_VOICE']))
+			);
+			
+			$url_post_tts = str_replace($replace['search'], $replace['replace'], URL_SOUND_POST);
+			$response = file_get_contents($url_post_tts);
+			if($response != "true"){
+				event_log("[ERROR][TTS] ".$r['REF_PORTAIL']." (".$url_post_tts.":".$response.")");
+			}else if(DEBUG){
+				event_log("[DEBUG][TTS] ".$r['REF_PORTAIL']." (".$url_post_tts.":".$response.")");
+			}
+		}
+		if(TTS_PRIORITY === true){
+			$url_sound = str_replace('#ID#', $r['ID_VISITE'], URL_SOUND_PRIORITY);
+			$result = file_get_contents($url_sound);
+			if($result != "true"){
+				event_log('[TTS][ERROR]'.$r['ID_VISITE'].' failed ('.$url_sound.':'.$result.')');				
+			}else if(DEBUG){
+				event_log('[DEBUG][TTS]'.$r['ID_VISITE'].' OK ('.$url_sound.':'.$result.')');
+			}
+		}
+		
+		if(CHECK_VIDEO === true){
+			$replace = array(
+				'search' => array('#TOUR#', '#LOGIN#', '#PASSWORD#', '#SITE#', '#TYPE#', '#TITLE#'),
+				'replace' => array($r['ID_VISITE'], urlencode($r['LOGIN_DIFFUSION']), urlencode($r['PASSWORD_DIFFUSION']), $r['SITE_DIFFUSION'], $r['TYPE_VIDEO'], urlencode($r['TITLE_DIFFUSION']))
+			);
+			$url_base = str_replace( $replace['search'], $replace['replace'], URL_CHECK_VIDEO);
+			$response = file_get_contents($url_base);
+			$xml = simplexml_load_string($response);
+			if($xml->VideoDiffusionResultCode != 0){ event_log('[CHECK] tour:'.$r['ID_VISITE'].' ('.$url_base.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})');}
+			else{ 
+				$logs['check_video'][$r['SITE_DIFFUSION']]++;
+				if(DEBUG){ event_log('[PUBLICATION] tour:'.$r['ID_VISITE'].' ('.$url_base.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})');}
+				if(CHECK_CONTINUE_VIDEO_ACTIVE) continue;
+			}
+		}
+		if(EDIT_VIDEO === true){               
+			$replace = array(
+				'search' => array('#TOUR#', '#LOGIN#', '#PASSWORD#', '#SITE#', '#TYPE#','#DISTRIB#', '#ID#', '#TITLE#'),
+				'replace' => array($r['ID_VISITE'], urlencode($r['LOGIN_DIFFUSION']), urlencode($r['PASSWORD_DIFFUSION']), $r['SITE_DIFFUSION'], $r['TYPE_VIDEO'], $r['ID_DISTRIBUTEUR'], $r['ID_VIDEO'], (UPDATE_DIFFUSION_TITLE ? urlencode($r['TITLE_DIFFUSION']) : ''))
+			);
+            $url = str_replace( $replace['search'], $replace['replace'], URL_EDIT_VIDEO);
+			if(NO_PLAYLIST) $url .= "&no_playlist=true";
+			$response = file_get_contents($url);
+			$xml = simplexml_load_string($response);
+			if($xml->VideoDiffusionResultCode != 0){ event_log('[EDIT][ERROR] tour:'.$r['ID_VISITE'].' ('.$url.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})');}
+			else{ 
+				if(DEBUG){ event_log('[EDIT_VIDEO] tour:'.$r['ID_VISITE'].' ('.$url.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})');}
+				$logs['edit'][$r['SITE_DIFFUSION']]++;
+			}
+			if(DEBUG){ break;}
+			continue;
+		}
+//		event_log('[DEBUG] tour:'.$r['ID_VISITE'].' SITE:'.$r['SITE_DIFFUSION']);
+//		foreach($partners as $partnerid){
+		$error = false;
+		//UNPUBLICATION
+		if(UNPUBLISH_VIDEO === true){
+			$replace = array(
+				'search' => array('#TOUR#', '#LOGIN#', '#PASSWORD#', '#SITE#', '#TYPE#'),
+//						'replace' => array($r['ID_VIDEO'], urlencode($r2['LOGIN']), urlencode($r2['PASSWORD']), $r2['SITE'], $r['TYPE_VIDEO'])
+				'replace' => array($r['ID_VISITE'], urlencode($r['LOGIN_DIFFUSION']), urlencode($r['PASSWORD_DIFFUSION']), $r['SITE_DIFFUSION'], $r['TYPE_VIDEO'])
+			);
+			$url = str_replace( $replace['search'], $replace['replace'], URL_UNPUBLISH_VIDEO);
+			
+			if(NO_NOTIFICATION) $url .= "&no_notification=true";
+			$response = file_get_contents($url);
+			$xml = simplexml_load_string($response);
+			if($xml->VideoDiffusionResultCode != -1){ 
+				event_log('[UNPUBLICATION] tour:'.$r['ID_VISITE'].' ('.$url.':'.$response.')');
+				$error = true;
+			}else{ $logs['unpublish_video'][$r['SITE_DIFFUSION']]++;}
+		}
+		if(UNPUBLISH === true){
+				$replace = array(
+					'search' => array('#PARTNER#','#TOUR#', '#USER#'),
+					'replace' => array($partners[$r['SITE_DIFFUSION'].(preg_match('/_CORP$/i', $r['TYPE_VIDEO']) > 0 ? '_CORP' : '')], $r['ID_VISITE'], $r['ID_UTILISATEUR'])
+				);
+				if(PUBLISH_ON_DEV === true){ 
+					$replace['search'][] = 'http://api';
+					$replace['replace'][] = 'http://dev.api';
+				}
+				$url_base = str_replace($replace['search'],$replace['replace'],URL_UNPUBLISH);
+
+				$result = file_get_contents($url_base);
+				if($result != "true"){ 
+					event_log('[UNPUBLICATION] tour:'.$r['ID_VISITE'].' ('.$url_base.':'.$result.')');
+					$error = true;
+				}else{ $logs['unpublish'][$r['SITE_DIFFUSION']]++;}
+		}
+		if($error){ 
+			if(DEBUG){ event_log('[DEBUG][ERROR] - next Tour');}
+			continue;
+		}
+		if($r['ID_STATUT_VISITE'] > 0){
+			//REPROCESS
+			if(REPROCESS === true){
+				//reprocess
+				$url_base = str_replace( 
+					array('#ID#', '#DISTRIB#'), 
+					array($r['ID_VIDEO'], $r['ID_DISTRIBUTEUR']), 
+					URL_REPROCESS_VIDEO
+				);
+				$result = file_get_contents($url_base);
+				if($result != "true"){ event_log('[REPROCESS] tour:'.$r['ID_VISITE'].' ('.$url_base.':'.$result.')');}
+				else if(DEBUG){ event_log('[DEBUG][REPROCESS] tour:'.$r['ID_VISITE'].' ('.$url_base.':'.$result.')');}
+				//add music
+	//					$sql = "UPDATE VISITE SET ID_MUSIQUE_VIDEO='11111113-8F9D-4405-9FFB-FCF00658E9F7', date_modification_visite='".date('Y-m-d H:i:d')."' WHERE Id_VISITE='".$r['ID_VIDEO']."'";
+	//					db_query($sql, $db_name);
+	//					$sql = "INSERT INTO VISITE_REMONTEE(Id_visite, Date_remontee, Nom_remontee, Commentaire) VALUES ('".$r['ID_VIDEO']."', '".date('Y-m-d H:i:s')."', 'MUSIC_PATCH', 'import music patch')";
+	//					db_query($sql, $db_name);
+				$update = true;
+				$logs['reprocess'][$r['SITE_DIFFUSION']]++;
+			}
+		
+			//PUBLICATION
+			if(PUBLISH_VIDEO === true){
+				$replace = array(
+					'search' => array('#TOUR#', '#LOGIN#', '#PASSWORD#', '#SITE#', '#TYPE#', '#TITLE#'),
+					'replace' => array($r['ID_VISITE'], urlencode($r['LOGIN_DIFFUSION']), urlencode($r['PASSWORD_DIFFUSION']), $r['SITE_DIFFUSION'], $r['TYPE_VIDEO'], (UPDATE_DIFFUSION_TITLE ? urlencode($r['TITLE_DIFFUSION']) : "")),
+				);
+				$url_base = str_replace($replace['search'],$replace['replace'],URL_PUBLISH_VIDEO);
+				$response = file_get_contents($url_base);
+				$xml = simplexml_load_string($response);
+				if($xml->VideoDiffusionResultCode != 0){ event_log('[PUBLICATION] tour:'.$r['ID_VISITE'].' ('.$url_base.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})');}
+				else{ 
+					$logs['publish_video'][$r['SITE_DIFFUSION']]++;
+					if(DEBUG){ event_log('[PUBLICATION] tour:'.$r['ID_VISITE'].' ('.$url_base.':'.$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.'{'.$xml->VideoDiffusionResultDescription.'})');}
+				}
+			}else if(PUBLISH === true){
+				//publish tour
+				$replace = array(
+					'search' => array('#PARTNER#','#TOUR#', '#USER#', '#REF#', '#TITLE#', '#TYPE#'),
+					'replace' => array($partners[$r['SITE_DIFFUSION'].(preg_match('/_CORP$/i', $r['TYPE_VIDEO']) > 0 ? '_CORP' : '')], $r['ID_VISITE'], $r['ID_UTILISATEUR'], $r['ID_VIDEO'], urlencode($r['TITLE_DIFFUSION']), ''/*$r['TYPE_VIDEO']*/)
+				);
+				if(PUBLISH_ON_DEV === true){ 
+					$replace['search'][] = 'http://api';
+					$replace['replace'][] = 'http://dev.api';
+				}
+				$url_base = str_replace( $replace['search'], $replace['replace'], URL_PUBLISH)."&action=do";
+				if(REDIFFUSE === true){ $url_base .= "&rediffuse=true";}
+				$result = file_get_contents($url_base);
+				if($result == "true"){
+					if(DEBUG){ event_log('[DEBUG][PUBLICATION] tour:'.$r['ID_VIDEO'].' ('.$url_base.':'.$result.')');} 
+					$logs['publish'][$r['SITE_DIFFUSION']]++;
+					sleep(DELAY_BETWEEN_DIFFUSION);
+				}else{ event_log('[PUBLICATION] tour:'.$r['ID_VIDEO'].' ('.$url_base.':'.$result.')');}
+			}
+			if(DEBUG){ break;}
+		} else if(DEBUG){ event_log('[DEBUG] deleted tour');}
+		if(DEBUG || (LIMIT > 0 && $i > LIMIT)){ break;}
+//		}
+//		event_log('[PUBLICATION] tour:'.$r['ID_VIDEO'].' DONE');
+//		if(count($done[$partners[0]]) > 10){ 
+//		if($nb_done++ > 100){ break;}
+	}
+	foreach($logs as $log=>$tab){
+		if(count($tab) > 0){
+			foreach($tab as $k=>$v){
+				event_log("Resume: ".$v."/".count($list_id)." ".$log." (".$k.")");
+			}
+		}
+	}
+	event_log("END DB: ".$db_name."-----------------");	
+}
+event_log("----------END---------");
+db_close();
+exit;
+
+//regénération d'un profil video
+DEFINE('LIMIT',				0);
+DEFINE('GENERATE_VIDEO', 	false);
+DEFINE('VIDEO_NEEDED',		'mobile');
+		$sql = "SELECT VIDEO.ID_VIDEO, VISITE.ID_VISITE, VIDEO.ID_DISTRIBUTEUR, TYPE_VIDEO FROM VIDEO 
+	inner join visite on visite.id_visite=video.id_visite
+	where id_distributeur in (select id_distributeur from distributeur where id_pays_distributeur='IL')
+	and id_statut_video > 0 and id_statut_visite >0 and profil_available not like '%mobile%' and type_video='HE_CUSTOM'";
+		if(GENERATE_VIDEO){
+			db_close();
+			$db_data['name'] = '10';
+			$obj_conn['dsn'] = 'odbtp(mssql)://previsite_account:travel001@10.0.4.10/PREVISITE_VIDEO?unicode=yes';
+			$sql = "SELECT COUNT(*) FROM VIDEO_CRON WHERE ID_STATUT_CRON > 0";
+			$count = db_getOne($sql, $db_data['name']);
+			if($count < 20){
+				$replace = array(
+					'search' => array( '#ID#', '#TYPE#', '#REF#', '#DISTRIB#', '#MODE#'),
+					'replace' => array( $r['ID_VISITE'], $r['TYPE_VIDEO'], $r['ID_VISITE'], $r['ID_DISTRIBUTEUR'], 'auto')
+				);
+				$url_generation = str_replace($replace['search'], $replace['replace'], URL_GENERATION_VIDEO);
+				if(VIDEO_NEEDED != ""){
+					$url_generation .= "&forceprofiles=true&profiles=".VIDEO_NEEDED;
+				}
+				$response = file_get_contents($url_generation);
+				$xml = @simplexml_load_string($response);
+				if($xml){
+					if($xml->VideoResultCode == '0'){
+						$logs['generation']['done']++;
+						$sql = "INSERT INTO VIDEO_CRON (Id_video, Id_distributeur, Id_statut_cron, Date_creation_cron, Date_modification_cron, Date_dernier_cron, Id_visite)VALUES('".$r['ID_VIDEO']."','".$r['ID_DISTRIBUTEUR']."',1,'".date('Y-m-d H:i:s')."','".date('Y-m-d H:i:s')."','".date('Y-m-d H:i:s')."','".$r['ID_VISITE']."')";
+						db_query($sql, $db_data['name']);
+					}else{
+						event_log("[ERROR][".$id."] error: ".$xml->VideoResultCode.'. '.$xml->VideoResultText); 
+					}
+				}
+				if(DEBUG || (LIMIT > 0 && $i >= LIMIT)){ break;}
+			}else{ 
+				event_log("[DEBUG] ".$count.' generation already in progress');
+			}
+			continue;
+		}
+
+
+//video en attente mais pas présente dans cron
+$sql = "SELECT ID_VIDEO FROM VIDEO_CRON";
+$result = db_query($sql, $db_data['name']);
+$ids = array();
+while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $ids[] = $r['ID_VIDEO'];}
+event_log(count($ids)." videos found");
+foreach($db_list as $db_name=>$dsn){
+	db_close();
+	event_log("START DB: ".$db_name."-----------------");	
+	$db_data['name'] = $db_name;
+	$obj_conn['dsn'] = $dsn;
+	
+	$sql = "select ID_VIDEO,ID_DISTRIBUTEUR,ID_VISITE FROM VIDEO WHERE ID_STATUT_VIDEO=0 AND ID_CRON=1";
+	$vids_to_add = array();
+	$list_id = array();
+	$result = db_query($sql, $db_name);
+	while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $list_id[] = $r;}
+	event_log(count($list_id)." vids found");
+	$nb_done = 0;
+	$last_checkpoint = 0;
+	$logs = array('already_waiting' => 0, 'add_in_cron' => 0);
+	foreach($list_id as $r){
+		if(($last_checkpoint+count($list_id)/5) < $nb_done++){
+			event_log(round(($nb_done/count($list_id))*100).'% done');
+			$last_checkpoint = $nb_done;
+		}
+		if(!in_array($r['ID_VIDEO'], $ids)){
+			$vids_to_add[] = $r;
+			$logs['add_in_cron']++;
+		}else{	$logs['already_waiting']++;}
+	}
+	if(count($vids_to_add) > 0){
+		db_close();
+		$db_data['name'] = 'video';
+		$obj_conn['dsn'] = DSN_VIDEO;
+		foreach($vids_to_add as $r){
+			$sql = "INSERT INTO [PREVISITE_VIDEO].[dbo].[VIDEO_CRON]
+		       (Id_video, Id_distributeur, Id_statut_cron, Date_creation_cron, Date_modification_cron, Date_dernier_cron, Id_visite) VALUES('".$r['ID_VIDEO']."',  '".$r['ID_DISTRIBUTEUR']."',  '0',  '".date('Y-m-d H:i:s')."',  '".date('Y-m-d H:i:s')."',  '".date('Y-m-d H:i:s')."',  '".$r['ID_VISITE']."')";
+	       db_query($sql, $db_data['name']);
+		}
+	}
+	foreach($logs as $k=>$v){
+		event_log("Resume: ".$v."/".count($list_id)." ".$k);
+	}
+	event_log("END DB: ".$db_name."-----------------");	
+}
+event_log("----------END---------");
+db_close();
+exit;
+
+
+$nb_diffusion_done = array();
+foreach($list_id as $r){
+	$list_voice = array('EN'=>'heather', 'ES'=>'maria', 'FR'=>'bruno', 'IT'=>'chiara', 'PT'=>'ester');
+/*	if($list_voice[$r['ID_LANGUE']] != ""){
+		$description = preg_replace("/<br *\/>/i", '', $r['DESCRIPTION']);
+		$replace = array(
+			'search' => array('#LANG#','#TEXT#'),
+			'replace'=> array($r['ID_LANGUE'],urlencode($description))
+		);
+		$r['DESCRIPTION'] = file_get_contents(str_replace($replace['search'], $replace['replace'], URL_CLEANDESC));
+
+		$replace = array(
+			'search' => array('#ID#', '#VOICE#', '#TEXT#'),
+			'replace'=> array($r['ID_VIDEO'], $list_voice[$r['ID_LANGUE']], urlencode(utf8_decode($r['DESCRIPTION'])))
+		);
+		$url_tts = str_replace($replace['search'], $replace['replace'], URL_SOUND_GENERATE_TEXT);
+		$response = file_get_contents($url_tts);
+		if(($xml_sound = simplexml_load_string($response)) !== false) {
+			$result_tts_code = (int) $xml_sound->MusicResultCode;
+			if($result_tts_code === 0) {
+				$delete_done = true;
+				$sites = "";
+				$sql = "select ID_VIDEO, LOGIN, PASSWORD, SITE, TITLE_DIFFUSION from diffusion_video where id_video='".$r['ID_VIDEO']."' and id_statut_diffusion_video > 0";
+				$result = db_query($sql, "video");
+				$diff = array();
+				while($r2 = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $diff[] = $r2;}
+				foreach($diff as $r2){
+*/					$replace = array(
+						'search' => array('#TOUR#', '#LOGIN#', '#PASSWORD#', '#SITE#', '#TYPE#'),
+//						'replace' => array($r['ID_VIDEO'], urlencode($r2['LOGIN']), urlencode($r2['PASSWORD']), $r2['SITE'], $r['TYPE_VIDEO'])
+						'replace' => array($r['ID_VIDEO'], urlencode($r['LOGIN']), urlencode($r['PASSWORD']), $r['SITE'], $r['TYPE_VIDEO'])
+					);
+					$url = str_replace($replace['search'],$replace['replace'],URL_UNPUBLISH_VIDEO);
+					$response = file_get_contents($url);
+					$xml = simplexml_load_string($response);
+					if($xml->VideoDiffusionResultCode == -1 || $xml->VideoDiffusionResultCode == 7 ||  $xml->VideoDiffusionResultCode == 2){
+						$replace = array(
+								'search' => array('#ID#', '#SITE#', '#TYPE#', '#REF#', '#LOGIN#', '#PASSWORD#', '#DATE#', '#TITLE#', '#DISTRIB#'),
+//								'replace' => array($r['ID_VIDEO'], $r2['SITE'], $r['TYPE_VIDEO'], urlencode($r['ID_VIDEO']), urlencode($r2['LOGIN']), urlencode($r2['PASSWORD']),'', urlencode(($r2['TITLE_DIFFUSION'] != "" ? $r2['TITLE_DIFFUSION'] : $r['TITLE_VIDEO'])), $r['ID_DISTRIBUTEUR'])								
+								'replace' => array($r['ID_VIDEO'], $r['SITE'], $r['TYPE_VIDEO'], urlencode($r['ID_VIDEO']), urlencode($r['LOGIN']), urlencode($r['PASSWORD']),'', urlencode($r['TITLE_VIDEO']), $r['ID_DISTRIBUTEUR'])
+						);
+						$url = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION);
+						$response = file_get_contents($url);
+//						if($response == "true"){ $nb_diffusion_done[strtoupper($r2['SITE'])]++;}
+						$xml = simplexml_load_string($response);
+						if($xml->VideoDiffusionResultCode == 0){ $nb_diffusion_done[strtoupper($r['SITE'])]++;}  
+						else{ event_log('[ERROR] publication failed for tour:'.$r['ID_VIDEO']." (".$url.":".$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.")");}
+					}else{ event_log('[ERROR] unpublication failed for tour:'.$r['ID_VIDEO']." (".$url.":".$xml->VideoDiffusionResultCode.". ".$xml->VideoDiffusionResultText.")");}
+/*				}
+			}else{ event_log('[ERROR] TTS failed for tour:'.$r['ID_VIDEO']." (".$url_tts.":".$response.")"); break;}
+		}else { event_log('[ERROR] send TTS failed for tour:'.$r['ID_VIDEO']." (".$url_tts.":".$response.")");}
+	}*/
+}
+foreach($nb_diffusion_done as $k=>$r){
+	event_log($r."/".count($list_id)." publication on ".$k." done");
+}
+event_log("---------END--------");
+db_close();
+exit;
+//D409F47C-5E10-591A-A938-004A7C0607A0
+//fix vallehermoso
+$db_data['name'] = 'software';
+$obj_conn['dsn'] = DSN_SOFTWARE_EXPLORIMMO;
+$list = array();
+$sql = "select REF_PORTAIL, NB_ACTIVE_IMAGE from diffusion_portail dp  inner join visite on visite.id_visite=dp.id_visite where id_portail='9DCA70ED-9D03-D2E4-FA99-F8C1CCFBB081' and id_statut_diffusion > 0 and id_statut_visite > 0";
+$result = db_query($sql , "software");
+while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $list[$r['REF_PORTAIL']] = $r['NB_ACTIVE_IMAGE'];}
+event_log(count($list)." tours found");
+
+db_close();
+$db_data['name'] = 'import';
+$obj_conn['dsn'] = DSN_IMPORT_EXPLORIMMO;
+$list_import = array();
+$sql = "select REF_PORTAIL,count(*) NB_ACTIVE_IMAGE from import_images where type='image' and id_statut_image > 0 and nom_script='vallehermoso' group by ref_portail";
+$result = db_query($sql , "import");
+while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $list_import[$r['REF_PORTAIL']] = $r['NB_ACTIVE_IMAGE'];}
+$final = array();
+foreach($list_import as $k=>$v){
+	if($v != $list[$k]){ $final[$k] = $list[$k];}
+}
+event_log(count($final)." tours to update");
+foreach($final as $k=>$v){
+	$sql = "update import_images set md5_image='need update' where type='image' and id_statut_image > 0 and nom_script='vallehermoso' and ref_portail='".$k."' and poids > ".$v;
+	db_query($sql , "import");
+}
+exit;
+//end
+
+$db_data['name'] = 'video';
+$obj_conn['dsn'] = DSN_VIDEO;
+event_log('--------------------------');
+event_log('[START]');
+$nb_cron_in_progress = 0;
+$nb_generation_tts 	= 0;
+
+$id_list = "0D8CD015-D5E1-6DE2-76E2-015328072170#E594AD9C-DF5B-4B6A-9D9C-09F1F952E5AE#6CB07CB7-25FB-9950-A09A-11DAF3DE14B5#611D84CF-072A-ABEB-0386-1318E80DB20C#EA5D4944-3FF9-6DCA-1C30-190BB80E5103#5995E665-CFA6-B532-AB95-1A24BB68288B#90C37F34-83FB-DCB6-0DCB-25CCEF9FF241#775B1187-5046-31A3-F842-35BFE667D35E#EA93EC55-4BDD-0B40-5271-453ED6FDE354#20079B19-C8A0-73EA-4D7A-49A2E694976F#19E8A69B-1060-9510-4C0E-4E88A03B75CF#602C9E01-0AEC-6F6F-AC90-504CD645AA20#0CF4940F-28F6-7EE2-94AB-544DE55E2222#57BEBAE4-C345-C92E-9B69-54ED843A7FC8#ECA12E6B-61A1-5F98-DFD8-5B406A4A61C1#C7AC4948-70B3-C1DD-CCA6-602EF8EE7CA4#15F494D9-2218-847D-9AA3-61EC11F7809E#8505DBB3-ABB9-CB49-72A8-6A3AE8BCB333#0FA6394B-D3CE-541C-3910-6C530F32FAA9#49D5BEB9-8D79-C10E-6F92-7AC5BC9200D2#9C2E901A-64F9-29A9-096D-7CA814DCDDC0#2686ED8B-AA6A-D589-AB2A-7E821E65568B#6B3459FE-132F-0E4A-BCB6-89D2D29942A0#494247F6-3F0A-D881-0CCA-8F739BF2FBF5#555DB8E4-9928-2BB2-13DB-965119A48DB5#CD90A1C2-0D29-599B-B5F5-9826817437D7#10879455-06BA-7237-72FA-9C28E1FAE3FD#9163861C-5787-6F6E-865F-9E1FFCF70EC0#B67CCA0D-8142-DB73-2895-A3BF6A14250C#49E28EDA-3E22-402A-074F-A7430FCB255A#1CE33268-50BB-EFBE-F914-B73E571E26E1#13B8FE26-7560-CAA6-C53B-B7E1607CD5C0#0A0E1B59-3548-FCA9-8B82-BA488E177CAE#A1BD023D-C7B9-CA85-7060-BFB25958332C#AE5CFDF2-C75B-BCF2-6D3B-C1DEBBAA21DE#456D26B9-FEDC-DF96-A9EB-CE7EDF9551F6#E8B02EA7-9733-194C-C5C6-D3041C92B3F3#569A6FEB-5D8D-2A68-9B14-E2182631F9DB#A2061FC9-0F2F-E216-F205-F135BA82D3D3#084AFDB5-5392-7CE7-AE67-F72DFFD49DC6#B6DCAC40-7188-2A83-7934-F863371B07BD#DCE4136A-D431-A08E-75E8-FB5FC34AEDF6#2A87A830-5B45-44DD-2816-FD2A67AAC6CC";
+$nb_video_done = 0;
+$ids = explode('#', $id_list);
+foreach($ids as $id){
+	$replace = array(
+		'search' => array( '#ID#', '#TYPE#', '#REF#', '#DISTRIB#', '#MODE#'),
+		'replace' => array( urlencode($id), 'FR', '', '6E7BC18E-E5AE-D6A1-93D9-FFE6F1BE2261', 'auto')
+	);
+	$url_generation = str_replace($replace['search'], $replace['replace'], URL_GENERATION_VIDEO);
+	$response = file_get_contents($url_generation);
+	$xml = @simplexml_load_string($response);
+	if($xml){
+		if($xml->VideoResultCode == '0'){
+			$nb_video_done++;
+		}else{
+			event_log("[CRON][".$id."] error: ".$xml->VideoResultCode.'. '.$xml->VideoResultText); 
+		}
+	}
+}
+event_log('Result: '.$nb_video_done.'/'.count($ids).' generations done');
+event_log('[END]');
+exit;
+$list_conversion_in_progress = array();
+$sql = "SELECT ID_VIDEO, DATE_MODIFICATION_VIDEO FROM DETAIL_VIDEO WHERE ID_CRON=2 AND ID_STATUT_VIDEO=0 AND ID_DISTRIBUTEUR='02E17DB4-82A7-1C01-8A54-AFC484480ABA'";
+$result = db_query($sql , "video");
+while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $list_conversion_in_progress[] = $r;}
+$nb_cron_in_progress = count($list_conversion_in_progress);
+$sql = "SELECT COUNT(*) FROM DETAIL_VIDEO WHERE ID_CRON=2 AND ID_STATUT_VIDEO=0 AND ID_DISTRIBUTEUR='02E17DB4-82A7-1C01-8A54-AFC484480ABA'";
+$nb_cron_waiting = db_getOne($sql, "video");
+event_log("[CRON] ".$nb_cron_in_progress."/".CRON_GENERATION_LIMIT." in progress and ".$nb_cron_waiting." waiting");
+
+if($nb_cron_in_progress < CRON_GENERATION_LIMIT){
+	$list_videos_to_generate = array();
+	$nb_video_done = 0;
+	$compteur = 0;
+	do{
+		$no_result= true;
+		$sql = "SELECT TOP 1 ID_VIDEO, TYPE_VIDEO, REF_VIDEO, ID_DISTRIBUTEUR, DESCRIPTION, DATE_MODIFICATION_VIDEO, ID_LANGUE, DATE_CRON_VIDEO FROM DETAIL_VIDEO WHERE ID_CRON=1 AND ID_DISTRIBUTEUR='02E17DB4-82A7-1C01-8A54-AFC484480ABA' ORDER BY DATE_MODIFICATION_VIDEO";
+		$result = db_query($sql, "video");
+		if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+	  		$sql = "UPDATE DETAIL_VIDEO SET DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."', ID_CRON='2' WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+	  		db_query($sql, "video");
+			$no_result = false;
+			$replace = array(
+				'search' => array( '#ID#', '#TYPE#', '#REF#', '#DISTRIB#', '#MODE#'),
+				'replace' => array( urlencode($r['ID_VIDEO']), urlencode($r['TYPE_VIDEO']), urlencode($r['REF_VIDEO']), urlencode($r['ID_DISTRIBUTEUR']), 'auto')
+			);
+			$url_generation = str_replace($replace['search'], $replace['replace'], URL_GENERATION_VIDEO);
+			$response = file_get_contents($url_generation);
+			$xml = @simplexml_load_string($response);
+			if($xml){
+				if($xml->VideoResultCode == '0'){
+					event_log("[CRON][".$r['ID_VIDEO']."] DONE");
+					$nb_video_done++;
+				}else{
+					event_log("[CRON][".$r['ID_VIDEO']."] error: ".$xml->VideoResultCode.'. '.$xml->VideoResultText); 
+					if($xml->VideoResultCode == 5){
+						if($r['DESCRIPTION'] != "" && $r['DATE_CRON_VIDEO'] <  date('Y-m-d H:i:s', mktime()-12*60*60)){
+							if($list_voice[$r['ID_LANGUE']] != ""){
+								$description = preg_replace("/<br *\/>/i", '', $r['DESCRIPTION']);
+								$replace = array(
+									'search' => array('#LANG#','#TEXT#'),
+									'replace'=> array($r['ID_LANGUE'],urlencode($description))
+								);
+								$r['DESCRIPTION'] = file_get_contents(str_replace($replace['search'], $replace['replace'], URL_CLEANDESC));
+	
+								$replace = array(
+									'search' => array('#ID#', '#VOICE#', '#TEXT#'),
+									'replace'=> array($r['ID_VIDEO'], $list_voice[$r['ID_LANGUE']], urlencode($r['DESCRIPTION']))
+								);
+								$response = file_get_contents(str_replace($replace['search'], $replace['replace'], URL_GENERATE_TTS));
+								if(trim($response) != "true"){
+									$nb_generation_tts++;
+									$sql = "UPDATE DETAIL_VIDEO SET DATE_CRON_VIDEO='".date('Y-m-d H:i:s')."', ID_CRON=4 WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+									db_query($sql, "video");
+								}
+							}else{
+								event_log('[CRON][TTS][ERROR]['.$r['ID_VIDEO'].'/'.$r['ID_LANGUE'].'] Voice not found');
+							}
+						}
+						$sql = "UPDATE DETAIL_VIDEO SET DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."', ID_CRON=4 WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+						db_query($sql, "video");
+					}
+				}
+			}else{
+				$sql = "UPDATE DETAIL_VIDEO SET DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."', ID_CRON=4 WHERE ID_VIDEO='".$r['ID_VIDEO']."'";
+				db_query($sql, "video");
+			}
+		}
+	}while(($nb_cron_in_progress+$nb_video_done) < CRON_GENERATION_LIMIT && !$no_result && $nb_cron_waiting > $compteur);
+	event_log('[CRON][FINAL] '.$nb_video_done.' generation launch & '.$nb_generation_tts.' TTS Generated');
+}
+
+event_log('[END]');
+
+/* Exit */
+db_close();
+exit;
+function sql_connect(&$db, $debug = false){
+	$log_function = $type."_log";
+	if($db['dsn'] != ""){
+		if(!isset($db['conn'])){
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] '.$db['name']);}
+			//PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'pear_error_handler');
+			if($debug){ event_log('[DEBUG][SQL_CONNECT] CONNECT TO '.$db['dsn']);}
+			$db['conn'] = DB::connect($db['dsn']);
+		}
+		if(!PEAR::isError($db['conn'])){ 
+			return false;
+		}else{
+			event_log('[SQL_CONNECT][ERROR] '.$db['name'].': '.$db['conn']->getCode().'. '.$db['conn']->getMessage().' ('.$db['dsn'].')');
+		}
+	}
+	unset($db['conn']);
+	return false;
+}
+
+function sql_disconnect(&$db, $debug = false){
+	$log_function = "event_log";
+	if($debug){ 
+		$log_function('[DEBUG][SQL_DISCONNECT] '.$db['name']);
+	}
+	if(isset($db['conn'])){
+		$db['conn']->disconnect();
+		unset($db['conn']);
+	}
+}
+
+function sql_query($sql, &$db, $debug = false, $r = 0, $nbTry = 0){
+	if($sql != ""){
+		$log_function = "event_log";
+		$log_error = "";
+		sql_connect($db, $debug);
+		if(isset($db['conn'])){
+			if($r == 0){
+				if($debug){ $log_function('[DEBUG][SQL_QUERY] '.$db['name'].':'.$sql);}
+				$result = $db['conn']->query($sql);
+			}else{
+				if($debug){ $log_function('[DEBUG][SQL_GETONE] '.$db.':'.$sql);}
+				$result = $db['conn']->getOne($sql);
+			}
+			if(!PEAR::isError($result)){ return $result;}
+			else{
+				$log_error = '[SQL_QUERY][ERROR] '.$db['name'].':'.$result->getCode().". ".$result->getMessage().' ('.$result->getUserInfo().') ';
+				$log_function($log_error, $script_name);
+			}
+		}else{
+			$log_error = '[SQL_QUERY][ERROR] '.$db['name'].': Connection failed';
+			$log_function($log_error, $script_name);
+		}
+		if($nbTry < 10 && !$debug){
+			$nbTry++;
+			sql_disconnect($db, $debug);
+			$log_function('[SQL_QUERY][ERROR] wait '.($nbTry*60).'s before next try ('.$nbTry.')');
+			sleep($nbTry*60);
+			return sql_query($sql, $db, $debug,$r, $nbTry);
+		}else{
+			sql_disconnect($db, $debug);
+			event_log('[SQL_QUERY][ERROR] '.$db['name'].' SCRIPT STOPPED');
+			event_log('REQUEST:'.$sql);
+			event_log($log_error, "", $debug);
+			exit;
+		}
+	}
+	return false;
+}
+
+function sql_getOne($sql, &$db, $debug = false){
+	return sql_query($sql, $db, $debug, 1);
+}
+?>

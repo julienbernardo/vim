@@ -1,0 +1,198 @@
+<?php
+function unpublish($scriptName, $workPath, $config, $debug = false){
+	global $db_data;
+	global $_REQUEST;
+
+	$debug |= ($_REQUEST['test'] != "");
+
+	$step_unpublish_pending = true;//true;
+	$step_disable_video_errors = true;//true;
+	$step_delete_old = true;//true;
+	$step_purge_simple_diffusion = true;
+	$step_old_diffusion = true;
+	$step_disable_diff = true;//0==date('H')%3 && date('i')>50; // 1 fois toutes les 3 heures suffit (très long sur le 17)
+
+	$return = array('DONE' => 0, 'FAILED' => '0', 'TOTAL' => '0');
+	//diffuse
+	for($k=0; $k < count($config['DNS']); $k++){
+		sql_disconnect($scriptName, $scriptName, $debug);
+		$dsn = preg_replace('/.+@\d+.\d+.\d+.([^\/]+).+/i', '$1', $config['DNS'][$k]);
+		$db_data['pool'][$scriptName] = array('STATUS'=>'normal','NAME'=>$scriptName,'DSN'=> $config['DNS'][$k]); 
+		unpublish_log('--------------', $scriptName, $debug);
+		unpublish_log('[DSN] '.$dsn.' START ', $scriptName, $debug);
+
+		///////////////////////////////////////////////////////
+		// Erreurs de diffusion videos (pas de notification) //
+		///////////////////////////////////////////////////////
+		if($step_disable_video_errors) {
+			$sql = <<<SQL
+-- Disabled old video diffusion without notification
+UPDATE
+	DIFFUSION_PORTAIL
+SET
+	ID_STATUT_DIFFUSION=0
+--2012-12-13 ajout JB
+FROM DIFFUSION_PORTAIL INNER JOIN VISITE ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE
+WHERE
+	ID_PORTAIL IN (
+		'59C4948B-DB6D-FDAF-E15D-CD67B8347126',
+		'1876B6F8-6894-1335-44C5-D984D5C8E04E',
+		'38429EA1-8BAD-1795-807E-B46BCF131567',
+		'812F1D71-043D-282E-640E-2B3F66072949'
+	) AND REF_PORTAIL=CAST(DIFFUSION_PORTAIL.ID_VISITE AS VARCHAR(36)) AND ID_STATUT_DIFFUSION > 0 AND DATE_DIFFUSION<GETDATE()-2
+	AND ID_STATUT_VISITE > 0
+
+SQL;
+			$nb = unpublish_update($sql, $db_name, $scriptName, $debug);
+			unpublish_log('Disable old video publication waiting notification : '.$nb, $scriptName, $debug);
+		}
+
+
+		//////////////////////////////////////////////////
+		// Purge diffusions desactivees de plus de 1 an //
+		//////////////////////////////////////////////////
+		if($step_delete_old) {
+			unpublish_log('Delete old diffusions', $scriptName, $debug);
+			$sql = 'SELECT TOP '.($debug ? '25' : '1000').' id_diffusion_portail FROM DIFFUSION_PORTAIL WHERE id_statut_diffusion=-1 AND date_diffusion<GETDATE()-120';
+			$rows = unpublish_query($sql, $db_name, $scriptName, $debug);
+			$tab_diff = array();
+
+			for($i=0; isset($rows[$i]); $i++) {
+				$tab_diff[] = $rows[$i]['id_diffusion_portail'];
+			}
+			// Separer le tableau en sous tableaux pour eviter verrou trop long sur la base...
+			$tab_diff = array_chunk($tab_diff, 100);
+			$steps = count($tab_diff);
+			$nb_deleted = 0;
+
+			for($i=0; $i<$steps; $i++) {
+				if(!empty($tab_diff[$i])) {
+					//$bind = implode(',', array_fill(0, count($tab_diff[$i]), '?'));
+					$bind = implode(',', $tab_diff[$i]);
+					$sql = "--CRON Purge Diffusion Step $i of $steps
+						DELETE FROM DIFFUSION_PORTAIL WHERE id_diffusion_portail IN ('".$bind."') AND id_statut_diffusion=-1";
+					$nb_deleted = unpublish_update($sql, $db_name, $scriptName, $debug);
+
+					$sql = "--CRON Purge Diffusion_options Step $i of $steps
+						DELETE FROM DIFFUSION_PORTAIL_OPTION WHERE id_diffusion_portail IN ('".$bind."')";
+					$nb_deleted = unpublish_update($sql, $db_name, $scriptName, $debug);
+				}
+			}
+
+			unpublish_log($nb_deleted." rows deleted", $scriptName, $debug);
+		}
+
+
+		////////////////////////////////////////////////////////////////////////////////
+		// Desactivation des diffusions encores actives pour les annonces desactivees //
+		////////////////////////////////////////////////////////////////////////////////
+		if($step_disable_diff) {
+			unpublish_log('Disable active diffusions from inactive tours', $scriptName, $debug);
+			$sql = <<<SQL
+-- CRON Purge_diffusion
+SELECT
+	TOP 500
+	d.id_diffusion_portail
+FROM
+	VISITE v
+	INNER JOIN DIFFUSION_PORTAIL d ON v.id_visite=d.id_visite AND d.id_statut_diffusion NOT IN (-3, -2,-1)
+WHERE
+	v.id_statut_visite<0 AND d.id_visite_active IS NULL
+	AND date_modification_visite>=getdate()-20
+SQL;
+			$rows = unpublish_query($sql, $db_name, $scriptName, $debug);
+			$nb_deleted = 0;
+			// Passage en pending unpublish
+			for($i=0; isset($rows[$i]); $i++) {
+				$sql = "UPDATE DIFFUSION_PORTAIL SET id_statut_diffusion=-2, date_diffusion=GETDATE() WHERE id_diffusion_portail='".$rows[$i]['id_diffusion_portail']."'";
+				$nb_deleted = unpublish_update($sql, $db_name, $scriptName, $debug);
+			}
+			unpublish_log($nb_deleted." rows of actives diffusions from deleted tours", $scriptName, $debug);
+		}
+
+
+		///////////////////////////////////////////////////////////////////////////////////
+		// Purge des lignes diffusion simples sans traitement ni statut particulier (FB) //
+		///////////////////////////////////////////////////////////////////////////////////
+		if($step_purge_simple_diffusion){
+			$sql = <<<SQL
+-- CRON Purge_diffusion
+DELETE FROM DIFFUSION_PORTAIL WHERE id_diffusion_portail IN (
+	SELECT TOP 1000 id_diffusion_portail FROM DIFFUSION_PORTAIL WHERE id_portail='191F4B45-53AD-2D10-DBE2-E7479443BBE7' AND id_statut_diffusion<0
+)
+SQL;
+
+			$nb_diffusion = unpublish_update($sql, $db_name, $scriptName, $debug);
+			unpublish_log($nb_diffusion." purged rows of inactives diffusions", $scriptName, $debug);
+		}
+
+		////////////////////////////////////////////////////////////////////////////
+		// Desactivation en arriere plan des annonces en attente de depublication //
+		////////////////////////////////////////////////////////////////////////////
+		if($step_unpublish_pending) {
+			unpublish_log('Disable diffusions waiting unpub', $scriptName, $debug);
+			$sql = "SELECT TOP ".($debug ? "25": "500") ." id_visite, id_portail FROM DIFFUSION_PORTAIL WHERE id_statut_diffusion=-2 AND date_diffusion<DATEADD(hour, -1, GETDATE()) AND id_portail<>'191F4B45-53AD-2D10-DBE2-E7479443BBE7'";
+			$rows = unpublish_query($sql, $db_name, $scriptName, $debug);
+			shuffle($rows);
+			$nb_unpub_ok = $nb_unpub_ko = 0;
+			for($i=0; isset($rows[$i]); $i++) {
+				$url_unpub = str_replace(
+					array('#USER#', '#TOUR#', '#PARTNER#', '#MODE#'),
+					array('', urlencode($rows[$i]['id_visite']), urlencode($rows[$i]['id_portail']), 'auto'),
+					URL_UNPUBLISH
+				);
+				$res = @file_get_contents($url_unpub);
+				if($debug) unpublish_log("[DEBUG] url_unpub: ".$url_unpub, $scriptName, $debug);
+				if('true'==$res) {
+					$nb_unpub_ok++;
+					$return['DONE']++;
+				} else {
+					$return['FAILED']++;
+					$nb_unpub_ko++;
+					//					if(1===$nb_unpub_ko) {
+					//						unpublish_log('Unpublication error example : '.$url_unpub, $scriptName, $debug);
+					//					}
+				}
+				$return['TOTAL']++;
+			}
+			unpublish_log("Unpublication result: ".$nb_unpub_ok." ok, ".$nb_unpub_ko." error", $scriptName, $debug);
+		}
+
+		///////////////////////////////////////////////////////////////////
+		// Passer les annonces expirees en statut attente de dediffusion //
+		///////////////////////////////////////////////////////////////////
+		if($step_old_diffusion){
+			$sql = <<<SQL
+-- CRON Purge_diffusion
+UPDATE DIFFUSION_PORTAIL SET id_statut_diffusion=-2, date_diffusion=GETDATE() WHERE id_diffusion_portail IN (
+	SELECT TOP 500 id_diffusion_portail FROM DIFFUSION_PORTAIL WHERE id_statut_diffusion>=0 AND date_expiration<GETDATE()
+)
+SQL;
+
+			$affected = unpublish_update($sql, $db_name, $scriptName, $debug);
+			unpublish_log("Set flag waiting unpublication for ".$affected." expired tours", $scriptName, $debug);
+		}
+		unpublish_log('[DSN] '.$dsn.' END ', $scriptName, $debug);
+	}
+
+	return $return;
+}
+
+function unpublish_query($sql, $db_name, $script_name, $debug, $r=0, $getNbAffectedRow = false){
+	$return = array();
+	$result = sql_query( $sql, $script_name, $script_name, $debug, "export", $r, ($_REQUEST['test'] != "" ? 1000 : 0), $getNbAffectedRow);
+	if($r == 0 && !$getNbAffectedRow){
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+	}else{ $return = $result;}
+	return $return;	
+}
+
+function unpublish_update($sql, $db_name, $script_name, $debug){
+	return 	unpublish_query($sql, $db_name, $script_name, $debug, 0, true);
+}
+
+function unpublish_log($text, $scriptName, $isTest = false){
+	if($isTest) echo date('Y-m-d H:i:s - ').$text."<br />";
+	else import_log($text, $scriptName, $isTest);
+}
+?>

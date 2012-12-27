@@ -1,0 +1,2957 @@
+<?php
+
+require_once('../../include/global.php');
+require_once('../../include/fonctions.php');
+require_once('../../include/fonction.db.php');
+require_once('../../include/fonction.sms.php');
+require_once('DB.php');
+require_once('include/header.php');
+require_once('include/dico.php');
+
+if(strlen($tab_tour['REF_VISITE']) == 0) {
+	$reference = get_tour_count($_SESSION['ID_UTILISATEUR']);
+	$reference = str_pad($reference, 5, '0', STR_PAD_LEFT);
+} else {
+	$reference = $tab_tour['REF_VISITE'];
+}
+
+
+// $tab_tour recupere dans le header...
+
+$default_currency = !empty($tab_tour['REF_DEVISE']) ? $tab_tour['REF_DEVISE'] : $_SESSION['REF_DEVISE'];
+
+$is_new_tour = !is_guid($tab_tour['ID_VISITE']);
+
+$url_post = 'edit_tour.php';
+if(!$is_new_tour) $url_post .= '?tour='.$tour;
+
+// traitement communs EU/US
+if(NEW_INTEGRATION) {
+	switch($_POST['todo']) {
+		case 'open_edit_form_eu':
+		case 'open_edit_form_us':
+			$tab_update = get_tour_auto_update($tour);
+			$tab_cpt = get_tour_complement($tour);
+
+			print_r($tab_cpt);exit;
+			$checked_block_tts = !empty($tab_cpt['BLOCKTTSAUTO']) ? ' checked="checked"' : '';
+			
+			$display_auto_update = !empty($tab_update);
+			if($display_auto_update) {
+				$full_lock = (int)$tab_tour['VERROU_ANNONCE'] == 2;
+				$no_lock   = (int)$tab_tour['VERROU_ANNONCE'] == 0;
+
+				$tab_update[0]['DATE_REMONTEE'] = datefmt_format($intl['datetime'], strtotime($tab_update[0]['DATE_REMONTEE']));
+
+				if($full_lock) {
+					$txt_action_label = $dico['edit_tour']['listing_mess_unlock'];
+					$chk_lock_value   = 'unlock';
+					$txt_autoupdate_resume = $dico['edit_tour']['listing_locked_ok'];
+				} else {
+					$txt_autoupdate_resume = $dico['edit_tour']['listing_locked_ko'];
+					$txt_action_label = $dico['edit_tour']['listing_mess_lock'];
+					$chk_lock_value   = 'lock';
+				}
+
+				$style_allow_image = $full_lock ? ' style="display:none;"' : '';
+				$chk_allow_image = $no_lock ? ' checked="checked"' : '';
+
+				$txt_autoupdate_last = nl2br(str_replace(
+					array('%DATE%', '%NAME%'),
+					array('<b>'.$tab_update[0]['DATE_REMONTEE'].'</b>', '<b>'.$tab_update[0]['NOM_REMONTEE'].'</b>'),
+					$dico['edit_tour']['listing_locked_last']
+				));
+			}
+
+			for($i=1; $i<=20; $i++) {
+				$label = floor($i/2).'h';
+				if($i%2==1) $label .= '30';
+				$html_duration .= '<option value="'.$i*0.5.'">'.$label.'</option>';
+			}
+			break;
+	}
+}
+
+// build <select> country
+if(empty($_SESSION['COUNTRY_LIST'])) $_SESSION['COUNTRY_LIST'] = get_country_list();
+$tab_country = $_SESSION['COUNTRY_LIST'];
+$nb = count($tab_country);
+$html_country = '';
+$default = !empty($tab_tour['ID_PAYS']) ? $tab_tour['ID_PAYS'] : $_SESSION['ID_PAYS'];
+for($i=0; $i<$nb; $i++) {
+	if($tab_country[$i]['ID_PAYS']==$default) {
+		$html_country .= '<option value="'.$tab_country[$i]['ID_PAYS'].'" selected="selected">'.$tab_country[$i]['NOM_PAYS'].'</option>';
+	} else {
+		$html_country .= '<option value="'.$tab_country[$i]['ID_PAYS'].'">'.$tab_country[$i]['NOM_PAYS'].'</option>';
+	}
+}
+
+
+// build <select> states
+$tab_states = get_us_states_list($default);
+$nb_states  = count($tab_states);
+$html_states = '<option value=""></option>';
+
+if($is_new_tour) $default = $_SESSION['ETAT'];
+else			 $default = $tab_tour['REF_ETAT'];
+
+for($i=0; $i<$nb_states; $i++) {
+	if($tab_states[$i]['REF_ETAT']==$default) {
+		$html_states .= '<option value="'.$tab_states[$i]['REF_ETAT'].'" selected="selected">'.$tab_states[$i]['NOM_ETAT'].'</option>';
+	} else {
+		$html_states .= '<option value="'.$tab_states[$i]['REF_ETAT'].'">'.$tab_states[$i]['NOM_ETAT'].'</option>';
+	}
+}
+
+
+switch($_POST['todo']) {
+	///////////////////////////////////
+	// PARTIE COMMUNE NOUVEAUX FORMS //
+	///////////////////////////////////
+	case 'del_openhouse':
+		if(del_openhouse((int)$_POST['oh'], $tour, $_SESSION['ID_UTILISATEUR'])) {
+			echo 'true';
+		}
+		break;
+
+
+	case 'open_del_openhouse':
+?>
+<h2><?=$dico['edit_tour']['confirm_delete_openhouse']?></h2>
+<div class="navigation_btn">
+ <span class="btn_half float_r" onclick="return closeAlertBox();">
+  <span class="inner_btn"><a href="#" onclick="return false;"><?=$dico['common']['no']?></a></span>
+ </span>
+ <span class="btn_half float_r margin4L" onclick="return confirmDeleteOpenHouse(<?=(int)$_POST['oh']?>);">
+  <span class="inner_btn"><a href="#" onclick="return false;"><?=$dico['common']['yes']?></a></span>
+ </span>
+ <div class="clear_sep">&nbsp;</div>
+</div>
+<input type="hidden" id="mess_del_openhouse_ok" value="<?=htmlspecialchars($dico['edit_tour']['mess_del_openhouse_ok'], ENT_QUOTES)?>" />
+<input type="hidden" id="mess_del_openhouse_ko" value="<?=htmlspecialchars($dico['edit_tour']['mess_del_openhouse_ko'], ENT_QUOTES)?>" />
+<div class="notify_box" id="notify_openhouse"></div>
+<?php
+		break;
+
+
+	case 'add_openhouse':
+		if(!empty($tab_tour)) {
+			$oh_date = @strtotime($_POST['oh_date']);
+
+			if(!empty($oh_date)) {
+				$oh_duration = (int)(2*$_POST['oh_duration']);
+				if($oh_duration < 1)	 $oh_duration = 1;
+				else if($oh_duration>20) $oh_duration = 20;
+				$oh_duration = $oh_duration / 2.0;
+
+				if($oh_date != false) {
+					add_openhouse($tour, $_SESSION['ID_UTILISATEUR'], date('Y-m-d H:i:00', $oh_date), $oh_duration, $_POST['oh_mess']);
+				}
+			}
+		}
+		// no break, return html openhouse list after add one
+
+	case 'get_openhouse';
+		$tab_open = get_tour_openhouse($tour);
+		$nb = count($tab_open);
+		
+		for($i=0; $i<$nb; $i++) {
+			$oh_date = datefmt_format($intl['date'], strtotime($tab_open[$i]['DATE_OPENHOUSE']));
+			$oh_time = datefmt_format(datefmt_create($_SESSION['ID_LANGUE'], IntlDateFormatter::NONE, IntlDateFormatter::SHORT, 'Europe/Paris', IntlDateFormatter::GREGORIAN), strtotime($tab_open[$i]['DATE_OPENHOUSE']));
+			$date = str_replace(array('%DATE%', '%TIME%'), array('<b>'.$oh_date.'</b>', '<b>'.$oh_time.'</b>'), htmlspecialchars($dico['edit_tour']['openhouse_date'], ENT_QUOTES));
+
+			$duree = (int)2*$tab_open[$i]['DUREE_OPENHOUSE'];
+
+			// demi heure
+			if($duree%2 == 1) $duree = floor($duree/2).'h30';
+			else			  $duree = floor($duree/2).'h';
+?>
+<div id="openhouse<?=$tab_open[$i]['ID_OPENHOUSE']?>" class="row_spaced <?=get_class_row($i)?>">
+ <div class="float_l block_w_oh_calendar form_align_left"><p class="label_field"><?=nl2br($date)?></p></div>
+ <div class="float_l block_w_oh_duration form_align_left"><p class="label_field"><?=$duree?></p></div>
+ <div class="float_l block_w_1_2 form_align_left"><p class="label_field"><?=htmlspecialchars($tab_open[$i]['COMMENTAIRE'], ENT_QUOTES)?></p></div>
+ <div class="float_r form_align_right"><p class="label_field"><a href="#" class="link_openhouse link_del" onclick="return openDeleteOpenHouse(<?=$tab_open[$i]['ID_OPENHOUSE']?>);"></a></p></div>
+ <div class="clear_sep"></div>
+</div>
+<?php
+		}
+		break;
+
+
+	case 'update_lock':
+		$lock = (int)$_POST['lock'];
+		$res = update_tour_data_http($tour, array(
+			'lock' => $lock
+		));
+		echo $lock;
+		break;
+
+
+	case 'view_currencies':
+		$currency = strtoupper($_POST['currency']);
+		if(empty($currency)) $currency = !empty($tab_tour['REF_DEVISE']) ? $tab_tour['REF_DEVISE'] : $_SESSION['REF_DEVISE'];
+?>
+<a href="#" class="link_currency" onclick="return displayCurrencyList('#ID#', '<?=php_str_to_js($currency)?>');">(<?=htmlspecialchars($currency)?>)</a>
+<?php
+		break;
+
+
+	case 'view_area_units':
+//		if(TEMPLATE_US) {
+//			require_once '../../include/fonction.db.usform.php';
+//			$tab_tour['DETAILS'] = get_tour_details_us($tour);
+			// sqft default
+//			if(empty($tab_tour['DETAILS']['ID_UNITE_SURFACE_TERRAIN'])) {
+//				$tab_tour['DETAILS']['ID_UNITE_SURFACE_TERRAIN'] = 2;
+//			}
+//		} else {
+//			require_once '../../include/fonction.db.euform.php';
+//			$tab_tour['DETAILS'] = get_tour_details_eu($tour);
+//		}
+
+		// 2012-12-03 : Details mergés dans le ws rest
+		$tab_tour['DETAILS'] = $tab_tour;
+
+		if(empty($_SESSION['LIST_AREA_UNIT'])) $_SESSION['LIST_AREA_UNIT'] = get_area_unit_list();
+		$tab_units = $_SESSION['LIST_AREA_UNIT'];
+		$nb_units  = count($tab_units);
+
+		if(empty($_POST['unit'])) {
+			if($_POST['type']=='area_home')  $unit = $tab_tour['DETAILS']['ID_UNITE_SURFACE_HABITABLE'];
+			else							 $unit = $tab_tour['DETAILS']['ID_UNITE_SURFACE_TERRAIN'];
+		} else {
+			$unit = $_POST['unit'];
+		}
+
+		if(empty($unit)) $unit = 1;
+
+		$unit_name = '';
+		$i=0;
+
+		while(empty($unit_name) && $i<$nb_units) {
+			$unit_name = $unit==$tab_units[$i]['ID_UNITE_SURFACE'] ? $tab_units[$i]['NOM_UNITE_SURFACE'] : '';
+			$i++;
+		}
+?>
+<a href="#" class="link_area_unit" onclick="return displayAreaUnits('<?=$_POST['type']?>', '<?=$unit?>');"><?=htmlspecialchars($unit_name)?></a>
+<?php
+		break;
+
+
+
+	case 'get_currencies':
+		if(empty($_SESSION['LIST_CURRENCY'])) $_SESSION['LIST_CURRENCY'] = get_currency_list();
+
+		$tab_currency = $_SESSION['LIST_CURRENCY'];
+		$nb_currency  = count($tab_currency);
+		$currency	 = $_POST['currency'];
+?>
+<select class="input_block" name="" onchange="changeCurrency(this.value);">
+<?php
+		for($i=0; $i<$nb_currency; $i++) {
+			$selected = $currency == $tab_currency[$i]['REF_DEVISE'] ? ' selected="selected"' : '';
+?>
+  <option value="<?=$tab_currency[$i]['REF_DEVISE']?>"<?=$selected?>><?=$tab_currency[$i]['REF_DEVISE'].' ('.$tab_currency[$i]['SYMBOLEBRUT_DEVISE'].')'?></option>
+<?php
+		}
+?>
+</select>
+<?php
+		break;
+
+
+
+	case 'get_area_units':
+		if(empty($_SESSION['LIST_AREA_UNIT'])) $_SESSION['LIST_AREA_UNIT'] = get_area_unit_list();
+		$tab_units = $_SESSION['LIST_AREA_UNIT'];
+		$nb_units  = count($tab_units);
+		$unit	  = $_POST['unit'];
+
+
+		if($_POST['type']=='area_home')  $select_name = 'area_home';
+		else							 $select_name = 'area_field';
+
+?>
+<select class="input_block" name="<?=$select_name?>" onchange="changeAreaUnit(this.value, this.name);">
+<?php
+		for($i=0; $i<$nb_units; $i++) {
+			$selected = $unit == $tab_units[$i]['ID_UNITE_SURFACE'] ? ' selected="selected"' : '';
+?>
+  <option value="<?=$tab_units[$i]['ID_UNITE_SURFACE']?>"<?=$selected?>><?=$tab_units[$i]['NOM_UNITE_SURFACE']?></option>
+<?php
+		}
+?>
+</select>
+<?php
+		break;
+
+
+
+	case 'google_preview':
+		$addr	= urlencode($_POST['address']);
+		$city	= urlencode($_POST['city']);
+		$zip	 = urlencode($_POST['zip']);
+		$country = urlencode($_POST['country']);
+		$state   = urlencode($_POST['state']);
+
+		$tab_pattern = array('#ADDR#', '#COUNTRY#', '#ZIP#', '#CITY#', '#STATE#');
+		$tab_replace = array($addr, $country, $zip, $city, $state);
+		$url_get_gps = str_replace($tab_pattern, $tab_replace, URL_FETCH_GPS);
+
+		list($lat, $lon) = explode('#', @file_get_contents($url_get_gps));
+
+		if(is_numeric($lat) && is_numeric($lon)) {
+			echo $lat.'#'.$lon;
+		}
+		break;
+
+
+
+	///////////////////////////////
+	// PARTIE SPECIFIQUE FORM US //
+	///////////////////////////////
+	case 'launch_get_data':
+		if(!AUTOFILL_DATA) die;
+		$url_xml = $url_autofill_data.'?mls='.urlencode($_POST['ref']);
+		if(($xml = @simplexml_load_file($url_xml)) !== false) {
+			$ref = (string) $xml->reference;
+			if(!empty($ref)) {
+				$tab_xml[] = $xml;
+				$nb_res = count($tab_xml);
+			}
+		}
+
+		if($nb_res > 5) $nb_res = 5;
+
+		if($nb_res>0) {
+			$text_found   = str_replace('#NB#', $nb_res, $dico['edit_tour']['search_property_found']);
+			$class_link   = 'expand_property';
+			$onclick_link = 'return openResults();';
+		} else {
+			$text_found   = $dico['edit_tour']['search_property_not_found'];
+			$class_link   = 'close_property';
+			$onclick_link = 'return closeResults();';
+		}
+
+?>
+<a url="#" onclick="<?=$onclick_link?>" id="link_expand_close_property" class="<?=$class_link?>"></a>
+<div class="search_property_data_top"><?=$text_found?></div>
+<?php
+		if($nb_res > 0) {
+
+			for($i=0; $nb_res>0; $i++) {
+?>
+<div class="search_property_data_center" id="div_property_result" style="display: none;">
+<?php
+				foreach($tab_xml as $node) {
+					if($nb_res>0) {
+						$nb_res--;
+
+						$price = (string)$node->price;
+						if(!empty($price)) {
+							$price =  NEW_INTL ? numfmt_format($intl['int'], $price) : number_format((string)$node->price, 0);
+						} else {
+							$price = '';
+						}
+
+						$onclick = " onclick=\"return autoFillData( {
+							publish_on: '".rawurlencode($tab_script_data[$i]['ID_PORTAIL'])."',
+							reference: '".rawurlencode((string)$node->reference)."',
+							title: '".rawurlencode((string)$node->title)."',
+							address: '".rawurlencode((string)$node->address)."',
+							neighborhood: '".rawurlencode((string)$node->neighborhood)."',
+							country: '".rawurlencode((string)$node->country)."',
+							city: '".rawurlencode((string)$node->city)."',
+							zip: '".rawurlencode((string)$node->zip)."',
+							state: '".rawurlencode((string)$node->state)."',
+							desc: '".rawurlencode((string)$node->description)."',
+							price: '".rawurlencode($price)."',
+							currency: '".rawurlencode((string)$node->currency)."',
+							year_built: '".rawurlencode((string)$node->year_built)."',
+							nb_br: '".rawurlencode((string)$node->bedrooms)."',
+							nb_fba: '".rawurlencode((string)$node->bathrooms)."',
+							nb_hba: '".rawurlencode((string)$node->half_bathrooms)."',
+							lot_size: '".rawurlencode((string)$node->lot_size)."',
+							area: '".rawurlencode((string)$node->area)."',
+							show_addr: '".rawurlencode((string)$node->show_address)."'
+						} );\"";
+/*
+<reference>1054490</reference>
+<city>STATEN ISLAND</city>
+<state>NY</state>
+<zip>10306</zip>
+<address>655 GREELEY AVE</address>
+<country>US</country>
+<bedrooms>3</bedrooms>
+<bathrooms>1</bathrooms>
+<half_bathrooms>1</half_bathrooms>
+<price>559000</price>
+<pricedisplay>$559,000</pricedisplay>
+<currency>USD</currency>
+<year_built>1980</year_built>
+<lot_size>2668</lot_size>
+<show_address>1</show_address>
+<desc/>
+*/
+						$addr = (string)$node->address."\n".(string)$node->city;
+						$addr = trim($addr.' '.(string)$node->state);
+						$addr = trim($addr.' '.(string)$node->zip);
+
+?>
+ <div title="<?=(string)$node->id_mls?>" class="item"<?=$onclick?>>
+  <div class="float_l block_addr"><?=nl2br($addr)?></div>
+  <div class="float_l block_price"><?=(string)$node->pricedisplay?></div>
+  <div class="clear_sep"></div>
+ </div>
+<?php
+					}
+				}
+			}
+?>
+</div>
+<?php
+		}
+?>
+<div class="search_property_data_bottom"></div>
+<?php
+		sleep(1);
+		break;
+
+
+
+	case 'open_edit_form_us':
+		require_once '../../include/fonction.db.usform.php';
+		if(is_guid($tour)) {
+//			$tab_tour['DETAILS'] = get_tour_details_us($tour); // new table
+		} else {
+			// check si possiblite de nouvelle vv
+			$tab_limit = get_max_images_tours($_SESSION['ID_UTILISATEUR']);
+		}
+		
+		// 2012-12-03 : Details mergés dans api rest
+		$tab_tour['DETAILS'] = $tab_tour;
+		
+		// modif visite ou creation si quota pas atteint
+		$allow_update_tour = is_guid($tour) || $tab_limit['RESTE_VISITES'] > 0;
+
+		if(SERVER_DEV || empty($_SESSION['LIST_BIENS_US'])) $_SESSION['LIST_BIENS_US'] = get_type_bien_us($_SESSION['ID_DISTRIBUTEUR']);
+		$tab_biens = $_SESSION['LIST_BIENS_US'];
+		$nb_biens  = count($tab_biens);
+		$html_biens = '';
+		for($i=0; $i<$nb_biens; $i++) {
+			if($tab_tour['DETAILS']['ID_TYPE_BIEN'] == $tab_biens[$i]['ID_TYPE_BIEN']) {
+				$html_biens .= '<option value="'.$tab_biens[$i]['ID_TYPE_BIEN'].'" selected="selected">'.$tab_biens[$i]['NOM_TYPE_BIEN'].'</option>';
+			} else {
+				$html_biens .= '<option value="'.$tab_biens[$i]['ID_TYPE_BIEN'].'">'.$tab_biens[$i]['NOM_TYPE_BIEN'].'</option>';
+			}
+		}
+
+		$tab_agents = get_user_list_second_agent($_SESSION['ID_UTILISATEUR']);
+		$nb_agents  = count($tab_agents);
+
+		$is_commercial = (int)$tab_tour['DETAILS']['ID_TYPE_LISTING']==1;
+		$is_rental	 = (int)$tab_tour['DETAILS']['ID_TYPE_TRANSACTION']==2;
+
+		if(empty($_SESSION['LIST_STATUS_US'])) $_SESSION['LIST_STATUS_US'] = get_type_status_listing();
+		$tab_status = $_SESSION['LIST_STATUS_US'];
+		$nb_status  = count($tab_status);
+
+		$class_rr = $class_rs = $class_cr = $class_cs = '';
+
+		// post prioritaire (si clique sur onglet)
+		if($_POST['tpl']=='rr')      $class_rr = ' class="active"';
+		else if($_POST['tpl']=='rs') $class_rs = ' class="active"';
+		else if($_POST['tpl']=='cs') $class_cs = ' class="active"';
+		else if($_POST['tpl']=='cr') $class_cr = ' class="active"';
+
+		else if($is_commercial && $is_rental)   $class_cr = ' class="active"';
+		else if($is_commercial && !$is_rental)  $class_cs = ' class="active"';
+		else if(!$is_commercial && $is_rental)  $class_rr = ' class="active"';
+		else if(!$is_commercial && !$is_rental) $class_rs = ' class="active"';
+
+		// param post prioritaire
+		if(!empty($_POST['tpl'])) {
+			$is_commercial = $_POST['tpl'][0]=='c';
+			$is_rental     = $_POST['tpl'][1]=='r';
+		}
+
+		$nb_br  = htmlspecialchars($tab_tour['DETAILS']['NOMBRE_CHAMBRE'], ENT_QUOTES);
+		$nb_br  = !empty($nb_br) ? $nb_br : '';
+		$nb_ba  = htmlspecialchars($tab_tour['DETAILS']['NOMBRE_SALLE_BAIN'], ENT_QUOTES);
+		$nb_ba  = !empty($nb_ba) ? $nb_ba : '';
+		$nb_hba = htmlspecialchars($tab_tour['DETAILS']['NOMBRE_DEMI_SALLE_BAIN'], ENT_QUOTES);
+		$nb_hba = !empty($nb_hba) ? $nb_hba : '';
+
+		$check_furnished	= !empty($tab_tour['DETAILS']['ID_BIEN_AMENAGE']) ? ' checked="checked"' : '';
+		$check_restriction  = (!is_guid($tour) && !empty($_SESSION['OPTIONS']['ALWAYSEMAILRESTRICT'])) || !empty($tab_tour['DETAILS']['ID_EMAIL_RESTRICTION']) ? ' checked="checked"' : '';
+		$check_hide_address = (!is_guid($tour) && !empty($_SESSION['OPTIONS']['ALWAYSHIDEADDR']))	  || !empty($tab_tour['DETAILS']['ID_ADRESSE_CACHEE'])	? ' checked="checked"' : '';
+		// new tour locked by default
+		$check_lock_listing = empty($tab_tour) || !empty($tab_tour['VERROU_ANNONCE']) ? ' checked="checked"' : '';
+		$check_hide_gmap	= !empty($tab_tour['CACHER_LOCALISATION']) ? ' checked="checked"' : '';
+
+		$neighborhood = htmlspecialchars($tab_tour['VOISINNAGE'], ENT_QUOTES);
+		$features	 = htmlspecialchars(!empty($tab_tour['EQUIPEMENTS']) ? $tab_tour['EQUIPEMENTS'] : $tab_tour['DETAILS']['EQUIPEMENTS'], ENT_QUOTES);
+		$year_built   = htmlspecialchars($tab_tour['DETAILS']['ANNEE_CONSTRUCTION'], ENT_QUOTES);
+		$lot_size	 = htmlspecialchars($tab_tour['DETAILS']['TAILLE_LOT_ACRES'], ENT_QUOTES);
+		$lot_size	 = !empty($lot_size) ? number_format($lot_size, 2) : '';
+		$taxes		= htmlspecialchars($tab_tour['DETAILS']['TAXES'], ENT_QUOTES);
+		$taxes		= !empty($taxes) ? number_format($taxes, 2) : '';
+
+		if(!empty($tab_tour['DETAILS']['TAXE_MUTATION'])) {
+			$mutation_tax = number_format($tab_tour['DETAILS']['TAXE_MUTATION'], 1);
+		} else {
+			$mutation_tax = '';
+		}
+		
+		$space		= htmlspecialchars($tab_tour['DETAILS']['ESPACE_TOTAL'], ENT_QUOTES);
+		$space		= !empty($space) ? number_format($space, 0) : '';
+		$usable_space = htmlspecialchars($tab_tour['DETAILS']['ESPACE_UTILE'], ENT_QUOTES);
+		$annual_rent  = htmlspecialchars(number_format($tab_tour['DETAILS']['LOCATION_ANNUELLE'], 0), ENT_QUOTES);
+		$title		= htmlspecialchars($tab_tour['NOM_VISITE'], ENT_QUOTES);
+		$id_agent	 = htmlspecialchars($tab_tour['DETAILS']['ID_AGENT'], ENT_QUOTES);
+
+		$style_advanced = !empty($neighborhood) || !empty($lot_size) || !empty($taxes) || is_guid($id_agent) ? 'display: block;' : 'display: none;';
+
+		if($is_rental) $label_price = $dico['edit_tour']['field_rent_month'];
+		else		   $label_price = $dico['edit_tour']['field_price'];
+
+		$price = !empty($tab_tour['PRIX_BIEN']) ? number_format($tab_tour['PRIX_BIEN'], 0) : '';
+
+		if(!$is_commercial) {
+			$label_1st	   = $dico['edit_tour']['field_nb_br'];
+			$maxlength	   = '3';
+			$input_id_1st	= 'p_nb_br';
+			$input_value_1st = $nb_br;
+			$input_class_1st = '';
+
+//			$space = !empty($tab_tour['DETAILS']['ESPACE_UTILE']) ? number_format($tab_tour['DETAILS']['ESPACE_UTILE'], 0) : '';
+
+			
+		} else if ($is_rental) {
+			$label_1st	   = $dico['edit_tour']['field_rent_annual'];
+			$maxlength	   = '9';
+			$input_id_1st	= 'p_rent_annual';
+			$input_value_1st = $annual_rent;
+			$input_class_1st = ' input_number';
+		} else {
+			$label_1st	   = $dico['edit_tour']['field_space'];
+			$maxlength	   = '9';
+			$input_id_1st	= 'p_space';
+			$input_value_1st = $space;
+			$input_class_1st = '';
+		}
+
+		$default_id	 = !empty($tab_tour['DETAILS']['ID_STATUT_LISTING']) ? $tab_tour['DETAILS']['ID_STATUT_LISTING'] : '1';
+		$lot_size_unit = $tab_tour['DETAILS']['ID_UNITE_SURFACE_TERRAIN'];
+		
+	
+		// sqft par defaut
+		if(empty($lot_size_unit)) {
+			$lot_size_unit = 2;
+		}
+?>
+<div class="container_services">
+  <div class="container_tabs">
+	<a id="link_rs" onclick="return openEditTourUS('rs');" href="#"<?=$class_rs?>><?=$dico['edit_tour']['tab_res_sales']?></a>
+	<a id="link_rr" onclick="return openEditTourUS('rr');" href="#"<?=$class_rr?>><?=$dico['edit_tour']['tab_res_rent']?></a>
+	<a id="link_cs" onclick="return openEditTourUS('cs');" href="#"<?=$class_cs?>><?=$dico['edit_tour']['tab_comm_sales']?></a>
+	<a id="link_cr" onclick="return openEditTourUS('cr');" href="#"<?=$class_cr?>><?=$dico['edit_tour']['tab_comm_rent']?></a>
+	<div class="clear_sep">&nbsp;</div>
+  </div>
+  <div class="box_services_square_top">&nbsp;</div>
+  <div class="box_services_center">
+	<div class="content_form">
+
+	  <form action="<?=$url_post?>" method="post" id="form_us" enctype="multipart/form-data">
+		<input type="hidden" name="p_publish_on" id="p_publish_on" value="" />
+		<input type="hidden" name="tour" value="<?=$tour?>" />
+		<input type="hidden" name="todo" value="update" />
+		<input type="hidden" name="listing_status" id="listing_status" value="<?=$default_id?>" />
+		<input type="hidden" name="listing_type" value="<?=$is_commercial ? '1' : '2'?>" />
+		<input type="hidden" name="transaction_type" id="transaction_type" value="<?=$is_rental ? '2' : '1'?>" />
+		<input type="hidden" name="p_lat" id="p_lat" value="<?=$tab_tour['LATITUDE']?>" />
+		<input type="hidden" name="p_lon" id="p_lon" value="<?=$tab_tour['LONGITUDE']?>" />
+		<input type="hidden" name="id_agent" id="id_agent" value="" />
+		<input type="hidden" name="p_currency" id="p_currency" value="<?=$default_currency?>" />
+	  <input type="hidden" name="p_area_unit_field" id="p_area_unit_field" value="<?=$lot_size_unit?>" />
+		<input type="hidden" name="mess_error_locate_property" id="mess_error_locate_property" value="<?=htmlspecialchars($dico['edit_tour']['error_locate_property'], ENT_QUOTES)?>" />
+		<input type="hidden" name="mess_search_please_wait" id="mess_search_please_wait" value="<?=htmlspecialchars($dico['edit_tour']['search_please_wait'], ENT_QUOTES)?>" />
+<?php
+		for($i=0; $i<$nb_status; $i++) {
+?>
+		<input type="hidden" name="listing_status<?=$tab_status[$i]['ID_STATUT_LISTING']?>" id="listing_status<?=$tab_status[$i]['ID_STATUT_LISTING']?>" value="<?=$dico['edit_tour']['status_'.$tab_status[$i]['ID_STATUT_LISTING']]?>" />
+<?php
+		}
+
+		if(NEW_INTEGRATION) {
+			if($display_auto_update) {
+?>
+	  <div class="notify_box messinfo">
+		<div class="half float_l">
+		  <div id="label_left"><?=$txt_autoupdate_resume?></div>
+		  <div>
+			<i><?=$txt_autoupdate_last?></i>
+		  </div>
+		</div>
+		<div class="half float_l">
+		  <input type="checkbox" onclick="updateLock(this);" name="chk_lock_listing" id="chk_lock_listing" value="<?=$chk_lock_value?>" /><label id="link_update_lock" class="chk" for="chk_lock_listing"><?=$txt_action_label?></label>
+		  <div id="label_right" <?=$style_allow_image?>>
+			<input type="checkbox" onclick="updateLock(this);" name="chk_allow_images" id="chk_allow_images" value="full_lock"<?=$chk_allow_image?> />&nbsp;<label class="chk" for="chk_allow_images"><?=$dico['edit_tour']['listing_locked_allow_images']?></label>
+			<br /><input type="checkbox" name="chk_block_tts" id="chk_block_tts" value="1" <?=$checked_block_tts?> />&nbsp;<label class="chk" for="chk_block_tts"><?=$dico['edit_tour']['block_tts']?></label>
+		  </div>
+		</div>
+		<div class="clear_sep"></div>
+	  </div>
+	  <input type="hidden" name="mess_listing_locked" id="mess_listing_locked" value="<?=htmlspecialchars($dico['edit_tour']['listing_locked_ok'], ENT_COMPAT)?>" />
+	  <input type="hidden" name="mess_listing_unlocked" id="mess_listing_unlocked" value="<?=htmlspecialchars($dico['edit_tour']['listing_locked_ko'], ENT_COMPAT)?>" />
+	  <input type="hidden" name="mess_update_lock" id="mess_update_lock" value="<?=htmlspecialchars($dico['edit_tour']['listing_mess_lock'], ENT_COMPAT)?>" />
+	  <input type="hidden" name="mess_update_unlock" id="mess_update_unlock" value="<?=htmlspecialchars($dico['edit_tour']['listing_mess_unlock'], ENT_COMPAT)?>" />
+<?php
+			}
+?>
+
+	  <div class="full_width <?=get_class_row($row_count++)?> margin4T">
+		<div class="full_width relative">
+		  <div class="block_w_1_2 float_l margin4L">
+			<div class="label_field">#Reference/MLS<strong>*</strong></div>
+		  </div>
+		  <div class="block_w_1_2_padding float_l margin4R">
+			<div class="label_field"><?=$dico['edit_tour']['field_tour_status']?><span id="label_status"></span></div>
+		  </div>
+		  <div class="clear_sep"></div>
+<?php
+		if(AUTOFILL_DATA) {
+?>
+		  <div id="search_property_container" class="search_property_block"></div>
+<?php
+		}
+?>
+		  <div class="block_w_1_2 float_l margin4L">
+			<div class="label_field">
+			  <input type="text" class="input_block input_w_1_4" name="p_ref" id="p_ref" value="<?=htmlspecialchars($reference, ENT_QUOTES)?>" <?=AUTOFILL_DATA ? 'onchange="lauchGetData(this.value);"' : ''?> />
+			</div>
+		  </div>
+		  <div class="block_w_1_2_padding float_l margin4R">
+			<div class="label_field">
+
+<?php
+		for($i=0; $i<$nb_status; $i++) {
+			$status = strtolower($tab_status[$i]['ID_STATUT_LISTING']);
+			$class_link = 'link_status float_l status_'.$status;
+			if($i==0) $class_link .= ' form_align_right';
+			$onclick	 = "return updateListingStatus(".$tab_status[$i]['ID_STATUT_LISTING'].");";
+			$onmouseover = "previewListingStatus(".$tab_status[$i]['ID_STATUT_LISTING'].");";
+?>
+			<a href="#" id="link_<?=$status?>" class="<?=$class_link?>" onclick="<?=$onclick?>" onmouseover="<?=$onmouseover?>" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+<?php
+		}
+?>
+			<div class="clear_sep">&nbsp;</div>
+
+			</div>
+		  </div>
+		  <div class="clear_sep"></div>
+
+
+<?php
+		if($is_commercial) {
+?>
+			<div class="block_w_1_2">
+			  <p class="label_field">
+				<?=$dico['edit_tour']['field_comm_type']?><br />
+				  <select class="input_block input_w_1_4" name="p_commercial_type" id="p_commercial_type" />
+					<?=$html_biens?>
+				  </select>
+			  </p>
+			</div>
+<?php
+		}
+?>
+		</div>
+		<!-- /relative -->
+	  </div>
+
+	  <!-- title & price -->
+	  <div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		<div class="float_l block_w_2_3 margin4L">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_title']?><br />
+			<input type="text" class="input_block input_w_2_3" name="p_title" id="p_title" value="<?=$title?>" />
+		  </p>
+		</div>
+		<div class="float_l block_w_1_3 margin4R">
+		  <p class="label_field">
+			<?=$label_price?><span id="currency1"></span><br />
+			<input type="text" class="input_block input_w_1_3 input_number" name="p_price" id="p_price" value="<?=$price?>" maxlength="10" />
+		  </p>
+		</div>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+	  <!-- /title & price -->
+
+	  <!-- description & stuff -->
+	  <div>
+		<!-- desc -->
+		<div class="float_l block_w_2_3 margin4L">
+		  <p class="label_field <?=get_class_row($row_count++)?>">
+			<?=$dico['edit_tour']['field_description']?><br />
+			<textarea class="input_block  input_w_2_3 textarea_description" name="p_desc" id="p_desc" ><?=htmlspecialchars($tab_tour['DESCRIPTION'], ENT_QUOTES)?></textarea>
+		  </p>
+		</div>
+		<!-- /desc -->
+
+		<!-- stuff -->
+		<div class="float_l block_w_1_3 margin4R">
+		  <p class="label_field <?=get_class_row($row_count-1)?>">
+				<?=$label_1st?><br />
+				<input type="text" class="input_block input_w_1_3 <?=$input_class_1st?>" name="<?=$input_id_1st?>" id="<?=$input_id_1st?>" value="<?=$input_value_1st?>" maxlength="<?=$maxlength?>"/>
+		  </p>
+
+<?php
+		if(!$is_commercial || $is_rental) {
+			if($is_commercial) {
+?>
+		  <p class="label_field <?=get_class_row($row_count++)?>">
+			<?=$dico['edit_tour']['field_rentable_space']?><br />
+			<input type="text" class="input_block input_w_1_3" name="p_space" id="p_space" value="<?=$space?>" />
+		  </p>
+
+<!--
+		  <p class="label_field <?=get_class_row($row_count++)?>">
+			<?=$dico['edit_tour']['field_useable_space']?><br />
+			<input type="text" class="float_l input_block input_w_1_3" name="p_usable_space" id="p_usable_space" value="<?=$usable_space?>" />
+		  </p>
+-->
+<?php
+			} else {
+?>
+		  <div class="no_pad no_marg">
+			<div class="block_w_1_6 float_l margin4L">
+			  <p class="label_field <?=get_class_row($row_count++)?>">
+				<?=$dico['edit_tour']['field_nb_ba']?><br />
+				<input type="text" class="input_block input_w_1_6" name="p_nb_ba" id="p_nb_ba" value="<?=$nb_ba?>" maxlength="3" />
+			  </p>
+			</div>
+			<div class="block_w_1_6 float_l margin4R">
+			  <p class="label_field <?=get_class_row($row_count-1)?>">
+				<?=$dico['edit_tour']['field_nb_hba']?><br />
+				<input type="text" class="input_block input_w_1_6" name="p_nb_hba" id="p_nb_hba" value="<?=$nb_hba?>" maxlength="3" />
+			  </p>
+			</div>
+			<div class="clear_sep"></div>
+		  </div>
+
+		  <p class="label_field <?=get_class_row($row_count++)?>">
+			<?=$dico['edit_tour']['field_sqft']?><br />
+			<input type="text" class="input_block input_w_1_3" name="p_space" id="p_space" value="<?=$space?>" maxlength="6" />
+		  </p>
+
+<?php
+			}
+		}
+?>
+		</div>
+		<!-- stuff -->
+		<div class="clear_sep"></div>
+	  </div>
+	  <!-- /description & stuff -->
+
+	  <div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		<p class="label_field">
+		  <?=$dico['edit_tour']['field_address']?><br />
+		  <input type="text" class="input_block input_w_1_1" name="p_address" id="p_address" value="<?=htmlspecialchars($tab_tour['ADRESSE'], ENT_QUOTES)?>" onchange="fetchGPS();" />
+		</p>
+	  </div>
+
+	  <div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		<div class="float_l block_w_1_4 margin4L">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_city']?><br />
+			<input type="text" class="input_block input_w_1_4" name="p_city" id="p_city" value="<?=htmlspecialchars($tab_tour['VILLE'], ENT_QUOTES)?>" onchange="fetchGPS();"/>
+		  </p>
+		</div>
+		<div class="float_l block_w_1_4 margin4L">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_state']?><br />
+			<select class="input_block input_w_1_4" name="p_state" id="p_state"><?=$html_states?></select>
+		  </p>
+		</div>
+		<div class="float_l block_w_1_4 margin4R">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_zip']?><br />
+			<input type="text" class="input_block input_w_1_4" name="p_zip" id="p_zip" value="<?=htmlspecialchars($tab_tour['CODE_POSTAL'], ENT_QUOTES)?>" onchange="fetchGPS();" />
+		  </p>
+		</div>
+		<div class="float_l block_w_1_4 margin4R">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_country']?><br />
+			<select class="input_block input_w_1_4" name="p_country" id="p_country" onchange="updateStatesList('p_state', this.value); fetchGPS();"><?=$html_country?></select>
+		  </p>
+		</div>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+
+	  <div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		<div class="float_l block_w_1_2 margin4L">
+		  <p class="label_field">
+			<label class="chk" for="hide_addr"><?=$dico['edit_tour']['field_hide_address']?></label>:&nbsp;<input type="checkbox" name="hide_addr" id="hide_addr" value="1"<?=$check_hide_address?> />
+		  </p>
+		</div>
+<?php
+		if(GOOGLE_ON) {
+?>
+		<div class="float_l block_w_1_2 margin4R">
+		  <p class="label_field">
+			<label class="chk" for="google_display"><?=$dico['edit_tour']['field_show_map']?></label>: &nbsp;<input type="checkbox" name="google_display" id="google_display" value="1" onclick="googlePreview();" />
+		  </p>
+		</div>
+<?php
+		}
+/*
+		<div class="block_w_1_1">
+		  <p class="label_field">
+			<label class="chk" for="hide_gmap"><?=$dico['edit_tour']['field_hide_googlemap']?></label>&nbsp;<input type="checkbox" name="hide_gmap" id="hide_gmap" value="1"<?=$check_hide_gmap?> />
+		  </p>
+		</div>
+
+*/
+?>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+
+	  <div id="google_preview">&nbsp;</div>
+	  <div id="google_notify" class="notify_box">&nbsp;</div>
+
+	  <p class="full_width">
+	   <a href="#" class="float_l link_details" id="link_details" onclick="return openDetailsForm(this.id);"><?=$dico['edit_tour']['field_add_info']?></a>
+	   <p class="clear_sep"></p>
+	  </p>
+
+
+
+	  <!-- advanced -->
+	  <div id="option_form" class="no_pad no_marg" style="<?=$style_advanced?>">
+
+		<!--  oh -->
+		<h3><?=$dico['edit_tour']['openhouse_add']?></h3>
+		<div class="row_spaced">
+		 <div class="float_l block_w_oh_calendar form_align_left">
+		  <div class="float_l">
+		   <p class="label_field">
+			<?=$dico['common']['date']?><br/>
+			<input type="text" class="input_block" style="width: 110px;" name="oh_date" id="oh_date" value="" />
+		   </p>
+		  </div>
+		  <div class="float_l">
+		   <p class="label_field">
+		   <br />
+		   <img class="chk" src="images/picto-cal.jpg" name="oh_cal" id="oh_cal">
+		   </p>
+		  </div>
+		  <div class="clear_sep"></div>
+		 </div>
+
+		 <div class="float_l block_w_oh_duration form_align_left">
+		  <p class="label_field">
+		   <?=$dico['common']['duration']?><br/>
+		   <select name="oh_duration" id="oh_duration" class="input_block">
+			<?=$html_duration?>
+		   </select>
+		  </p>
+		 </div>
+		 
+		 <div class="float_l block_w_1_2 form_align_left">
+		  <p class="label_field">
+		   <?=$dico['common']['message']?><br/>
+		   <input type="text" class="input_block input_w_1_2" name="oh_mess" id="oh_mess" value="" />
+		  </p>
+		 </div>
+
+		 <div class="float_r form_align_right">
+		  <p class="label_field">
+		  <br />
+		  <a href="#" class="link_openhouse link_add" onclick="return addOpenHouse();"></a>
+		  </p>
+		 </div>
+
+		 <div class="clear_sep"></div>
+		</div>
+		<div id="oh_list"></div>
+		<br />
+		<!-- / oh -->
+
+
+
+		<!-- features & yearbuilt & neighborhood -->
+		<div>
+		  <div class="float_l block_w_1_2 margin4L">
+			<p class="label_field <?=get_class_row($row_count++)?>">
+			  <?=$dico['edit_tour']['field_neighborhood']?><br />
+			  <input type="text" class="input_block input_w_1_2" name="p_neighborhood" value="<?=$neighborhood?>" />
+			</p>
+			<p class="label_field <?=get_class_row($row_count++)?>">
+			  <?=$dico['edit_tour']['field_year_built']?><br />
+			  <input type="text" class="input_block input_w_1_2" name="p_year_built" id="p_year_built" value="<?=$year_built?>" maxlength="4" />
+			</p>
+		  </div>
+
+		  <div class="float_l block_w_1_2 margin4R">
+			<p class="label_field <?=get_class_row($row_count)?>">
+			  <?=$dico['edit_tour']['field_features']?><br />
+			  <textarea class="input_block input_w_1_2 textarea_features" name="p_features"><?=$features?></textarea>
+			</p>
+		  </div>
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+		<!-- /features & yearbuilt & neighborhood -->
+
+		<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+<?php
+		if($is_commercial || $is_rental) {
+?>
+		  <div class="float_l block_w_1_2 margin4L">
+			<p class="label_field">
+			  <?=$dico['edit_tour']['field_lot_size']?><span id="area_field" class="area_unit">11</span><br />
+			  <input type="text" class="input_block input_w_1_2" name="p_lot_size" id="p_lot_size" value="<?=$lot_size?>" maxlength="8" />
+			</p>
+		  </div>
+		  <div class="float_l block_w_1_2 margin4R">
+			<p class="label_field">
+			  <label class="chk" for="p_furnished"><?=$dico['edit_tour']['furnished']?></label> <input type="checkbox" name="p_furnished" id="p_furnished" value="1"<?=$check_furnished?> />
+			</p>
+		  </div>
+<?php
+		} else {
+?>
+		  <div class="float_l block_w_1_4 margin4L">
+			<p class="label_field">
+			  <?=$dico['edit_tour']['field_lot_size']?><span id="area_field" class="area_unit">11</span><br />
+			  <input type="text" class="input_block input_w_1_4" name="p_lot_size" id="p_lot_size" value="<?=$lot_size?>" />
+			</p>
+		  </div>
+		  <div class="float_l block_w_1_4 margin4L">
+			<p class="label_field">
+			  <?=$dico['edit_tour']['field_taxes']?><span id="currency2"></span><br />
+			  <input type="text" class="input_block input_w_1_4 input_number" name="p_taxes" id="p_taxes" value="<?=$taxes?>" />
+			</p>
+		  </div>
+		  <div class="float_l block_w_1_4 margin4L">
+			<p class="label_field">
+			  <label class="chk" for="p_furnished"><?=$dico['edit_tour']['furnished']?></label> <input type="checkbox" name="p_furnished" id="p_furnished" value="1"<?=$check_furnished?> />
+			</p>
+		  </div>
+<?php
+		}
+?>
+
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+
+<?php
+			if(USER_CA) {
+?>
+		<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		  <div class="float_l block_w_1_4 margin4L">
+			<p class="label_field">
+				Evaluation Municipale<br />
+				<input type="text" class="input_block input_w_1_4 input_number" name="p_estimation_municipale" id="p_estimation_municipale" value="" />
+			</p>
+			</div>
+		  <div class="float_l block_w_1_4 margin4L">
+			<p class="label_field">
+				Taxe mutation<br />
+				<input type="text" class="input_block input_w_1_4 input_number" name="p_tax_mutation" id="p_tax_mutation" value="<?=$mutation_tax?>" />
+			</p>
+			</div>
+			<div class="clear_sep">&nbsp;</div>
+		</div>
+<?php
+			}
+?>
+
+		<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		  <p class="label_field">
+			<label class="chk" for="p_email_restriction"><?=$dico['edit_tour']['field_email_restriction']?></label> <input type="checkbox" name="p_email_restriction"id ="p_email_restriction" value="1"<?=$check_restriction?> /><em><small>&nbsp; <?=$dico['edit_tour']['field_email_restriction_help']?></small></em>
+		  </p>
+		</div>
+
+		<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			<div class="block_w_1_1 margin4L">
+				<p class="label_field">
+					<?=$dico['edit_tour']['url_listing']?><br />
+					<input type="text" class="input_block input_w_1_1" name="p_url_listing" value="<?=fix_html($tab_tour['URL_ANNONCE'])?>" />
+				</p>
+			</div>
+		</div>
+
+		<p>
+		<strong class="title_agent"><?=$dico['edit_tour']['field_2nd_agent']?></strong>
+		</p>
+		  <!-- existing agents -->
+		  <div class="full_width" id="content_agent">
+<?php
+		for($i=0; $i<$nb_agents; $i++) {
+			$nom_agent = trim($tab_agents[$i]['NOM_AGENT'].' '.$tab_agents[$i]['PRENOM_AGENT']);
+			if(mb_strlen($nom_agent) > 30) $nom_agent = mb_strcut($nom_agent, 0, 30).'...';
+
+			if($i%3 == 2)	  $class_div_container = 'margin4R';
+			else if($i%3 == 1) $class_div_container = 'margin2H';
+			else			   $class_div_container = 'margin4L';
+
+			$class_div_agent = $tab_tour['DETAILS']['ID_AGENT'] == $tab_agents[$i]['ID_AGENT'] ? 'second_agent_selected' : 'second_agent';
+
+			if(!empty($tab_agents[$i]['EXTENSION_LOGO'])) {
+				$url_logo  = clean_url(get_image_path('user',$tab_agents[$i]['ID_AGENT'])).'&ext='.strtolower($tab_agents[$i]['EXTENSION_LOGO']).'&maxwidth=60&maxheight=60';
+				$url_logo .= !empty($tab_agents[$i]['DATE_MODIFICATION_AGENT']) ? '&t='.@strtotime($tab_agents[$i]['DATE_MODIFICATION_AGENT']) : '';
+				$style_div = ' style="background-image: url('.$url_logo.')"';
+			} else {
+				$style_div = '';
+			}
+?>
+			<div class="row_spaced float_l block_w_1_3 <?=$class_div_container?> <?=get_class_row($row_count++)?>">
+			  <div class="<?=$class_div_agent?>" onclick="return selectSecondAgent('<?=$tab_agents[$i]['ID_AGENT']?>', '<?=php_str_to_js($tab_agents[$i]['NOM_AGENT'])?>', '<?=php_str_to_js($tab_agents[$i]['PRENOM_AGENT'])?>', '<?=php_str_to_js($tab_agents[$i]['TELEPHONE_AGENT'])?>', this);">
+				<div class="float_l logo_agent"<?=$style_div?>>&nbsp;</div>
+				<div class="float_l infos_agent"><strong><?=htmlspecialchars($nom_agent, ENT_QUOTES)?></strong><?=$tab_agents[$i]['TELEPHONE_AGENT']?></div>
+				<div class="clear_sep"></div>
+			  </div>
+			</div>
+<?php
+		}
+
+		if($i%3 == 2)	  $class_div_container = 'margin4R';
+		else if($i%3 == 1) $class_div_container = 'margin2H';
+		else			   $class_div_container = 'margin4L';
+?>
+			<div class="row_spaced float_l block_w_1_3 <?=$class_div_container?> <?=get_class_row($row_count++)?>">
+			  <div class="float_l form_align_left second_agent" onclick="return selectSecondAgent('new', '', '', '', this);">
+				<div class="float_l logo_new_agent"></div>
+				<div class="float_l infos_agent"><strong><?=$dico['edit_tour']['field_2nd_agent_add']?></strong></div>
+			  </div>
+			</div>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <!-- /existing agents -->
+
+		  <!-- add agent -->
+		  <div id="form_add_agent" style="display: none;">
+			<div class="row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_2nd_agent_first_name']?>*<br />
+				  <input type="text" class="input_block input_w_1_3" name="a_first_name" id="a_first_name" value="" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_3 margin2H">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_2nd_agent_last_name']?>*<br />
+				  <input type="text" class="input_block input_w_1_3" name="a_last_name" id="a_last_name" value="" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_3 margin4R">
+				<p class="label_field">
+				  <?=$dico['common']['phone']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="a_phone" id="a_phone" value="" />
+				</p>
+			  </div>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+			<div class="row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="block_w_2_3">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_2nd_agent_logo']?><br />
+				  <input type="file" name="a_logo" class="float_l  form_align_left" value="" />
+				  <input type="button" name="remove_agent" id="remove_agent" value="<?=htmlspecialchars($dico['edit_tour']['field_2nd_agent_del'], ENT_QUOTES)?>" onclick="return removeSecondAgent();" />
+				</p>
+			  </div>
+			</div>
+		  </div>
+		  <!-- /add agent -->
+
+	  </div>
+	  <p />
+	  <!-- /advanced -->
+<!--
+	</div>
+-->
+
+
+<?php
+
+
+
+		} else { // old layout
+
+
+
+
+?>
+		  <div class="row_highlight">
+			<div class="row_form" style="position: relative;">
+			  <p class="float_l form_block_w_1_2 block_w_1_2 form_align_left">#Reference/MLS<strong>*</strong></p>
+			  <p class="float_l form_block_w_1_2 block_w_1_2_padding form_align_right"><?=$dico['edit_tour']['field_tour_status']?><span id="label_status"></span></p>
+<?php
+		if(AUTOFILL_DATA) {
+?>
+<div id="search_property_container" class="search_property_block"></div>
+<?php
+		}
+?>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+
+			<div class="row_form row_link_status">
+			  <p class="float_l form_block_w_1_2 block_w_1_2 form_align_left">
+				<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_left" name="p_ref" id="p_ref" value="<?=htmlspecialchars($reference, ENT_QUOTES)?>" <?=AUTOFILL_DATA ? 'onchange="lauchGetData(this.value);"' : ''?> />
+			  </p>
+			  <p class="float_l form_block_w_1_2 block_w_1_2_padding form_align_right">
+<?php
+		for($i=0; $i<$nb_status; $i++) {
+			$status = strtolower($tab_status[$i]['ID_STATUT_LISTING']);
+			$class_link = 'link_status float_l status_'.$status;
+			if($i==0) $class_link .= ' form_align_right';
+			$onclick	 = "return updateListingStatus(".$tab_status[$i]['ID_STATUT_LISTING'].");";
+			$onmouseover = "previewListingStatus(".$tab_status[$i]['ID_STATUT_LISTING'].");";
+?>
+				<a href="#" id="link_<?=$status?>" class="<?=$class_link?>" onclick="<?=$onclick?>" onmouseover="<?=$onmouseover?>" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+<?php
+		}
+?>
+				<div class="clear_sep">&nbsp;</div>
+			  </p>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+<?php
+		if($is_commercial) {
+?>
+			<div class="row_form">
+			  <p class="form_block_w_1_2 block_w_1_2 form_align_left"><?=$dico['edit_tour']['field_comm_type']?></p>
+			</div>
+			<div class="row_form">
+			  <select class="input_block form_block_w_1_4 block_w_1_4 form_align_left" name="p_commercial_type" id="p_commercial_type" />
+				<?=$html_biens?>
+			  </select>
+			</div>
+<?php
+		}
+?>
+		  </div>
+
+		  <div class="row_form">
+			<p class="float_l form_block_w_2_3 block_w_2_3 form_align_left"><?=$dico['edit_tour']['field_title']?></p>
+			<p class="float_l form_block_w_1_3 block_w_1_3 form_align_right" style="position: relative;"><?=$label_price?><span id="currency1"></span></p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <div class="row_form">
+			<input type="text" class="input_block float_l form_input_w_2_3 input_w_2_3 form_align_left" name="p_title" id="p_title" value="<?=$title?>" />
+			<input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 form_align_right input_number" name="p_price" id="p_price" value="<?=$price?>" maxlength="10" />
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+
+		  <div class="row_form">
+			<p class="float_l form_block_w_2_3 block_w_2_3 form_align_left"><?=$dico['edit_tour']['field_description']?></p>
+			<p class="float_l form_block_w_1_3 block_w_1_3 form_align_right"><?=$label_1st?></p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <div class="row_form size_h3">
+			<textarea class="input_block float_l form_input_w_2_3 input_w_2_3 form_align_left input_h3" name="p_desc" id="p_desc" ><?=htmlspecialchars($tab_tour['DESCRIPTION'], ENT_QUOTES)?></textarea>
+
+			<div class="float_r form_block_w_1_3 block_w_1_3 no_pad no_marg size_h3">
+			  <input type="text" class="float_l input_block form_input_w_1_3 input_w_1_3 no_marg<?=$input_class_1st?>" name="<?=$input_id_1st?>" id="<?=$input_id_1st?>" value="<?=$input_value_1st?>" maxlength="<?=$maxlength?>"/>
+<?php
+		if(!$is_commercial || $is_rental) {
+			if($is_commercial) {
+?>
+			  <p class="float_l form_block_w_1_3 block_w_1_3 no_marg"><?=$dico['edit_tour']['field_rentable_space']?></p>
+			  <input type="text" class="float_l input_block form_input_w_1_3 input_w_1_3" name="p_space" id="p_space" value="<?=$space?>" />
+			  <p class="float_l form_block_w_1_3 block_w_1_3 no_marg"><?=$dico['edit_tour']['field_useable_space']?></p>
+			  <input type="text" class="float_l input_block form_input_w_1_3 input_w_1_3" name="p_usable_space" id="p_usable_space" value="<?=$usable_space?>" />
+<?php
+			} else {
+?>
+			  <p class="float_l form_block_w_1_6 block_w_1_6 no_marg"><?=$dico['edit_tour']['field_nb_ba']?></p>
+			  <p class="float_l form_block_w_1_6 block_w_1_6 no_marg form_align_right"><?=$dico['edit_tour']['field_nb_hba']?></p>
+			  <input type="text" class="input_block float_l form_input_w_1_6 input_w_1_6 form_align_left" name="p_nb_ba" id="p_nb_ba" value="<?=$nb_ba?>" maxlength="3" />
+			  <input type="text" class="input_block float_l form_input_w_1_6 input_w_1_6 form_align_right" name="p_nb_hba" id="p_nb_hba" value="<?=$nb_hba?>" maxlength="3" />
+			  <p class="float_l form_block_w_1_3 block_w_1_3 no_marg"><?=$dico['edit_tour']['field_sqft']?></p>
+			  <input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 no_marg" name="p_space" id="p_space" value="<?=$space?>" maxlength="6" />
+<?php
+			}
+		}
+?>
+			</div>
+
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+
+		  <div class="row_form">
+			<p class="form_block_w_1_1 block_w_1_1"><?=$dico['edit_tour']['field_address']?></p>
+		  </div>
+		  <div class="row_form">
+			<input type="text" class="input_block form_input_w_1_1 input_w_1_1 no_marg" name="p_address" id="p_address" value="<?=htmlspecialchars($tab_tour['ADRESSE'], ENT_QUOTES)?>" onchange="fetchGPS();" />
+		  </div>
+
+		  <div class="row_form">
+			<p class="float_l form_block_w_1_4 block_w_1_4 form_align_left"><?=$dico['edit_tour']['field_city']?></p>
+			<p class="float_l form_block_w_1_4 block_w_1_4 form_align_left"><?=$dico['edit_tour']['field_state']?></p>
+			<p class="float_l form_block_w_1_4 block_w_1_4 form_align_right"><?=$dico['edit_tour']['field_zip']?></p>
+			<p class="float_l form_block_w_1_4 block_w_1_4 form_align_right"><?=$dico['edit_tour']['field_country']?></p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <div class="row_form">
+			<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_left" name="p_city" id="p_city" value="<?=htmlspecialchars($tab_tour['VILLE'], ENT_QUOTES)?>" onchange="fetchGPS();"/>
+			<select class="input_block float_l form_block_w_1_4 block_w_1_4 form_align_left" name="p_state" id="p_state"><?=$html_states?></select>
+			<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_right" name="p_zip" id="p_zip" value="<?=htmlspecialchars($tab_tour['CODE_POSTAL'], ENT_QUOTES)?>" onchange="fetchGPS();" />
+			<select class="input_block float_l form_block_w_1_4 block_w_1_4 form_align_right" name="p_country" id="p_country" onchange="updateStatesList('p_state', this.value); fetchGPS();"><?=$html_country?></select>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+
+		  <div class="row_form">
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_left"><label class="chk" for="hide_addr"><?=$dico['edit_tour']['field_hide_address']?></label>:&nbsp;<input type="checkbox" name="hide_addr" id="hide_addr" value="1"<?=$check_hide_address?> /></p>
+<?php
+		if(GOOGLE_ON) {
+?>
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_right"><label class="chk" for="google_display"><?=$dico['edit_tour']['field_show_map']?></label>: &nbsp;<input type="checkbox" name="google_display" id="google_display" value="1" onclick="googlePreview();" /></p>
+<?php
+		}
+?>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <div id="google_preview">&nbsp;</div>
+		  <div id="google_notify" class="notify_box">&nbsp;</div>
+
+		  <p><a href="#" class="link_details" id="link_details" onclick="return openDetailsForm(this.id);"><?=$dico['edit_tour']['field_add_info']?></a></p>
+		  <div id="option_form" class="no_pad no_marg" style="<?=$style_advanced?>">
+		  <div class="row_form">
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_left"><?=$dico['edit_tour']['field_neighborhood']?></p>
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_right"><?=$dico['edit_tour']['field_features']?></p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+
+		  <div class="row_form size_h2">
+			<div class="float_l form_block_w_1_2 block_w_1_2 no_pad no_marg size_h2">
+			  <input type="text" class="input_block float_l form_input_w_1_2 input_w_1_2 no_marg" name="p_neighborhood" value="<?=$neighborhood?>" />
+			  <p class="float_l form_block_w_1_2 block_w_1_2 no_marg"><?=$dico['edit_tour']['field_year_built']?></p>
+			  <input type="text" class="input_block float_l form_input_w_1_2 input_w_1_2 no_marg" name="p_year_built" id="p_year_built" value="<?=$year_built?>" maxlength="4" />
+			</div>
+			<textarea class="input_block float_r form_input_w_1_2 input_w_1_2 form_align_right input_h2" name="p_features"><?=$features?></textarea>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+
+<?php
+		if($is_commercial || $is_rental) {
+?>
+		  <div class="row_form">
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_left"><?=$dico['edit_tour']['field_lot_size']?></p>
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_right">&nbsp;</p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <div class="row_form">
+			<input type="text" class="input_block float_l form_input_w_1_2 input_w_1_2 form_align_left" name="p_lot_size" id="p_lot_size" value="<?=$lot_size?>" maxlength="8" />
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_right"><label class="chk" for="p_furnished"><?=$dico['edit_tour']['furnished']?></label> <input type="checkbox" name="p_furnished" id="p_furnished" value="1"<?=$check_furnished?> /></p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+<?php
+		} else {
+?>
+		  <div class="row_form">
+			<p class="float_l form_block_w_1_4 block_w_1_4 form_align_left"><?=$dico['edit_tour']['field_lot_size']?></p>
+			<p class="float_l form_block_w_1_4 block_w_1_4 form_align_left"><?=$dico['edit_tour']['field_taxes']?><span id="currency2"></span></p>
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_right">&nbsp;</p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <div class="row_form">
+			<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_left" name="p_lot_size" id="p_lot_size" value="<?=$lot_size?>" />
+			<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_left input_number" name="p_taxes" id="p_taxes" value="<?=$taxes?>" />
+			<p class="float_l form_block_w_1_2 block_w_1_2 form_align_right"><label class="chk" for="p_furnished"><?=$dico['edit_tour']['furnished']?></label> <input type="checkbox" name="p_furnished" id="p_furnished" value="1"<?=$check_furnished?> /></p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+<?php
+		}
+?>
+		  <div class="row_form">
+			<p class="float_l form_block_w_1_1 block_w_1_1 form_align_left"><label class="chk" for="p_email_restriction"><?=$dico['edit_tour']['field_email_restriction']?></label> <input type="checkbox" name="p_email_restriction"id ="p_email_restriction" value="1"<?=$check_restriction?> /><em><small>&nbsp; <?=$dico['edit_tour']['field_email_restriction_help']?></small></em></p>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+		  <br />
+		  <strong class="title_agent"><?=$dico['edit_tour']['field_2nd_agent']?></strong>
+		  <div id="content_agent">
+<?php
+		for($i=0; $i<$nb_agents; $i++) {
+			$nom_agent = trim($tab_agents[$i]['NOM_AGENT'].' '.$tab_agents[$i]['PRENOM_AGENT']);
+			if(mb_strlen($nom_agent) > 30) $nom_agent = mb_strcut($nom_agent, 0, 30).'...';
+			$classdiv = $tab_tour['DETAILS']['ID_AGENT'] == $tab_agents[$i]['ID_AGENT'] ? 'float_l form_align_left second_agent_selected' : 'float_l form_align_left second_agent';
+
+			if(!empty($tab_agents[$i]['EXTENSION_LOGO'])) {
+				$url_logo  = clean_url(get_image_path('user',$tab_agents[$i]['ID_AGENT'])).'&ext='.strtolower($tab_agents[$i]['EXTENSION_LOGO']).'&maxwidth=60&maxheight=60';
+				$url_logo .= !empty($tab_agents[$i]['DATE_MODIFICATION_AGENT']) ? '&t='.@strtotime($tab_agents[$i]['DATE_MODIFICATION_AGENT']) : '';
+				$style_div = ' style="background-image: url('.$url_logo.')"';
+			} else {
+				$style_div = '';
+			}
+?>
+			<div class="<?=$classdiv?>" onclick="return selectSecondAgent('<?=$tab_agents[$i]['ID_AGENT']?>', '<?=php_str_to_js($tab_agents[$i]['NOM_AGENT'])?>', '<?=php_str_to_js($tab_agents[$i]['PRENOM_AGENT'])?>', '<?=php_str_to_js($tab_agents[$i]['TELEPHONE_AGENT'])?>', this);">
+			  <div class="float_l logo_agent"<?=$style_div?>>&nbsp;</div>
+			  <div class="float_l infos_agent"><strong><?=htmlspecialchars($nom_agent, ENT_QUOTES)?></strong><?=$tab_agents[$i]['TELEPHONE_AGENT']?></div>
+			</div>
+<?php
+		}
+?>
+			<div class="float_l form_align_left second_agent" onclick="return selectSecondAgent('new', '', '', '', this);">
+			  <div class="float_l logo_new_agent"></div>
+			  <div class="float_l infos_agent"><strong><?=$dico['edit_tour']['field_2nd_agent_add']?></strong></div>
+			</div>
+			<div class="clear_sep">&nbsp;</div>
+		  </div>
+
+		  <div id="form_add_agent" style="display: none;">
+			<div class="row_form">
+			  <p class="float_l form_block_w_1_3 block_w_1_3 form_align_left"><?=$dico['edit_tour']['field_2nd_agent_first_name']?>*</p>
+			  <p class="float_l form_block_w_1_3 block_w_1_3 form_align_center"><?=$dico['edit_tour']['field_2nd_agent_last_name']?>*</p>
+			  <p class="float_l form_block_w_1_3 block_w_1_3 form_align_right"><?=$dico['common']['phone']?></p>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+			<div class="row_form">
+			  <input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 form_align_left" name="a_first_name" id="a_first_name" value="" />
+			  <input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 form_align_center" name="a_last_name" id="a_last_name" value="" />
+			  <input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 form_align_right" name="a_phone" id="a_phone" value="" />
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+			<div class="row_form">
+			  <p class="float_l form_block_w_1_3 block_w_1_3 form_align_left"><?=$dico['edit_tour']['field_2nd_agent_logo']?></p>
+			  <p class="float_l form_block_w_2_3 block_w_2_3 form_align_left">&nbsp;</p>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+			<div class="row_form">
+			  <input type="file" name="a_logo" class="float_l  form_align_left" value="" />
+			  <input type="button" name="remove_agent" id="remove_agent" value="<?=htmlspecialchars($dico['edit_tour']['field_2nd_agent_del'], ENT_QUOTES)?>" onclick="return removeSecondAgent();" />
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+		  </div>
+		</div>
+		<br />
+<?php
+		}
+?>
+
+
+
+
+
+
+	  </form>
+	</div>
+  </div>
+  <div class="box_services_bottom">&nbsp;</div>
+
+<?php
+		if($allow_update_tour) {
+?>
+  <div id="notify_form" class="notify_box"></div>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+<div class="navigation_btn">
+<?php
+			}
+?>
+  <span class="btn btn_next" onclick="return checkFormUS();">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['save']?></a></span>
+  </span>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+</div>
+<?php
+			}
+?>
+
+<?php
+		} else {
+?>
+  <div id="notify_form" class="notify_box messwarn" style="display: block;"><?=$dico['edit_tour']['error_limitation_tours']?></div>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+<div class="navigation_btn">
+<?php
+			}
+?>
+  <span class="btn btn_next btn_deactivated" onclick="return false;">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['save']?></a></span>
+  </span>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+</div>
+<?php
+			}
+		}
+?>
+</div>
+<?php
+		break;
+
+
+	case 'open_edit_form_eu':
+		require_once '../../include/fonction.db.euform.php';
+		if(!$is_new_tour) {
+//			$tab_tour['DETAILS'] = get_tour_details_eu($tour); // new table
+		} else {
+			// check si possiblite de nouvelle vv
+			$tab_limit = get_max_images_tours($_SESSION['ID_UTILISATEUR']);
+		}
+		
+		
+		// 2012-12-03 : Details mergés dans api rest
+		$tab_tour['DETAILS'] = $tab_tour;
+		
+		// modif visite ou creation si quota pas atteint
+		$allow_update_tour = is_guid($tour) || $tab_limit['RESTE_VISITES'] > 0;
+
+		$tab_tour['DETAILS']['ID_TYPE_TRANSACTION'] = in_array($tab_tour['DETAILS']['ID_TYPE_TRANSACTION'], array(1, 2, 3, 4)) ? $tab_tour['DETAILS']['ID_TYPE_TRANSACTION'] : 1;
+
+		if(empty($_SESSION['LIST_STATUS_US'])) $_SESSION['LIST_STATUS_US'] = get_type_status_listing();
+		$tab_status = $_SESSION['LIST_STATUS_US'];
+		$nb_status  = count($tab_status);
+
+		$default_status = !empty($tab_tour['DETAILS']['ID_STATUT_LISTING']) ? $tab_tour['DETAILS']['ID_STATUT_LISTING'] : '1';
+
+		// param post prioritaire (click sur onglet) sur valeur base
+		$is_rental = !empty($_POST['tpl']) ? $_POST['tpl']=='rent' : (int)$tab_tour['DETAILS']['ID_TYPE_TRANSACTION']==2;
+		$is_rental_season = !empty($_POST['tpl']) ? $_POST['tpl']=='rentseason' : (int)$tab_tour['DETAILS']['ID_TYPE_TRANSACTION']==4;
+		$is_viager = USER_FR && !empty($_POST['tpl']) ? $_POST['tpl']=='lifetime' : (int)$tab_tour['DETAILS']['ID_TYPE_TRANSACTION']==3;
+		
+		$class_div_lifetime = $is_viager ? '' : 'hidden';
+
+		$class_lifetime = $class_rent = $class_sale = $class_rent_season = '';
+		if($is_viager) {
+			$class_lifetime = ' class="active"';
+			$label_price = $dico['edit_tour']['lifetime_price'];
+		} else if($is_rental) {
+			$class_rent = ' class="active"';
+			$label_price = $dico['edit_tour']['field_rent'];
+		} else if($is_rental_season) {
+			$class_rent_season = ' class="active"';
+			$label_price = $dico['edit_tour']['field_rent'];
+		} else {
+			$class_sale = ' class="active"';
+			$label_price = $dico['edit_tour']['field_price'];
+		}
+
+
+		$title		= htmlspecialchars($tab_tour['NOM_VISITE'], ENT_QUOTES);
+		$nb_rooms	 = !empty($tab_tour['DETAILS']['NOMBRE_PIECE']) ? (float)$tab_tour['DETAILS']['NOMBRE_PIECE'] : '';
+		
+		$nb_half_rooms = !empty($tab_tour['DETAILS']['NOMBRE_DEMI_PIECE']) ? (int)$tab_tour['DETAILS']['NOMBRE_DEMI_PIECE'] : '';
+		
+		$live_area	= !empty($tab_tour['DETAILS']['SURFACE_HABITABLE']) ? (int)$tab_tour['DETAILS']['SURFACE_HABITABLE'] : '';
+
+		$check_restriction  = (!is_guid($tour) && !empty($_SESSION['OPTIONS']['ALWAYSEMAILRESTRICT'])) || !empty($tab_tour['DETAILS']['ID_EMAIL_RESTRICTION']) ? ' checked="checked"' : '';
+		$check_hide_address = (!is_guid($tour) && !empty($_SESSION['OPTIONS']['ALWAYSHIDEADDR']))	  || !empty($tab_tour['DETAILS']['ID_ADRESSE_CACHEE'])	? ' checked="checked"' : '';
+		// new tour locked by default
+		$check_lock_listing = empty($tab_tour) || !empty($tab_tour['VERROU_ANNONCE']) ? ' checked="checked"' : '';
+		$check_hide_gmap	= !empty($tab_tour['CACHER_LOCALISATION']) ? ' checked="checked"' : '';
+
+		if(NEW_INTL) {
+			$price		 = !empty($tab_tour['PRIX_BIEN'])				? numfmt_format($intl['int'], $tab_tour['PRIX_BIEN'])				: '';
+			$agency_taxes  = !empty($tab_tour['DETAILS']['FRAIS_AGENCE'])  ? numfmt_format($intl['int'], $tab_tour['DETAILS']['FRAIS_AGENCE'])  : '';
+			$area_field	= !empty($tab_tour['DETAILS']['SURFACE_TERRAIN'])	? numfmt_format($intl['int'], $tab_tour['DETAILS']['SURFACE_TERRAIN'])	 : '';
+			$monthly_taxes = !empty($tab_tour['DETAILS']['CHARGES_MENSUELLES']) ? numfmt_format($intl['int'], $tab_tour['DETAILS']['CHARGES_MENSUELLES'])  : '';
+		} else {
+			$price		 = !empty($tab_tour['PRIX_BIEN'])				? number_format($tab_tour['PRIX_BIEN'], 0)				  : '';
+			$agency_taxes  = !empty($tab_tour['DETAILS']['FRAIS_AGENCE'])  ? number_format($tab_tour['DETAILS']['FRAIS_AGENCE'], 0)	: '';
+			$area_field	= !empty($tab_tour['DETAILS']['SURFACE_TERRAIN'])	? number_format($tab_tour['DETAILS']['SURFACE_TERRAIN'], 0)	: '';
+			$monthly_taxes = !empty($tab_tour['DETAILS']['CHARGES_MENSUELLES']) ? number_format($tab_tour['DETAILS']['CHARGES_MENSUELLES'], 0) : '';
+		}
+
+		// build <select> property type
+		if(empty($_SESSION['LIST_TYPE_BIEN'])) $_SESSION['LIST_TYPE_BIEN'] = get_type_bien_list($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_LANGUE']);
+		$tab_biens = $_SESSION['LIST_TYPE_BIEN'];
+		$nb = count($tab_biens);
+		$html_type_biens = '';
+
+		// Default : House
+		$default_type = isset($tab_tour['DETAILS']['ID_TYPE_BIEN']) ? $tab_tour['DETAILS']['ID_TYPE_BIEN'] : 2;
+		
+		for($i=0; $i<$nb; $i++) {
+			$selected = $tab_biens[$i]['ID_TYPE_BIEN']==$default_type ? ' selected="selected"' : '';
+			$html_type_biens .= "\n";
+			$html_type_biens .= '<option value="'.$tab_biens[$i]['ID_TYPE_BIEN'].'"'.$selected.'>'.$tab_biens[$i]['NOM_TYPE_BIEN'].'</option>';
+		}
+		
+		$checked_win_n = strpos($tab_tour['DETAILS']['ORIENTATION_FENETRES'], 'N')!==false ? 'checked="checked" ' : '';
+		$checked_win_s = strpos($tab_tour['DETAILS']['ORIENTATION_FENETRES'], 'S')!==false ? 'checked="checked" ' : '';
+		$checked_win_e = strpos($tab_tour['DETAILS']['ORIENTATION_FENETRES'], 'E')!==false ? 'checked="checked" ' : '';
+		$checked_win_w = strpos($tab_tour['DETAILS']['ORIENTATION_FENETRES'], 'W')!==false ? 'checked="checked" ' : '';
+
+		// build <select> heating
+		if(empty($_SESSION['HEATING_TYPE_LIST'])) $_SESSION['HEATING_TYPE_LIST'] = get_heating_type($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_LANGUE']);
+		$tab_heat = $_SESSION['HEATING_TYPE_LIST'];
+		$nb = count($tab_heat);
+		$html_heat_type = '<option value="">-</option>';
+		for($i=0; $i<$nb; $i++) {
+			$selected = $tab_heat[$i]['ID_TYPE_CHAUFFAGE'] == $tab_tour['DETAILS']['ID_TYPE_CHAUFFAGE'] ? ' selected="selected"' : '';
+			if(!empty($tab_heat[$i]['NOM_TYPE_CHAUFFAGE'])) $label = $tab_heat[$i]['NOM_TYPE_CHAUFFAGE'];
+			else $label = $dico['edit_tour']['heating_type'.$tab_heat[$i]['ID_TYPE_CHAUFFAGE']];
+
+			if(!empty($label)) {
+				$html_heat_type .= '<option value="'.$tab_heat[$i]['ID_TYPE_CHAUFFAGE'].'"'.$selected.'>'.htmlspecialchars($label, ENT_QUOTES).'</option>';
+			}
+		}
+
+		// build <select> orientation
+		$html_orientation = '<option value="">-</option>';
+		$tab_orientation = array('N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW');
+		$nb = count($tab_orientation);
+		for($i=0; $i<$nb; $i++) {
+			$selected = $tab_orientation[$i]==$tab_tour['DETAILS']['ORIENTATION'] ? ' selected="selected"' : '';
+			$label = $dico['common']['orientation_'.strtolower($tab_orientation[$i])];
+			$html_orientation .= '<option value="'.$tab_orientation[$i].'"'.$selected.'>'.$label.'</option>';
+		}
+
+		// build <select> kitchen
+		if(empty($_SESSION['KITCHEN_LIST'])) $_SESSION['KITCHEN_LIST'] = get_type_kitchen_list($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_LANGUE']);
+		$tab_kitchen = $_SESSION['KITCHEN_LIST'];
+		$nb = count($tab_kitchen);
+		$html_kitchen = '<option value="">-</option>';
+		for($i=0; $i<$nb; $i++) {
+			$selected = $tab_kitchen[$i]['ID_TYPE_CUISINE']==$tab_tour['DETAILS']['ID_TYPE_CUISINE'] ? ' selected="selected"' : '';
+			if(!empty($tab_kitchen[$i]['NOM_TYPE_CUISINE'])) $label = $tab_kitchen[$i]['NOM_TYPE_CUISINE'];
+			else $label = $dico['edit_tour']['kitchen_type'.$tab_kitchen[$i]['ID_TYPE_CUISINE']];
+			if(!empty($label)) {
+				$html_kitchen .= '<option value="'.$tab_kitchen[$i]['ID_TYPE_CUISINE'].'"'.$selected.'>'.htmlspecialchars($label, ENT_QUOTES).'</option>';
+			}
+		}
+
+
+		if(empty($tab_tour['DETAILS']['ID_UNITE_SURFACE_HABITABLE'])) $tab_tour['DETAILS']['ID_UNITE_SURFACE_HABITABLE'] = 1;
+		if(empty($tab_tour['DETAILS']['ID_UNITE_SURFACE_TERRAIN']))   $tab_tour['DETAILS']['ID_UNITE_SURFACE_TERRAIN']   = 1;
+
+		$class_active1 = $class_active2 = $class_active3 = $class_active4 = $class_active5 = '';
+
+		if($tab_status[$i]['ID_STATUT_LISTING']==2)	  $class_active2 = 'status_2_active';
+		else if($tab_status[$i]['ID_STATUT_LISTING']==3) $class_active3 = 'status_3_active';
+		else if($tab_status[$i]['ID_STATUT_LISTING']==4) $class_active4 = 'status_4_active';
+		else if($tab_status[$i]['ID_STATUT_LISTING']==5) $class_active5 = 'status_5_active';
+		else											 $class_active1 = 'status_1_active';
+
+		$date_dispo = !empty($tab_tour['DETAILS']['DATE_DISPONIBILITE']) ? date('Y-m-d', strtotime($tab_tour['DETAILS']['DATE_DISPONIBILITE'])) : '';
+		$tab_period = get_rent_period();
+
+?>
+<div class="container_services">
+  <div class="container_tabs">
+	<a id="link_rs" onclick="return changeTemplate('sale');" href="#"<?=$class_sale?>><?=$dico['common']['sale']?></a>
+	<a id="link_rr" onclick="return changeTemplate('rent');" href="#"<?=$class_rent?>><?=$dico['common']['rental']?></a>
+<?php
+		if(USER_FR) {
+?>
+	<a id="link_ls" onclick="return changeTemplate('rentseason');" href="#"<?=$class_rent_season?>><?=$dico['common']['rental_season']?></a>
+	<a id="link_rv" onclick="return changeTemplate('lifetime');" href="#"<?=$class_lifetime?>><?=$dico['common']['lifetime']?></a>
+<?php
+		}
+?>
+	<div class="clear_sep">&nbsp;</div>
+  </div>
+  <div class="box_services_square_top">&nbsp;</div>
+  <div class="box_services_center">
+  
+	<div class="content_form content_form_eu">
+	<form action="<?=$url_post?>" method="post" id="form_eu">
+	  <input type="hidden" name="p_publish_on" id="p_publish_on" value="" />
+	  <input type="hidden" name="tour" value="<?=$tour?>" />
+	  <input type="hidden" name="todo" value="update" />
+	  <input type="hidden" name="listing_status" id="listing_status" value="<?=$default_status?>" />
+	  <input type="hidden" name="transaction_type" id="transaction_type" value="<?=$tab_tour['DETAILS']['ID_TYPE_TRANSACTION']?>" />
+	  <input type="hidden" name="p_lat" id="p_lat" value="<?=$tab_tour['LATITUDE']?>" />
+	  <input type="hidden" name="p_lon" id="p_lon" value="<?=$tab_tour['LONGITUDE']?>" />
+	  <input type="hidden" name="p_currency" id="p_currency" value="<?=$default_currency?>" />
+	  <input type="hidden" name="p_area_unit_home" id="p_area_unit_home" value="<?=$tab_tour['DETAILS']['ID_UNITE_SURFACE_HABITABLE']?>" />
+	  <input type="hidden" name="p_area_unit_field" id="p_area_unit_field" value="<?=$tab_tour['DETAILS']['ID_UNITE_SURFACE_TERRAIN']?>" />
+	  <input type="hidden" name="mess_error_ref" id="mess_error_ref" value="<?=htmlspecialchars($dico['edit_tour']['error_reference'], ENT_QUOTES)?>" />
+	  <input type="hidden" name="mess_error_price" id="mess_error_price" value="<?=htmlspecialchars($dico['edit_tour']['error_price'], ENT_QUOTES)?>" />
+	  <input type="hidden" name="mess_error_locate_property" id="mess_error_locate_property" value="<?=htmlspecialchars($dico['edit_tour']['error_locate_property'], ENT_QUOTES)?>" />
+	  <input type="hidden" name="mess_search_please_wait" id="mess_search_please_wait" value="<?=htmlspecialchars($dico['edit_tour']['search_please_wait'], ENT_QUOTES)?>" />
+	  <input type="hidden" name="label_rent" id="label_rent" value="<?=htmlspecialchars($dico['edit_tour']['field_rent'], ENT_QUOTES)?>" />
+	  <input type="hidden" name="label_sale" id="label_sale" value="<?=htmlspecialchars($dico['edit_tour']['field_price'], ENT_QUOTES)?>" />
+	  <input type="hidden" name="label_life" id="label_lifetime" value="<?=htmlspecialchars($dico['edit_tour']['lifetime_price'], ENT_QUOTES)?>" />
+
+<?php
+
+?>
+	  <input type="hidden" name="p_rent_period" id="p_rent_period" value="<?=$tab_tour['DETAILS']['ID_PERIODICITE_LOYER']?>" />
+<?php
+		for($i=0; $i<count($tab_period); $i++) {
+			$label_period = $dico['edit_tour'][ 'rent_period'.$tab_period[$i]['ID_PERIODICITE_LOYER'] ];
+			if(!empty($label_period)) {
+?>
+	  <input type="hidden" id="label_rent_period<?=$tab_period[$i]['ID_PERIODICITE_LOYER']?>" name="label_rent_period<?=$tab_period[$i]['ID_PERIODICITE_LOYER']?>" value="<?=htmlspecialchars($label_period, ENT_QUOTES)?>" />
+<?php
+			}
+		}
+
+
+		for($i=0; $i<$nb_status; $i++) {
+			$input_name = 'listing_status'.$tab_status[$i]['ID_STATUT_LISTING'];
+			$input_value = $dico['edit_tour'][ 'status_'.$tab_status[$i]['ID_STATUT_LISTING'] ];
+?>
+	  <input type="hidden" name="<?=$input_name?>" id="<?=$input_name?>" value="<?=htmlspecialchars($input_value, ENT_QUOTES)?>" />
+<?php
+		}
+
+		if(NEW_INTEGRATION) {
+			if($display_auto_update) {
+?>
+	  <div class="notify_box messinfo">
+		<div class="half float_l">
+		  <div id="label_left"><?=$txt_autoupdate_resume?></div>
+		  <div>
+			<i><?=$txt_autoupdate_last?></i>
+		  </div>
+		</div>
+		<div class="half float_l">
+		  <input type="checkbox" onclick="updateLock(this);" name="chk_lock_listing" id="chk_lock_listing" value="<?=$chk_lock_value?>" /><label id="link_update_lock" class="chk" for="chk_lock_listing"><?=$txt_action_label?></label>
+		  <div id="label_right" <?=$style_allow_image?>>
+			<input type="checkbox" onclick="updateLock(this);" name="chk_allow_images" id="chk_allow_images" value="full_lock"<?=$chk_allow_image?> />&nbsp;<label class="chk" for="chk_allow_images"><?=$dico['edit_tour']['listing_locked_allow_images']?></label>
+			<br /><input type="checkbox" name="chk_block_tts" id="chk_block_tts" value="1" <?=$checked_block_tts?> />&nbsp;<label class="chk" for="chk_block_tts"><?=$dico['edit_tour']['block_tts']?></label>
+			
+		  </div>
+		</div>
+		<div class="clear_sep"></div>
+	  </div>
+	  <input type="hidden" name="mess_listing_locked" id="mess_listing_locked" value="<?=htmlspecialchars($dico['edit_tour']['listing_locked_ok'], ENT_COMPAT)?>" />
+	  <input type="hidden" name="mess_listing_unlocked" id="mess_listing_unlocked" value="<?=htmlspecialchars($dico['edit_tour']['listing_locked_ko'], ENT_COMPAT)?>" />
+	  <input type="hidden" name="mess_update_lock" id="mess_update_lock" value="<?=htmlspecialchars($dico['edit_tour']['listing_mess_lock'], ENT_COMPAT)?>" />
+	  <input type="hidden" name="mess_update_unlock" id="mess_update_unlock" value="<?=htmlspecialchars($dico['edit_tour']['listing_mess_unlock'], ENT_COMPAT)?>" />
+<?php
+			}
+?>
+	  <div class="full_width <?=get_class_row($row_count++)?> margin4T">
+		<div class="relative full_width">
+		  <div class="float_l block_w_1_2 margin4L">
+		   <div class="label_field"><?=$dico['common']['reference']?>&nbsp;<strong>*</strong></div>
+		  </div>
+
+		  <div class="float_l block_w_1_2_padding margin4R">
+		   <div class="label_field">
+		   <?=$dico['edit_tour']['field_tour_status']?><span id="label_status"></span>
+		   </div>
+		  </div>
+
+		  <div class="clear_sep"></div>
+
+<?php
+			if(AUTOFILL_DATA) {
+?>
+		  <div id="search_property_container" class="search_property_block"></div>
+<?php
+			}
+?>
+
+		</div>
+
+		<div class="full_width">
+		  <div class="float_l block_w_1_2 margin4L">
+			<div class="label_field">
+			  <input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_left" name="p_ref" id="p_ref" value="<?=htmlspecialchars($reference, ENT_QUOTES)?>" <?=AUTOFILL_DATA ? 'onchange="lauchGetData(this.value);"' : ''?> />
+			</div>
+		  </div>
+
+		  <div class="float_l block_w_1_2_padding margin4R">
+			<div class="label_field">
+			  <a href="#" id="link_1" class="link_status link_status_fr float_l status_1" onclick="return updateListingStatus(1);" onmouseover="previewListingStatus(1);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			  <a href="#" id="link_5" class="link_status link_status_fr float_l status_5" onclick="return updateListingStatus(5);" onmouseover="previewListingStatus(5);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			  <a href="#" id="link_2" class="link_status link_status_fr float_l status_2" onclick="return updateListingStatus(2);" onmouseover="previewListingStatus(2);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			  <a href="#" id="link_3" class="link_status link_status_fr float_l status_3" onclick="return updateListingStatus(3);" onmouseover="previewListingStatus(3);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			  <a href="#" id="link_4" class="link_status link_status_fr float_l status_4" onclick="return updateListingStatus(4);" onmouseover="previewListingStatus(4);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			  <div class="clear_sep"></div>
+			</div>
+		  </div>
+		  <div class="clear_sep"></div>
+		</div>
+	  </div>
+
+	  <!-- title & price -->
+	  <div>
+		<div class="row_spaced float_l block_w_2_3 margin4L <?=get_class_row($row_count++)?>">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_title']?><br />
+			<input type="text" class="input_block input_w_2_3" name="p_title" id="p_title" value="<?=$title?>" maxlength="150" />
+		  </p>
+		</div>
+		<div class="row_spaced float_l block_w_1_3 margin4R <?=get_class_row($row_count-1)?>">
+		  <p class="label_field">
+			<span id="label_price"><?=$label_price?></span><span id="currency1"></span>
+<?php
+
+?>
+			<a href="#" class="link_period" onclick="return changeRentPeriod(true);" id="period_price">&nbsp;</a>
+<?php
+
+?>
+			<br />
+			<input type="text" class="input_block input_w_1_3 input_number" name="p_price" id="p_price" value="<?=$price?>" maxlength="10" />
+		  </p>
+		</div>
+		<div class="clear_sep">&nbsp;</div>
+		
+		<div id="lifetime_fields" class="<?=$class_div_lifetime?>">
+			<div class="float_l block_w_1_4 margin4L">
+				<p class="label_field">
+					<?=$dico['edit_tour']['lifetime_loan']?><br />
+					<input type="text" class="input_block input_w_1_4 input_number" name="p_monthly_loan" id="p_monthly_loan" value="<?=$tab_tour['DETAILS']['RENTE_MENSUELLE']?>" maxlength="10" />
+				</p>
+			</div>
+			<div class="float_l block_w_1_4 margin4L">
+				<p class="label_field">
+					<?=$dico['edit_tour']['lifetime_owner_age_m']?><br />
+					<input type="text" class="input_block input_w_1_4" name="p_owner_age_m" id="p_owner_age_m" value="<?=$tab_tour['DETAILS']['AGE_PROPRIETAIRE_M']?>" maxlength="10" />
+				</p>
+			</div>
+			<div class="float_l block_w_1_4 margin4R">
+				<p class="label_field">
+					<?=$dico['edit_tour']['lifetime_owner_age_f']?><br />
+					<input type="text" class="input_block input_w_1_4" name="p_owner_age_f" id="p_owner_age_f" value="<?=$tab_tour['DETAILS']['AGE_PROPRIETAIRE_F']?>" maxlength="10" />
+				</p>
+			</div>
+			<div class="float_l block_w_1_4 margin4R">
+				<p class="label_field">
+					<?=$dico['edit_tour']['lifetime_property_occupied']?><br />
+					<label class="chk"><input type="radio" name="p_lifetime_occupied" value="1"<?=!empty($tab_tour['DETAILS']['ID_LOGEMENT_OCCUPE']) ? ' checked="checked"' : ''?> />
+					<?=$dico['common']['yes']?></label>
+					<label class="chk"><input type="radio" name="p_lifetime_occupied" value="0"<?=empty($tab_tour['DETAILS']['ID_LOGEMENT_OCCUPE']) ? ' checked="checked"' : ''?> />
+					<?=$dico['common']['no']?></label>
+				</p>
+			</div>
+			<div class="clear_sep">&nbsp;</div>
+		</div>
+	  
+	  </div>
+	  <!-- /title & price -->
+
+
+	  <!-- desc & rooms -->
+	  <div>
+		<div class="float_l block_w_2_3 margin4L">
+		  <p class="label_field <?=get_class_row($row_count++)?>">
+			<?=$dico['edit_tour']['field_description']?><br />
+			<textarea class="input_block input_w_2_3 textarea_description" name="p_desc" id="p_desc" ><?=htmlspecialchars($tab_tour['DESCRIPTION'], ENT_QUOTES)?></textarea>
+		  </p>
+		</div>
+
+		<div class="float_l block_w_1_3 margin4R">
+		  <p class="label_field <?=get_class_row($row_count-1)?>">
+			<?=$dico['edit_tour']['field_type_bien']?><br />
+			<select class="input_block input_w_1_3" name="p_type_bien" id="p_type_bien">
+			  <?=$html_type_biens?>
+			</select>
+		  </p>
+		  	<div class="float_l block_w_1_6 margin4L">
+					<p class="label_field <?=get_class_row($row_count++)?>">
+						<?=$dico['edit_tour']['field_nb_rooms']?><br />
+						<input type="text" class="input_block input_w_1_6" name="p_rooms" id="p_rooms" value="<?=$nb_rooms?>" maxlength="5" />
+					</p>
+		  	</div>
+<?php
+if(USER_IL) {
+?>
+		  	<div class="float_r block_w_1_6 margin4R">
+					<p class="label_field <?=get_class_row($row_count++)?>">
+						<?=$dico['edit_tour']['field_nb_half_rooms']?><br />
+						<input type="text" class="input_block input_w_1_6" name="p_half_rooms" id="p_half_rooms" value="<?=$nb_half_rooms?>" maxlength="5" />
+					</p>
+		  	</div>
+<?php
+}
+?>
+		  	<div class="clear_sep"></div>
+		  <p class="label_field <?=get_class_row($row_count++)?>">
+			<?=$dico['edit_tour']['field_liveable_area']?><span id="area_home" class="area_unit"></span><br />
+			<input type="text" class="input_block input_w_1_3" name="p_area_home" id="p_area_home" value="<?=$live_area?>"  maxlength="8" />
+		  </p>
+		</div>
+		<div class="clear_sep"></div>
+	  </div>
+	  <!-- /desc & price -->
+
+	  <!-- neighborhood -->
+	  <div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		<p class="label_field">
+		  <?=$dico['edit_tour']['field_neighborhood']?><br />
+		  <input type="text" class="input_block input_w_1_1" name="p_neighborhood" id="p_neighborhood" value="<?=htmlspecialchars($tab_tour['VOISINNAGE'], ENT_QUOTES)?>" maxlength="200" />
+		</p>
+	  </div>
+	  <!-- /neighborhood -->
+
+	  <div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		<div class="block_w_1_4 float_l margin4L">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_city']?><br />
+			<input type="text" class="input_block input_w_1_4" name="p_city" id="p_city" value="<?=htmlspecialchars($tab_tour['VILLE'], ENT_QUOTES)?>" onchange="fetchGPS();" maxlength="100" />
+		  </p>
+		</div>
+		<div class="block_w_1_4 float_l margin4L">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_state']?><br />
+			<select class="input_block input_w_1_4" name="p_state" id="p_state"><?=$html_states?></select>
+		  </p>
+		</div>
+		<div class="block_w_1_4 float_l margin4R">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_zip']?><br />
+			<input type="text" class="input_block input_w_1_4" name="p_zip" id="p_zip" value="<?=htmlspecialchars($tab_tour['CODE_POSTAL'], ENT_QUOTES)?>" onchange="fetchGPS();" maxlength="20" />
+		  </p>
+		</div>
+		<div class="block_w_1_4 float_l margin4R">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_country']?><br />
+			<select class="input_block input_w_1_4" name="p_country" id="p_country" onchange="updateStatesList('p_state', this.value); fetchGPS();"><?=$html_country?></select>
+		  </p>
+		</div>
+		<div class="clear_sep"></div>
+	  </div>
+
+
+<?php
+if(USER_FR) {
+?>
+<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+	<div class="block_w_1_2 float_l margin4L">
+		<p class="label_field">
+			Consommation d'énergie<br />
+			<div id="dpe_letter" class="float_l dpe_letter margin4L dpe_letter_<?=strtolower($tab_tour['DETAILS']['DPE_LETTRE'])?>"></div>
+			<input type="text" class="input_block input_w_1_6" name="p_dpe_val" id="p_dpe_val" value="<?=htmlspecialchars($tab_tour['DETAILS']['DPE_VALEUR'], ENT_QUOTES)?>" maxlength="5" onblur="updateDPE(this.value);" /><span class="margin4R">kWh ep/m².an</span>
+		</p>
+	</div>
+	<div class="block_w_1_2 float_r margin4R">
+		<p class="label_field">
+			Emissions de gazs à effet de serre<br />
+			<div id="ges_letter" class="float_l ges_letter margin4L ges_letter_<?=strtolower($tab_tour['DETAILS']['GES_LETTRE'])?>"></div>
+			<input type="text" class="input_block input_w_1_6" name="p_ges_val" id="p_ges_val" value="<?=htmlspecialchars($tab_tour['DETAILS']['GES_VALEUR'], ENT_QUOTES)?>" maxlength="5" onblur="updateGES(this.value);" /><span class="margin4R">kg eqCO2/m².an</span>
+		</p>
+	</div>
+	<div class="clear_sep"></div>
+</div>
+<?php
+}
+?>
+
+
+	  <p>
+	   <a href="#" class="float_l link_details" id="link_details" onclick="return openDetailsForm(this.id);"><?=$dico['edit_tour']['optionnal_fields']?></a>
+	   <p class="clear_sep"></p>
+	  </p>
+	  <div id="option_form" style="display: none;">
+
+		<div class="row_spaced <?=get_class_row($row_count++)?>">
+		  <p class="label_field">
+			<?=$dico['edit_tour']['field_address']?><br />
+			<input type="text" class="input_block input_w_1_1" name="p_address" id="p_address" value="<?=htmlspecialchars($tab_tour['ADRESSE'], ENT_QUOTES)?>" maxlength="150" onchange="fetchGPS();" />
+		  </p>
+		</div>
+
+		<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		  <div class="block_w_1_2 float_l margin4L">
+			<p class="label_field">
+			  <label class="chk" for="hide_addr"><?=$dico['edit_tour']['field_hide_address']?></label>&nbsp;<input type="checkbox" name="hide_addr" id="hide_addr" value="1"<?=$check_hide_address?> />
+			</p>
+		  </div>
+		  <div class="block_w_1_2 float_l margin4R">
+			<p class="label_field">
+			  <label class="chk" for="google_display"><?=$dico['edit_tour']['field_show_map']?></label>&nbsp;<input type="checkbox" name="google_display" id="google_display" value="1" onclick="fetchGPS();" /><!-- googlePreview(); -->
+			</p>
+		  </div>
+		  <div class="clear_sep">&nbsp;</div>
+		  <div class="block_w_1_1">
+			<p class="label_field">
+			  <label class="chk" for="hide_gmap"><?=$dico['edit_tour']['field_hide_googlemap']?></label>&nbsp;<input type="checkbox" name="hide_gmap" id="hide_gmap" value="1"<?=$check_hide_gmap?> />
+			</p>
+		  </div>
+		</div>
+
+		<div id="google_preview">&nbsp;</div>
+		<div id="google_notify" class="notify_box">&nbsp;</div>
+		
+		<!--  oh -->
+		<h3><?=$dico['edit_tour']['openhouse_add']?></h3>
+		<div class="row_spaced">
+		 <div class="float_l block_w_oh_calendar form_align_left">
+		  <div class="float_l">
+		   <p class="label_field">
+			<?=$dico['common']['date']?><br/>
+			<input type="text" class="input_block" style="width: 110px;" name="oh_date" id="oh_date" value="" />
+		   </p>
+		  </div>
+		  <div class="float_l">
+		   <p class="label_field">
+		   <br />
+		   <img class="chk" src="images/picto-cal.jpg" name="oh_cal" id="oh_cal">
+		   </p>
+		  </div>
+		  <div class="clear_sep"></div>
+		 </div>
+
+		 <div class="float_l block_w_oh_duration form_align_left">
+		  <p class="label_field">
+		   <?=$dico['common']['duration']?><br/>
+		   <select name="oh_duration" id="oh_duration" class="input_block">
+			<?=$html_duration?>
+		   </select>
+		  </p>
+		 </div>
+		 
+		 <div class="float_l block_w_1_2 form_align_left">
+		  <p class="label_field">
+		   <?=$dico['common']['message']?><br/>
+		   <input type="text" class="input_block input_w_1_2" name="oh_mess" id="oh_mess" value="" />
+		  </p>
+		 </div>
+
+		 <div class="float_r form_align_right">
+		  <p class="label_field">
+		  <br />
+		  <a href="#" class="link_openhouse link_add" onclick="return addOpenHouse();"></a>
+		  </p>
+		 </div>
+
+		 <div class="clear_sep"></div>
+		</div>
+		<div id="oh_list"></div>
+		<!-- / oh -->
+
+		<div class="content_features no_marg" style="">
+
+		  <!-- block 2/3 -->
+		  <div class="row_spaced block_w_2_3 float_l margin4L">
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_nb_br']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_nb_br" id="p_nb_br" value="<?=$tab_tour['DETAILS']['NOMBRE_CHAMBRE']?>" maxlength="2" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_3">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_area_field']?><span id="area_field" class="area_unit"></span><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_area_field" id="p_area_field" value="<?=$area_field?>" maxlength="8" />
+				</p>
+			  </div>
+			  <div class="clear_sep"></div>
+			</div>
+
+
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_nb_ba']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_nb_ba" id="p_nb_ba" value="<?=$tab_tour['DETAILS']['NOMBRE_SALLE_BAIN']?>" maxlength="2" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_4">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['availability_date']?><br />
+				  <input type="text" class="input_block input_w_1_4" name="p_date_dispo" id="p_date_dispo" value="<?=$date_dispo?>" maxlength="8" readonly="readonly" />
+				</p>
+			  </div>
+			  <div class="float_l">
+				<p class="label_field">
+				  <br />
+				  <img class="chk" src="images/picto-cal.jpg" name="t_calendar" id="t_calendar">
+				</p>
+			  </div>
+			  <div class="clear_sep"></div>
+			</div>
+
+
+
+
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_agency_taxes']?><br />
+				  <input type="text" class="input_block input_w_1_3 input_number" name="p_ag_taxes" id="p_ag_taxes" value="<?=$agency_taxes?>" maxlength="8" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_3">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_monthly_taxes']?><br />
+				  <input type="text" class="input_block input_w_1_3 input_number" name="p_monthly_taxes" id="p_monthly_taxes" value="<?=$monthly_taxes?>" maxlength="8" />
+				</p>
+			  </div>
+			  <div class="clear_sep"></div>
+			</div>
+
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_nb_terrace']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_nb_terrace" id="p_nb_terrace" value="<?=$tab_tour['DETAILS']['NOMBRE_TERRASSE']?>" maxlength="2" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_3">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_nb_parking']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_nb_parking" id="p_nb_parking" value="<?=$tab_tour['DETAILS']['NOMBRE_GARAGE']?>" maxlength="2" />
+				</p>
+			  </div>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+
+
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_num_floor']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_num_floor" id="p_num_floor" value="<?=$tab_tour['DETAILS']['NUMERO_ETAGE']?>" maxlength="2" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_3">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_total_floors']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_tot_floor" id="p_tot_floor" value="<?=$tab_tour['DETAILS']['NOMBRE_ETAGES']?>" maxlength="2" />
+				</p>
+			  </div>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_year_built']?><br />
+				  <input type="text" class="input_block input_w_1_3" name="p_year_built" id="p_year_built" value="<?=$tab_tour['DETAILS']['ANNEE_CONSTRUCTION']?>" maxlength="4" />
+				</p>
+			  </div>
+			  <div class="float_l block_w_1_3">
+				<p class="label_field">
+				  <?=$dico['edit_tour']['field_orientation']?><br />
+				  <select class="input_block input_w_1_3" name="p_orientation" id="p_orientation">
+					<?=$html_orientation?>
+				  </select>
+				</p>
+			  </div>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			  <div class="float_l block_w_1_3 margin4L">
+					<p class="label_field">
+						<?=$dico['edit_tour']['field_heating_type']?><br />
+						<select class="input_block input_w_1_3" name="p_heat_type" id="p_heat_type">
+						<?=$html_heat_type?>
+						</select>
+					</p>
+			  </div>
+			  <div class="float_l block_w_1_3">
+					<p class="label_field">
+						<?=$dico['edit_tour']['field_kitchen']?><br />
+						<select class="input_block input_w_1_3" name="p_kitchen" id="p_kitchen">
+						<?=$html_kitchen?>
+						</select>
+					</p>
+			  </div>
+			  <div class="clear_sep">&nbsp;</div>
+			</div>
+<?php
+if(USER_IL) {
+?>
+			<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+				<p class="label_field">
+					<?=$dico['edit_tour']['field_orientation_windows']?><br />
+					<input type="checkbox" name="orientation_window[]" id="win_n" value="N" <?=$checked_win_n?>/><label class="chk" for="win_n"><?=$dico['common']['orientation_n']?></label>
+					<input type="checkbox" name="orientation_window[]" id="win_s" value="S" <?=$checked_win_s?>/><label class="chk" for="win_s"><?=$dico['common']['orientation_s']?></label>
+					<input type="checkbox" name="orientation_window[]" id="win_e" value="E" <?=$checked_win_e?>/><label class="chk" for="win_e"><?=$dico['common']['orientation_e']?></label>
+					<input type="checkbox" name="orientation_window[]" id="win_w" value="W" <?=$checked_win_w?>/><label class="chk" for="win_w"><?=$dico['common']['orientation_w']?></label>
+				</p>
+			</div>
+<?php
+}
+?>
+		  </div>
+		  <!-- /block 2/3 -->
+
+
+		  <!-- block 1/3 -->
+		  <div class="block_w_1_3 float_l margin4R">
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_exclu" id="p_exclu" value="1"<?=!empty($tab_tour['DETAILS']['ID_EXCLUSIVITE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_exclu"><?=$dico['edit_tour']['exclusive']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_lux" id="p_lux" value="1"<?=!empty($tab_tour['DETAILS']['ID_PRESTIGE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_lux"><?=$dico['edit_tour']['prestige']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_furnished" id="p_furnished" value="1"<?=!empty($tab_tour['DETAILS']['ID_BIEN_AMENAGE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_furnished"><?=$dico['edit_tour']['furnished']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_recent" id="p_recent" value="1"<?=!empty($tab_tour['DETAILS']['ID_IMMEUBLE_RECENT']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_recent"><?=$dico['edit_tour']['recent']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_need_work" id="p_need_work" value="1"<?=!empty($tab_tour['DETAILS']['ID_TRAVAUX']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_need_work"><?=$dico['edit_tour']['need_work']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_brand_new" id="p_brand_new" value="1"<?=!empty($tab_tour['DETAILS']['ID_REFAIT_NEUF']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_brand_new"><?=$dico['edit_tour']['brand_new']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_digicode" id="p_digicode" value="1"<?=!empty($tab_tour['DETAILS']['ID_DIGICODE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_digicode"><?=$dico['edit_tour']['digicode']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_elevator" id="p_elevator" value="1"<?=!empty($tab_tour['DETAILS']['ID_ASCENSEUR']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_elevator"><?=$dico['edit_tour']['elevator']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_interphone" id="p_interphone" value="1"<?=!empty($tab_tour['DETAILS']['ID_INTERPHONE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_interphone"><?=$dico['edit_tour']['interphone']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_guard" id="p_guard" value="1"<?=!empty($tab_tour['DETAILS']['ID_GARDIEN']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_guard"><?=$dico['edit_tour']['guard']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_cave" id="p_cave" value="1"<?=!empty($tab_tour['DETAILS']['ID_CAVE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_cave"><?=$dico['edit_tour']['cave']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_internet_hd" id="p_internet_hd" value="1"<?=!empty($tab_tour['DETAILS']['ID_INTERNET_HAUT_DEBIT']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_internet_hd"><?=$dico['edit_tour']['internet_hd']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_clim" id="p_clim" value="1"<?=!empty($tab_tour['DETAILS']['ID_CLIMATISATION']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_clim"><?=$dico['edit_tour']['air_conditionning']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_pool" id="p_pool" value="1"<?=!empty($tab_tour['DETAILS']['ID_PISCINE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_pool"><?=$dico['edit_tour']['pool']?></label>
+			  </p>
+			</div>
+
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_disabled_person" id="p_disabled_person" value="1"<?=!empty($tab_tour['DETAILS']['ID_AMENAGEMENT_HANDICAP']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_disabled_person"><?=$dico['edit_tour']['for_disabled_person']?></label>
+			  </p>
+			</div>
+<?php
+	if(USER_IL) {
+?>
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_shielded_room" id="p_shielded_room" value="1"<?=!empty($tab_tour['DETAILS']['ID_CHAMBRE_BLINDEE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_shielded_room"><?=$dico['edit_tour']['shielded_room']?></label>
+			  </p>
+			</div>
+			<div class="block_w_1_3 row_features <?=get_class_row($row_count++)?>">
+			  <p class="label_field">
+				<input type="checkbox" name="p_sep_wc" id="p_sep_wc" value="1"<?=!empty($tab_tour['DETAILS']['ID_TOILETTE_SEPARE']) ? ' checked="checked"' : ''?> />
+				<label class="chk" for="p_sep_wc"><?=$dico['edit_tour']['field_separate_wc']?></label>
+			  </p>
+			</div>
+<?php
+	}
+?>
+		  </div>
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+
+		<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+		  <div class="block_w_1_1 margin4L">
+			<p class="label_field"><label class="chk" for="p_email_restriction"><?=$dico['edit_tour']['field_email_restriction']?></label> <input type="checkbox" name="p_email_restriction" id="p_email_restriction" value="1"<?=$check_restriction?> /><em><small>&nbsp; <?=$dico['edit_tour']['field_email_restriction_help']?></small></em></p>
+		  </div>
+		</div>
+		
+		<div class="full_width row_spaced <?=get_class_row($row_count++)?>">
+			<div class="block_w_1_1 margin4L">
+				<p class="label_field">
+					<?=$dico['edit_tour']['url_listing']?><br />
+					<input type="text" class="input_block input_w_1_1" name="p_url_listing" value="<?=fix_html($tab_tour['URL_ANNONCE'])?>" />
+				</p>
+			</div>
+		</div>
+
+
+<?php
+		} else { // old layout
+?>
+	  <div class="row_highlight">
+		<div class="row_form" style="position: relative;">
+		  <p class="float_l form_block_w_1_2 block_w_1_2 form_align_left"><?=$dico['common']['reference']?>&nbsp;<strong>*</strong></p>
+		  <p class="float_l form_block_w_1_2 block_w_1_2_padding form_align_right"><?=$dico['edit_tour']['field_tour_status']?><span id="label_status"></span></p>
+		  <div class="clear_sep">&nbsp;</div>
+<?php
+			if(AUTOFILL_DATA) {
+?>
+		  <div id="search_property_container" class="search_property_block"></div>
+<?php
+			}
+?>
+		</div>
+
+		<div class="row_form row_link_status">
+		  <p class="float_l form_block_w_1_2 block_w_1_2 form_align_left">
+			<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_left" name="p_ref" id="p_ref" value="<?=htmlspecialchars($reference, ENT_QUOTES)?>" <?=AUTOFILL_DATA ? 'onchange="lauchGetData(this.value);"' : ''?> />
+		  </p>
+		  <p class="float_l form_block_w_1_2 block_w_1_2_padding form_align_right auto_height">
+			<a href="#" id="link_1" class="link_status link_status_fr float_l status_1" onclick="return updateListingStatus(1);" onmouseover="previewListingStatus(1);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			<a href="#" id="link_5" class="link_status link_status_fr float_l status_5" onclick="return updateListingStatus(5);" onmouseover="previewListingStatus(5);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			<a href="#" id="link_2" class="link_status link_status_fr float_l status_2" onclick="return updateListingStatus(2);" onmouseover="previewListingStatus(2);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			<a href="#" id="link_3" class="link_status link_status_fr float_l status_3" onclick="return updateListingStatus(3);" onmouseover="previewListingStatus(3);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			<a href="#" id="link_4" class="link_status link_status_fr float_l status_4" onclick="return updateListingStatus(4);" onmouseover="previewListingStatus(4);" onmouseout="previewListingStatus($F('listing_status'));">&nbsp;</a>
+			<div class="clear_sep">&nbsp;</div>
+		  </p>
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+	  </div>
+
+	  <!-- block title & price -->
+	  <div class="row_form">
+		<p class="float_l form_block_w_2_3 block_w_2_3 form_align_left"><?=$dico['edit_tour']['field_title']?></p>
+		<p class="float_l form_block_w_1_3 block_w_1_3 form_align_right" style="position: relative;" id="label_price"><?=$label_price?><span id="currency1"></span></p>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+	  <div class="row_form">
+		<input type="text" class="input_block float_l form_input_w_2_3 input_w_2_3 form_align_left" name="p_title" id="p_title" value="<?=$title?>" maxlength="150" />
+		<input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 form_align_right input_number" name="p_price" id="p_price" value="<?=$price?>" maxlength="10" />
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+
+	  <!-- block description -->
+	  <div class="row_form">
+		<p class="float_l form_block_w_2_3 block_w_2_3 form_align_left"><?=$dico['edit_tour']['field_description']?></p>
+		<p class="float_l form_block_w_1_3 block_w_1_3 form_align_right"><?=$dico['edit_tour']['field_type_bien']?></p>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+
+	  <div class="row_form size_h3">
+		<textarea class="input_block float_l form_input_w_2_3 input_w_2_3 form_align_left input_h3" name="p_desc" id="p_desc" ><?=htmlspecialchars($tab_tour['DESCRIPTION'], ENT_QUOTES)?></textarea>
+		<div class="float_r form_block_w_1_3 block_w_1_3 no_pad no_marg size_h3">
+		  <select class="input_block float_l form_block_w_1_3 block_w_1_3 no_marg" name="p_type_bien" id="p_type_bien">
+			<?=$html_type_biens?>
+		  </select>
+		  <p class="float_l form_block_w_1_3 block_w_1_3 no_marg"><?=$dico['edit_tour']['field_nb_rooms']?></p>
+		  <input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 no_marg" name="p_rooms" id="p_rooms" value="<?=$nb_rooms?>" maxlength="5" />
+		  <p class="float_l form_block_w_1_3 block_w_1_3 no_marg"><?=$dico['edit_tour']['field_liveable_area']?><span id="area_home" class="area_unit"></span></p>
+		  <input type="text" class="input_block float_l form_input_w_1_3 input_w_1_3 no_marg" name="p_area_home" id="p_area_home" value="<?=$live_area?>"  maxlength="8" />
+		</div>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+
+	  <!-- block neighborhood -->
+	  <div class="row_form">
+		<p class="float_l form_block_w_1_1 block_w_1_1 form_align_left"><?=$dico['edit_tour']['field_neighborhood']?></p>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+	  <div class="row_form">
+		<input type="text" class="input_block float_l form_input_w_1_1 input_w_1_1 form_align_left" name="p_neighborhood" id="p_neighborhood" value="<?=htmlspecialchars($tab_tour['VOISINNAGE'], ENT_QUOTES)?>" maxlength="200" />
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+
+	  <div class="row_form">
+		<p class="float_l form_block_w_1_4 block_w_1_4 form_align_left"><?=$dico['edit_tour']['field_city']?></p>
+		<p class="float_l form_block_w_1_4 block_w_1_4 form_align_left"><?=$dico['edit_tour']['field_state']?></p>
+		<p class="float_l form_block_w_1_4 block_w_1_4 form_align_right"><?=$dico['edit_tour']['field_zip']?></p>
+		<p class="float_l form_block_w_1_4 block_w_1_4 form_align_right"><?=$dico['edit_tour']['field_country']?></p>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+	  <div class="row_form">
+		<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_left" name="p_city" id="p_city" value="<?=htmlspecialchars($tab_tour['VILLE'], ENT_QUOTES)?>" onchange="fetchGPS();" maxlength="100" />
+		<select class="input_block float_l form_block_w_1_4 block_w_1_4 form_align_left" name="p_state" id="p_state"><?=$html_states?></select>
+		<input type="text" class="input_block float_l form_input_w_1_4 input_w_1_4 form_align_right" name="p_zip" id="p_zip" value="<?=htmlspecialchars($tab_tour['CODE_POSTAL'], ENT_QUOTES)?>" onchange="fetchGPS();" maxlength="20" />
+		<select class="input_block float_l form_block_w_1_4 block_w_1_4 form_align_right" name="p_country" id="p_country" onchange="updateStatesList('p_state', this.value); fetchGPS();"><?=$html_country?></select>
+		<div class="clear_sep">&nbsp;</div>
+	  </div>
+
+	  <p><a href="#" class="link_details" id="link_details" onclick="return openDetailsForm(this.id);"><?=$dico['edit_tour']['optionnal_fields']?></a></p>
+	  <div id="option_form" class="no_pad no_marg" style="display: none;">
+		<div class="row_form">
+		  <p class="float_l form_block_w_1_1 block_w_1_1 form_align_left"><?=$dico['edit_tour']['field_address']?></p>
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+		<div class="row_form">
+		  <input type="text" class="input_block float_l form_input_w_1_1 input_w_1_1 form_align_left" name="p_address" id="p_address" value="<?=htmlspecialchars($tab_tour['ADRESSE'], ENT_QUOTES)?>" maxlength="150" onchange="fetchGPS();" />
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+
+		<div class="row_form">
+		  <p class="float_l form_block_w_1_2 block_w_1_2 form_align_left"><label class="chk" for="hide_addr"><?=$dico['edit_tour']['field_hide_address']?></label>&nbsp;<input type="checkbox" name="hide_addr" id="hide_addr" value="1"<?=$check_hide_address?> /></p>
+		  <p class="float_l form_block_w_1_2 block_w_1_2 form_align_right"><label class="chk" for="google_display"><?=$dico['edit_tour']['field_show_map']?></label>&nbsp;<input type="checkbox" name="google_display" id="google_display" value="1" onclick="googlePreview();" /></p>
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+
+		<div id="google_preview">&nbsp;</div>
+		<div id="google_notify" class="notify_box">&nbsp;</div>
+
+		<div class="content_features">
+		  <div class="form_block_w_1_3 block_w_1_3 float_l form_align_left">
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_nb_br']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4" name="p_nb_br" id="p_nb_br" value="<?=$tab_tour['DETAILS']['NOMBRE_CHAMBRE']?>" maxlength="2" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_agency_taxes']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4 input_number" name="p_ag_taxes" id="p_ag_taxes" value="<?=$agency_taxes?>" maxlength="8" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_nb_terrace']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4" name="p_nb_terrace" id="p_nb_terrace" value="<?=$tab_tour['DETAILS']['NOMBRE_TERRASSE']?>" maxlength="2" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_num_floor']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4" name="p_num_floor" id="p_num_floor" value="<?=$tab_tour['DETAILS']['NUMERO_ETAGE']?>" maxlength="2" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_year_built']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4" name="p_year_built" id="p_year_built" value="<?=$tab_tour['DETAILS']['ANNEE_CONSTRUCTION']?>" maxlength="4" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_heating_type']?></div>
+			<select class="input_block form_block_w_1_4 block_w_1_4" name="p_heat_type" id="p_heat_type">
+			  <?=$html_heat_type?>
+			</select>
+		  </div>
+		  <div class="form_block_w_1_3 block_w_1_3 float_l form_align_left">
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_area_field']?><span id="area_field" class="area_unit"></span></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4" name="p_area_field" id="p_area_field" value="<?=$area_field?>" maxlength="8" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_monthly_taxes']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4 input_number" name="p_monthly_taxes" id="p_monthly_taxes" value="<?=$monthly_taxes?>" maxlength="8" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_nb_parking']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4" name="p_nb_parking" id="p_nb_parking" value="<?=$tab_tour['DETAILS']['NOMBRE_GARAGE']?>" maxlength="2" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_total_floors']?></div>
+			<input type="text" class="input_block form_input_w_1_4 input_w_1_4" name="p_tot_floor" id="p_tot_floor" value="<?=$tab_tour['DETAILS']['NOMBRE_ETAGES']?>" maxlength="2" />
+
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_orientation']?></div>
+			<select class="input_block form_block_w_1_4 block_w_1_4" name="p_orientation" id="p_orientation">
+			  <?=$html_orientation?>
+			</select>
+			<div class="row_form form_block_w_1_3 block_w_1_3"><?=$dico['edit_tour']['field_kitchen']?></div>
+			<select class="input_block form_block_w_1_4 block_w_1_4" name="p_kitchen" id="p_kitchen">
+			  <?=$html_kitchen?>
+			</select>
+		  </div>
+
+		  <div class="form_block_w_1_3 block_w_1_3 float_l form_align_left">
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_exclu" id="p_exclu" value="1"<?=!empty($tab_tour['DETAILS']['ID_EXCLUSIVITE']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_exclu"><?=$dico['edit_tour']['exclusive']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_furnished" id="p_furnished" value="1"<?=!empty($tab_tour['DETAILS']['ID_BIEN_AMENAGE']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_furnished"><?=$dico['edit_tour']['furnished']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_recent" id="p_recent" value="1"<?=!empty($tab_tour['DETAILS']['ID_IMMEUBLE_RECENT']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_recent"><?=$dico['edit_tour']['recent']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_need_work" id="p_need_work" value="1"<?=!empty($tab_tour['DETAILS']['ID_TRAVAUX']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_need_work"><?=$dico['edit_tour']['need_work']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_digicode" id="p_digicode" value="1"<?=!empty($tab_tour['DETAILS']['ID_DIGICODE']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_digicode"><?=$dico['edit_tour']['digicode']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_elevator" id="p_elevator" value="1"<?=!empty($tab_tour['DETAILS']['ID_ASCENSEUR']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_elevator"><?=$dico['edit_tour']['elevator']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_interphone" id="p_interphone" value="1"<?=!empty($tab_tour['DETAILS']['ID_INTERPHONE']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_interphone"><?=$dico['edit_tour']['interphone']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_guard" id="p_guard" value="1"<?=!empty($tab_tour['DETAILS']['ID_GARDIEN']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_guard"><?=$dico['edit_tour']['guard']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_cave" id="p_cave" value="1"<?=!empty($tab_tour['DETAILS']['ID_CAVE']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_cave"><?=$dico['edit_tour']['cave']?></label>
+			</div>
+
+			<div class="row_form form_block_w_1_3 block_w_1_3 row_features">
+			  <input type="checkbox" name="p_internet_hd" id="p_internet_hd" value="1"<?=!empty($tab_tour['DETAILS']['ID_INTERNET_HAUT_DEBIT']) ? ' checked="checked"' : ''?> />
+			  <label class="chk" for="p_internet_hd"><?=$dico['edit_tour']['internet_hd']?></label>
+			</div>
+
+		  </div>
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+
+<?php
+			if(SERVER_DEV) {
+?>
+		<!-- block email restriction -->
+		<div class="row_form">
+		  <p class="float_l form_block_w_1_1 block_w_1_1 form_align_left"><label class="chk" for="p_email_restriction"><?=$dico['edit_tour']['field_email_restriction']?></label> <input type="checkbox" name="p_email_restriction" id="p_email_restriction" value="1"<?=$check_restriction?> /><em><small>&nbsp; <?=$dico['edit_tour']['field_email_restriction_help']?></small></em></p>
+		  <div class="clear_sep">&nbsp;</div>
+		</div>
+<?php
+			}
+		}
+?>
+	  </div>
+	  <br />
+	</form>
+	</div>
+  </div>
+  <div class="box_services_bottom">&nbsp;</div>
+<?php
+		if($allow_update_tour) {
+?>
+  <div id="notify_form" class="notify_box"></div>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+<div class="navigation_btn">
+<?php
+			}
+?>
+  <span class="btn btn_next" onclick="return checkFormEU();">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['save']?></a></span>
+  </span>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+</div>
+<?php
+			}
+		} else {
+?>
+  <div id="notify_form" class="notify_box messwarn" style="display: block;"><?=$dico['edit_tour']['error_limitation_tours']?></div>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+<div class="navigation_btn">
+<?php
+			}
+?>
+  <span class="btn btn_next btn_deactivated" onclick="return false;">
+	<span class="inner_btn"><a href="#"><?=$dico['common']['save']?></a></span>
+  </span>
+<?php
+			if(NEW_INTEGRATION) {
+?>
+</div>
+<?php
+			}
+		}
+?>
+</div>
+<?php
+		break;
+
+
+	case 'open_edit_form_us_lot':
+		require_once '../../include/fonction.db.euform.php';
+//		$tab_detail = get_tour_details_eu($tour);
+
+		// RS 2012-12-03 : Details mergés dans ws api
+		$tab_detail = $tab_tour;
+		$tab_biens = get_type_bien_list($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_LANGUE']);
+
+		// id visite master pour lot deja cree ou en cours de crea &mt=guid
+		$id_visite_master = !empty($tab_detail['ID_VISITE_MAITRE']) ? $tab_detail['ID_VISITE_MAITRE'] : $_REQUEST['mt'];
+
+
+		// lot existant ou nouveau lot avec visite_master
+		//$is_sub_tour  = is_sub_tour($tour); // deplace dans header.php
+		$is_sub_tour |= is_guid($id_visite_master) && empty($tour);
+
+		// Inserer des type_bien custom par defaut pour le distrib pour eviter d'utiliser les type de biens standard EU
+		if(!is_guid($tab_biens[0]['ID_DISTRIBUTEUR'])) {
+			$tab_biens = array(
+				array('ID_TYPE_BIEN' => 0, 'NOM_TYPE_BIEN' => 'Others'),
+				array('ID_TYPE_BIEN' => 3, 'NOM_TYPE_BIEN' => 'Land'),
+				array('ID_TYPE_BIEN' => 4, 'NOM_TYPE_BIEN' => 'Office'),
+				array('ID_TYPE_BIEN' => 48, 'NOM_TYPE_BIEN' => 'Retail'),
+				array('ID_TYPE_BIEN' => 49, 'NOM_TYPE_BIEN' => 'Condo'),
+				array('ID_TYPE_BIEN' => 20, 'NOM_TYPE_BIEN' => 'Industrial')
+			);
+		}
+
+		if(!$is_sub_tour) {
+			$tab_lots = array_values(get_sub_tours($tour));
+			$nb_lots = count($tab_lots);
+		} else {
+			$nb_lots = 0;
+			$url_master = 'edit_tour.php?tour='.$id_visite_master;
+			$tab_status = get_type_status_listing();
+		}
+
+		$checked_rent = 2==$tab_detail['ID_TYPE_TRANSACTION'] ? ' checked="checked"' : '';
+		$checked_sale = !$checked_rent ? ' checked="checked"' : '';
+
+		$default_country = !empty($tab_tour['ID_PAYS']) ? $tab_tour['ID_PAYS'] : 'US';
+		$default_state = !empty($tab_tour['REF_ETAT']) ? $tab_tour['REF_ETAT'] : '';
+		$default_area_unit = !empty($tab_detail['ID_UNITE_SURFACE_HABITABLE']) ? $tab_detail['ID_UNITE_SURFACE_HABITABLE'] : 2;
+		$default_curr = !empty($tab_tour['REF_DEVISE']) ? $tab_tour['REF_DEVISE'] : 'USD';
+		$default_status = !empty($tab_detail['ID_STATUT_LISTING']) ? $tab_detail['ID_STATUT_LISTING'] : 1;
+
+		$default_ptype = $tab_detail['ID_TYPE_BIEN'];
+
+		if(empty($_SESSION['COUNTRY_LIST'])) $_SESSION['COUNTRY_LIST'] = get_country_list();
+		$tab_country = $_SESSION['COUNTRY_LIST'];
+		$tab_states = get_us_states_list($default_country);
+		$tab_units = get_area_unit_list();
+		$tab_curr = get_currency_list();
+
+		$formatted_price = (int)$tab_tour['PRIX_BIEN'];
+
+		if($formatted_price>0) {
+			$formatted_price = number_format($formatted_price, 0, '.', ',');
+		} else {
+			$formatted_price = '';
+		}
+
+?>
+	<div class="box_services_top">&nbsp;</div>
+	<div class="box_services_center">
+
+			<?php 
+				if($is_sub_tour) {
+					require_once 'templates/form_us_lot_sub.php';
+				} else {
+					require_once 'templates/form_us_lot_master.php';
+				}
+			?>
+
+	</div>
+	<div class="box_services_bottom">&nbsp;</div>
+<?php
+		break;
+
+	case 'open_edit_form_cush':
+		require_once '../../include/fonction.db.euform.php';
+		require_once 'include/cushwake.php';
+//		$tab_detail = get_tour_details_eu($tour);
+		// RS 2012-12-03 : Details mergés dans ws api
+		$tab_detail = $tab_tour;
+		
+		$tab_cpt = get_tour_complement($tour);
+
+		// id visite master pour lot deja cree ou en cours de crea &mt=guid
+		$id_visite_master = !empty($tab_detail['ID_VISITE_MAITRE']) ? $tab_detail['ID_VISITE_MAITRE'] : $_REQUEST['mt'];
+
+		// lot existant ou nouveau lot avec visite_master
+		//$is_sub_tour  = is_sub_tour($tour); // deplace dans header.php
+		$is_sub_tour |= is_guid($id_visite_master) && empty($tour);
+
+		$class_bui = $class_ind = $class_land = $class_off = $class_condo = $class_ret = '';
+
+		// check changement de template par onglet permis
+		// valeur forcee par onglet
+		$change_template_ok  = !empty($_REQUEST['tpl']);
+		// pas un lot existant ou lot en cours de creation
+		$change_template_ok &= !$is_sub_tour || is_guid($_REQUEST['mt']);
+		$change_template_ok &= $is_new_tour;
+
+		$template =  $change_template_ok ? $_REQUEST['tpl'] : $tab_detail['ID_TYPE_BIEN'];
+
+		if($template==3) {
+			$template = 'LAND';
+			$default_transaction = 1;
+			$class_land = ' class="active"';
+			$template_id = 3;
+		} else if($template==4) {
+			$template = 'OFFICE';
+			$default_transaction = 2;
+			$class_off = ' class="active"';
+			$template_id = 4;
+		} else if($template==48) {
+			$template = 'RETAIL';
+			$default_transaction = 2;
+			$class_ret = ' class="active"';
+			$template_id = 48;
+		} else if($template==49) {
+			$template = 'CONDO';
+			$default_transaction = 1;
+			$class_condo = ' class="active"';
+			$template_id = 49;
+		} else /*if($template==20)*/ {
+			$template = 'INDUS';
+			$default_transaction = 2;
+			$class_ind = ' class="active"';
+			$template_id = 20;
+		}
+
+		if(empty($_SESSION['LIST_TYPE_BIEN'])) $_SESSION['LIST_TYPE_BIEN'] = get_type_bien_list($_SESSION['ID_DISTRIBUTEUR'], $_SESSION['ID_LANGUE']);
+		$tab_biens = $_SESSION['LIST_TYPE_BIEN'];
+
+		$html_subtypes = '';
+		$nb = count($tab_biens);
+		for($i=0; $i<$nb; $i++) {
+			$selected = $tab_biens[$i]['ID_TYPE_BIEN'] == $tab_tour['SUBTYPE'] ? ' selected="selected"' : '';
+			$html_subtypes .= '<option value="'.$tab_biens[$i]['ID_TYPE_BIEN'].'"'.$selected.'>'.$tab_biens[$i]['NOM_TYPE_BIEN'].'</option>';
+		}
+
+		$tab_pattern = array(
+			'{reference}',
+			'{title}',
+			'{checked_class_empty}',
+			'{checked_class_a}',
+			'{checked_class_b}',
+			'{checked_class_c}',
+			'{address}',
+			'{sale_price}',
+			'{city}',
+			'{zip}',
+			'{list_states}',
+			'{list_countries}',
+			'{list_subtypes}',
+			'{description}',
+			'{amenities}',
+			'{features}',
+			'{floor_number}',
+			'{total_floors}',
+			'{year_built}',
+			'{build_area_total}',
+			'{rent_min}',
+			'{rent_max}',
+			'{checked_negotiable_ok}',
+			'{checked_negotiable_ko}',
+			'{park_ratio}',
+			'{building_ratio}',
+			'{build_area_left}',
+			'{division_smallest}',
+			'{division_largest}',
+			'{checked_lease_sub}',
+			'{checked_lease_direct}',
+			'{lease_expiration}',
+			'{possession_date}',
+			'{tenant_improvements}',
+			'{checked_floor_entire}',
+			'{checked_floor_partial}',
+			'{ceil_h_min}',
+			'{ceil_h_max}',
+			'{dock_high_doors}',
+			'{grade_level_doors}',
+			'{checked_rail_ok}',
+			'{checked_rail_ko}',
+			'{transaction_comment}',
+			'{office_area_left}',
+			'{clear_height}',
+			'{neighborhood}',
+			'{tenant_area}',
+			'{suite_number}',
+			'{url_main}',
+			'{available_area}',
+			'{disabled_field}',
+			'{checked_occupancy_ok}',
+			'{checked_occupancy_ko}',
+			'{other_comments}',
+			'{highlights}',
+			'{truck_storage}',
+			'{ceiling_height}',
+
+			'{checked_divisible_ok}',
+			'{checked_divisible_ko}',
+			'{checked_sale_investment}',
+			'{checked_sale_occupancy}',
+			'{term}',
+			'{total_gla}',
+			'{select_type_0}',
+			'{shopping_center}',
+			'{frontage}',
+			'{space_type}',
+			'{availability_status}',
+			'{checked_transaction_sale}',
+			'{checked_transaction_rent}',
+			'{checked_is_condo_ok}',
+			'{checked_is_condo_ko}'
+		);
+	
+		$tab_pattern_lot_summary = array(
+		'{reference}',
+		'{nb_images}',
+		'{url_thumb}',
+		'{floor_number}',
+		'{available_area}',
+		'{sale_price}',
+
+		'{suite_number}',
+		'{division_smallest}',
+		'{division_largest}',
+
+		'{class}',
+		'{tour_id}',
+		);
+
+		$tab_replace = array(
+			htmlspecialchars($reference, ENT_QUOTES),
+			htmlspecialchars($tab_tour['NOM_VISITE'], ENT_QUOTES),
+			empty($tab_detail['CLASSE_BATIMENT']) ? 'checked="checked"' : '',
+			strtolower($tab_detail['CLASSE_BATIMENT'])=='a' ? 'checked="checked"' : '',
+			strtolower($tab_detail['CLASSE_BATIMENT'])=='b' ? 'checked="checked"' : '',
+			strtolower($tab_detail['CLASSE_BATIMENT'])=='c' ? 'checked="checked"' : '',
+			htmlspecialchars($tab_tour['ADRESSE'], ENT_QUOTES),
+			!empty($tab_tour['PRIX_BIEN']) ? numfmt_format($intl['int'], $tab_tour['PRIX_BIEN']) : '',
+			htmlspecialchars($tab_tour['VILLE'], ENT_QUOTES),
+			htmlspecialchars($tab_tour['CODE_POSTAL'], ENT_QUOTES),
+			$html_states,
+			$html_country,
+			$html_subtypes,
+			htmlspecialchars($tab_tour['DESCRIPTION'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['AMENITIES'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['CARACTERISTIQUES'], ENT_QUOTES),
+			!empty($tab_detail['NUMERO_ETAGE']) ? (int) $tab_detail['NUMERO_ETAGE'] : '',
+			!empty($tab_detail['NOMBRE_ETAGES']) ? (int)$tab_detail['NOMBRE_ETAGES'] : '',
+			!empty($tab_detail['ANNEE_CONSTRUCTION']) ? (int)$tab_detail['ANNEE_CONSTRUCTION'] : '',
+			!empty($tab_detail['SURFACE_BATIMENT_TOTALE']) ? numfmt_format($intl['int'], $tab_detail['SURFACE_BATIMENT_TOTALE']) : '',
+			!empty($tab_detail['PRIX_MIN']) ? (float)$tab_detail['PRIX_MIN'] : '',
+			!empty($tab_detail['PRIX_MAX']) ? (float)$tab_detail['PRIX_MAX'] : '',
+			!empty($tab_detail['ID_PRIX_NEGOCIABLE']) ? 'checked="checked"' : '',
+			empty($tab_detail['ID_PRIX_NEGOCIABLE']) ? 'checked="checked"' : '',
+			!empty($tab_cpt['PARKING_RATIO']) ? (float)$tab_cpt['PARKING_RATIO'] : '',
+			!empty($tab_cpt['TAUX_OCCUPATION_BATIMENT']) ? (float)$tab_cpt['TAUX_OCCUPATION_BATIMENT'] : '',
+			!empty($tab_cpt['SURFACE_DISPONIBLE_BATIMENT']) ? numfmt_format($intl['int'], $tab_cpt['SURFACE_DISPONIBLE_BATIMENT']) : '',
+			!empty($tab_detail['SURFACE_DIVISION_MIN']) ? numfmt_format($intl['int'], $tab_detail['SURFACE_DIVISION_MIN']) : '',
+			!empty($tab_detail['SURFACE_DIVISION_MAX']) ? numfmt_format($intl['int'], $tab_detail['SURFACE_DIVISION_MAX']) : '',
+			!empty($tab_detail['ID_SOUS_LOCATION']) ? 'checked="checked"' : '',
+			empty($tab_detail['ID_SOUS_LOCATION']) ? 'checked="checked"' : '',
+			!empty($tab_cpt['LEASE_EXPIRATION']) && strtotime($tab_cpt['LEASE_EXPIRATION'])!== false ? date('Y-m-d', strtotime($tab_cpt['LEASE_EXPIRATION'])) : '',
+			!empty($tab_cpt['POSSESSION_DATE']) && strtotime($tab_cpt['POSSESSION_DATE'])!== false ? date('Y-m-d', strtotime($tab_cpt['POSSESSION_DATE'])) : '',
+			htmlspecialchars($tab_cpt['TENANT_IMPROVEMENTS'], ENT_QUOTES),
+			!empty($tab_cpt['ID_ETAGE_COMPLET']) ? 'checked="checked"' : '',
+			empty($tab_cpt['ID_ETAGE_COMPLET']) ? 'checked="checked"' : '',
+			!empty($tab_cpt['HAUTEUR_PLAFOND_MIN']) ? (float)$tab_cpt['HAUTEUR_PLAFOND_MIN'] : '',
+			!empty($tab_cpt['HAUTEUR_PLAFOND_MAX']) ? (float)$tab_cpt['HAUTEUR_PLAFOND_MAX'] : '',
+			htmlspecialchars($tab_cpt['DOCK_HIGH_DOORS'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['GRADE_LEVEL_DOORS'], ENT_QUOTES),
+			!empty($tab_detail['ID_RAIL']) ? 'checked="checked"' : '',
+			empty($tab_detail['ID_RAIL']) ? 'checked="checked"' : '',
+			htmlspecialchars($tab_cpt['TRANSACTION_COMMENT'], ENT_QUOTES),
+			!empty($tab_cpt['SURFACE_DISPONIBLE_BUREAUX']) ? numfmt_format($intl['int'], $tab_cpt['SURFACE_DISPONIBLE_BUREAUX']) : '',
+			htmlspecialchars($tab_cpt['CLEAR_HEIGHT'], ENT_QUOTES),
+			htmlspecialchars($tab_tour['VOISINNAGE'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['TENANTS_AREA'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['SUITE_NUMBER'], ENT_QUOTES),
+			'edit_tour.php?tour='.$id_visite_master,
+			!empty($tab_detail['SURFACE_DISPONIBLE']) ? numfmt_format($intl['int'], $tab_detail['SURFACE_DISPONIBLE']) : '',
+			$is_new_tour ? '' : 'disabled="disabled"',
+			!empty($tab_cpt['ID_BIEN_OCCUPE']) ? 'checked="checked"' : '',
+			empty($tab_detail['ID_BIEN_OCCUPE']) ? 'checked="checked"' : '',
+			htmlspecialchars($tab_cpt['OTHER_COMMENTS'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['HIGHLIGHTS'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['TRUCK_STORAGE'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['CEILING_HEIGHT'], ENT_QUOTES),
+
+			!empty($tab_cpt['ID_DIVISIBLE']) ? 'checked="checked"' : '',
+			empty($tab_cpt['ID_DIVISIBLE']) ? 'checked="checked"' : '',
+			$tab_cpt['SALE_TYPE']=='investment' ? 'checked="checked"' : '',
+			$tab_cpt['SALE_TYPE']!='investment' ? 'checked="checked"' : '',
+			htmlspecialchars($tab_cpt['TERM'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['TOTAL_GLA'], ENT_QUOTES),
+			empty($tab_cpt['SUBTYPE']) ? 'selected="selected"' : '',
+			htmlspecialchars($tab_cpt['SHOPING_CENTER'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['FRONTAGE'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['SPACE_TYPE'], ENT_QUOTES),
+			htmlspecialchars($tab_cpt['AVAILABILITY_STATUS'], ENT_QUOTES),
+			$tab_detail['ID_TYPE_TRANSACTION']!=2 ? ' checked="checked"' : '',
+			$tab_detail['ID_TYPE_TRANSACTION']==2 ? ' checked="checked"' : '',
+			!empty($tab_cpt['ID_CONDO']) ? ' checked="checked"' : '',
+			empty($tab_cpt['ID_CONDO']) ? ' checked="checked"' : ''
+			
+		);
+		
+
+		$tab_cushwake_types = array(0, 4, 5, 6, 7, 8, 33, 34, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 503, 504, 505, 507, 508, 509, 512);
+		foreach($tab_cushwake_types as $subtype) {
+			$tab_pattern[] = '{select_type_'.$subtype.'}';
+			$tab_replace[] = (int)$tab_cpt['SUBTYPE']===$subtype ? 'selected="selected"' : '';
+		}
+
+		if(!$is_sub_tour) {
+			$tab_lots = get_sub_tours($tour);
+
+			$tab_markets = get_cushwake_market($is_new_tour ? $template_id : $tab_detail['ID_TYPE_BIEN']);
+
+			$html_markets = '<option value="">-</option>';
+			foreach($tab_markets as $parent => $childs) {
+				$html_markets .= '<optgroup label="'.htmlspecialchars($parent, ENT_QUOTES).'">';
+				$nb = count($childs);
+				for($i=0; $i<$nb; $i++) {
+					$selected = ($tab_cpt['ID_MARKET'] == $childs[$i]['ID'] ? ' selected="selected"' : '');
+					if($selected == "") $selected = ($tab_cpt['MD5_MARKET'] == $childs[$i]['ID'] ? ' selected="selected"' : '');
+					$html_markets .= '<option value="'.$childs[$i]['ID'].'" '.$selected.'>'.htmlspecialchars($childs[$i]['NOM'], ENT_QUOTES).'</option>';
+				}
+				$html_markets .= '</optgroup>';
+			}
+
+			$tab_pattern[] = '{list_markets}';
+			$tab_replace[] = $html_markets;
+
+			$final_html = str_replace($tab_pattern, $tab_replace, $html_cushwake[ $template ]);
+
+		} else {
+			$final_html = str_replace($tab_pattern, $tab_replace, $html_cushwake_lot[ $template ]);
+
+			// infos visite master
+			if(!isset($_SESSION['TAB_TOURS'][ $id_visite_master ])) $_SESSION['TAB_TOURS'][ $id_visite_master ] = get_tour_data($id_visite_master, $_SESSION['ID_UTILISATEUR']);
+			$tab_tour_master = $_SESSION['TAB_TOURS'][ $id_visite_master ];
+		}
+
+?>
+<div class="container_services">
+	<div class="container_tabs">
+		<!--
+		<a id="link_bui" onclick="return changeTemplate('5');" href="#"<?=$class_bui?>>Buildings</a>
+		-->
+		<a id="link_ind" onclick="return openEditTourCush('20');" href="#"<?=$class_ind?>>Industrial</a>
+		<a id="link_land" onclick="return openEditTourCush('3');" href="#"<?=$class_land?>>Land</a>
+		<a id="link_off" onclick="return openEditTourCush('4');" href="#"<?=$class_off?>>Office</a>
+		<!--
+		<a id="link_condo" onclick="return openEditTourCush('49');" href="#"<?=$class_condo?>>Condo</a>
+		-->
+		<a id="link_ret" onclick="return openEditTourCush('48');" href="#"<?=$class_ret?>>Retail</a>
+		<div class="clear_sep">&nbsp;</div>
+	</div>
+	<div class="box_services_square_top">&nbsp;</div>
+	<div class="box_services_center">
+		<div class="content_form content_form_cush">
+			<form action="<?=$url_post?>" method="post" id="edit_cush">
+				<input type="hidden" name="tour" value="<?=$tour?>" />
+				<input type="hidden" name="todo" value="update" />
+				<input type="hidden" name="p_lat" id="p_lat" value="<?=$tab_tour['LATITUDE']?>" />
+				<input type="hidden" name="p_lon" id="p_lon" value="<?=$tab_tour['LONGITUDE']?>" />
+				<input type="hidden" name="p_currency" id="p_currency" value="USD" />
+				<input type="hidden" name="p_type_bien" id="p_type_bien" value="<?=$template_id?>" />
+				<input type="hidden" name="transaction_type" value="<?=!empty($tab_detail['ID_TYPE_TRANSACTION']) ? $tab_detail['ID_TYPE_TRANSACTION'] : $default_transaction?>" />
+				<input type="hidden" name="is_sub" value="<?=$is_sub_tour ? '1' : '0'?>" />
+
+<?php
+		// ajout des infos de bases de la vv master
+		if($is_sub_tour) {
+			if(is_guid($id_visite_master)) {
+?>
+				<input type="hidden" name="p_redirect_to" value="<?=htmlspecialchars($id_visite_master, ENT_QUOTES)?>" />
+<?php
+			}
+?>
+				<input type="hidden" name="p_address" value="<?=htmlspecialchars($tab_tour_master['ADRESSE'], ENT_QUOTES)?>" />
+				<input type="hidden" name="p_city" value="<?=htmlspecialchars($tab_tour_master['VILLE'], ENT_QUOTES)?>" />
+				<input type="hidden" name="p_zip" value="<?=htmlspecialchars($tab_tour_master['CODE_POSTAL'], ENT_QUOTES)?>" />
+				<input type="hidden" name="p_country" value="<?=htmlspecialchars($tab_tour_master['ID_PAYS'], ENT_QUOTES)?>" />
+				<input type="hidden" name="p_state" value="<?=htmlspecialchars($tab_tour_master['REF_ETAT'], ENT_QUOTES)?>" />
+				<input type="hidden" name="p_lat" value="<?=htmlspecialchars($tab_tour_master['LATITUDE'], ENT_QUOTES)?>" />
+				<input type="hidden" name="p_lon" value="<?=htmlspecialchars($tab_tour_master['LONGITUDE'], ENT_QUOTES)?>" />
+				<input type="hidden" name="p_master_tour" value="<?=htmlspecialchars($id_visite_master, ENT_QUOTES)?>" />
+<?php
+		}
+
+		echo $final_html;
+?>
+
+				<div class="navigation_btn">
+					<span class="btn btn_next" onclick="return checkFormCush();">
+						<span class="inner_btn"><a href="#"><?=$dico['common']['save']?></a></span>
+					</span>
+				</div>
+
+<?php
+
+		$show_add_lot = $template_id==48; // Land & retail only
+		// pas de sous lots pour les buildings et les sous lots
+		// Land & retail only
+		if($show_add_lot && !$is_sub_tour && $template != 'BUILD') {
+			$nb_lot = count($tab_lots);
+			$title_lot = $nb_lot.' Lots/Spaces Added';
+?>
+<p><h2><?=$title_lot?></h2></p>
+<?php
+			if(!empty($tab_lots)) {
+				foreach($tab_lots as $id_lot => $tab_lot)  {
+					$url_thumb = is_guid($tab_lot['ID_PREMIERE_IMAGE']) ? str_replace($tab_pattern_media, array($tab_lot['ID_PREMIERE_IMAGE'], 'thumb', 'jpg', 'crop_96x72'), URL_MEDIA) : 'images/no-image.gif';
+			
+					$tab_replace = array(
+						$tab_lot['REF_VISITE'],
+						(int)$tab_lot['NB_ACTIVE_IMAGE'],
+						$url_thumb,
+						$tab_lot['NUMERO_ETAGE'],
+						numfmt_format($intl['int'], $tab_lot['SURFACE_DISPONIBLE']).' SF',
+						'$'.numfmt_format($intl['int'], $tab_lot['PRIX_BIEN']),
+						$tab_lot['SUITE_NUMBER'],
+						numfmt_format($intl['int'], $tab_lot['SURFACE_DIVISION_MIN']).' SF',
+						numfmt_format($intl['int'], $tab_lot['SURFACE_DIVISION_MAX']).' SF',
+//						numfmt_format($intl['int'], $tab_lot['LOT_SIZE_SF']).' SF',
+						get_class_row($i++),
+						$id_lot
+					);
+
+					$html_lot = str_replace($tab_pattern_lot_summary, $tab_replace, $html_cushwake_lot_summary[ $template ]);
+					echo $html_lot;
+				}
+			} else if(false){ // to remove for the moment...
+?>
+				<p class="no_results">No Lots/Spaces Added</p>
+<?php
+			}
+?>
+				<div class="navigation_btn">
+					<span class="btn btn_next" onclick="window.location.href='edit_tour.php?mt=<?=$tour?>_<?=$tab_detail['ID_TYPE_BIEN']?>'; return false;">
+						<span class="inner_btn"><a href="#">Add Lot/Space</a></span>
+					</span>
+				</div>
+<?php
+		}
+?>
+			</form>
+		</div>
+	</div>
+	<div class="box_services_bottom">&nbsp;</div>
+</div>
+
+<?php
+		break;
+}
+
+write_bench();
+
+?>

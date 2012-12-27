@@ -1,0 +1,246 @@
+<?php
+require_once('DB.php');
+require_once 'HTTP/Request.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('previsite/GetDsn.php');
+require_once('previsite/fonctions.crypt.php');
+require_once('previsite/fonctions.url.php');
+require_once('/var/www/gateway2.previsite.net/include/global.php');
+require_once(PATH_INCLUDE.'function.php');
+require_once(PATH_INCLUDE.'PrevisiteExport.php');
+require_once(PATH_INCLUDE.'function.db.php');
+require_once(PATH_INCLUDE.'function.cron.php');
+require_once PATH_INCLUDE.'function.rets.php';
+require_once PATH_INCLUDE.'class.rets.php';
+require_once(PATH_INCLUDE.'function.images.php');
+require_once(PATH_INCLUDE.'function.import.data.php');
+require_once(PATH_INCLUDE.'function.import.software.php');
+require_once(PATH_INCLUDE.'function.ws.php');
+require_once(PATH_INCLUDE.'function.tts.php');
+
+$script = $_REQUEST['script'];
+$force	= ($_REQUEST['force'] == "true");
+$debug	= $_REQUEST['test'];
+$srv	= $_REQUEST['srv'];
+$output	= ($_REQUEST['output'] != "false");
+$nomail	= ($_REQUEST['nomail'] == "true" || $debug != "" || $_SERVER['argc'][2] == "nomail");
+$sample = ($_REQUEST['sample'] == "true");
+if($_SERVER['argc'] > 0 && $_SERVER['argv'][1] != ""){
+	$script = $_SERVER['argv'][1];
+	$force = true;
+}
+//exit;
+$server_name = get_server_name();
+
+if($debug != ""){
+	if(file_exists(PATH_EXPORT.$debug.".php")){
+		require_once(PATH_EXPORT.$debug.".php");	
+		$name_log = PREFIXE_EXPORT.$debug;
+		$workPath = PATH_TMP."debug/";
+		if(!is_dir($workPath)){ mkdir($workPath);}
+		$workPath = PATH_TMP."debug/".$name_log."/";	
+		if(!is_dir($workPath)){ mkdir($workPath);}	
+		$export = getConfigExport($debug);
+		if(count($export) > 0 && function_exists($debug)){
+			//$id_cron = debug_start_export($debug);
+//			if(is_guid($id_cron)){
+				export_log_header($name_log);
+				/************** */		
+				if(is_array($export['ACTION'])){
+					$errors = export_verif_action($export['ACTION']);
+					if(count($errors) > 0){
+						foreach($errors as $error){
+							echo "<font color = 'red'>".$error."</font><br>";
+						}
+						exit;
+					}
+				}
+				$logs = $debug($name_log, $workPath, $export, true);
+				if(is_array($export['ACTION'])){
+					export_action($export['ACTION'],$logs['RETOUR']);
+				}
+				export_log_resume($export['SCRIPT_NAME'], $name_log, $logs, true);
+				//debug_end_export( $id_cron, $debug);
+				exec('rm -r '.$workPath);
+				export_log_footer($name_log);
+//			}else{ echo "script  already in progress";}
+		}else{ echo "script not found in <b>".$srv."</b>";}
+	}else{ echo "script not found...";}
+	exit;
+}
+
+$scripts = array();
+if($script != ""){
+	$tmp = getConfigExport($script);
+	if(count($tmp) > 0){ $scripts = array($script);}
+	else{ die("Invalide Script");}
+}else{ $scripts = getExportOnServer($server_name);}
+
+$db_data['name'] = "import";
+
+write_cron_log("--------START--------", 'export');
+foreach($scripts as $script){
+	$export = getConfigExport($script);
+	if($export['ID_STATUT_EXPORT'] > 0 || $force){
+		$name = $export['CODE_EXPORT'];
+		if(file_exists(PATH_EXPORT.$name.".php")){
+			$output = array();
+			$phpTest = exec("php -l ".PATH_EXPORT.$name.".php", $output);
+			if(preg_match('/^No syntax errors detected in/i', $phpTest) == 0){
+				$body = array(
+				   	" - Server:".get_server_name(),
+				    " - Script: <a href=\"http://gateway2.previsite.net/manage_export?script=".$name."\" >".$name."</a>",
+				   	" - Error:".implode("<br />", $output),
+				);
+				write_cron_log("Script ".$name." parse error...", "export");
+				if(count($output) > 0) desactivateExport($name);
+				write_cron_log("Script ".$name." descativated...", "export");
+				sendMail("gateway@previsite.com", "Gateway", "Export alert - ".$name, implode("<br />", $body));
+				continue;
+			}
+			write_cron_log("check ".$name."...", 'export');
+			if(is_cron_export( $export['CODE_EXPORT'], $export['DEBUG']) || $force){
+				$name_log = PREFIXE_EXPORT.$name;
+				ini_set('error_log', str_replace('#SCRIPT#', $name_log, ERROR_LOG_FILE));
+				write_cron_log("Start ".$name."...", 'export');
+				include(PATH_EXPORT.$name.".php");
+				if(function_exists($name)){
+					if(is_array($export['ACTION'])){
+						$errors = export_verif_action($export['ACTION']);
+						if(count($errors) > 0){
+							foreach($errors as $error){
+								echo "<font color = 'red'>".$error."</font><br>";
+							}
+							exit;
+						}
+					}
+					if(!file_exists(PATH_TMP.$name_log."/")){ mkdir(PATH_TMP.$name_log."/");}
+					$workPath = PATH_TMP.$name_log."/".date('YmdHis')."/";
+					if(!file_exists($workPath)){ mkdir($workPath);}
+					export_log_header($name_log);
+					$id_cron = update_cron_export_start($name, $export['DEBUG']);
+					if(is_guid($id_cron)){
+						$logs = $name($name_log, $workPath, $export, ($export['DEBUG'] === true));
+						export_log_resume($export['CODE_EXPORT'], $name_log, $logs);
+					
+						if(is_array($export['ACTION'])){
+							export_action($export['ACTION'],$logs['RETOUR']);
+						}
+						$resume = "";
+						if(count($logs) > 0){
+							if(isset($logs['TOTAL']) && isset($logs['DONE']) && isset($logs['FAILED'])){
+								$logs = array($logs);
+							}
+							$resume = array('DONE' => 0, 'FAILED' => 0, 'TOTAL' => 0, 'WAITING' => 0, 'WAITING_DONE' => 0, 'DELETED' => 0, 'DELETED_DONE' => 0);
+							foreach($logs as $k=>$log){
+								$resume['DONE'] += $log['DONE'];
+								$resume['FAILED'] += $log['FAILED'];
+								$resume['TOTAL'] += $log['TOTAL'];
+								$resume['WAITING_DONE'] += $log['WAITING_DONE'];
+								$resume['WAITING'] += $log['WAITING'];
+								$resume['DELETED'] += $log['DELETED'];
+								$resume['DELETED_DONE'] += $log['DELETED_DONE'];
+							}
+							$resume = "DONE:".$resume['DONE']."/".$resume['TOTAL'].";FAILED:".$resume['FAILED']."/".$resume['TOTAL'].";WAITING:".$resume['WAITING_DONE']."/".$resume['WAITING'].";DELETED:".$resume['DELETED']."/".$resume['DELETED'];
+						}
+						update_cron_export_end($id_cron, $name, $resume, $export['DEBUG']);
+						export_log_purge($name_log);
+					}
+					export_log_footer($name_log);
+					exec('rm -r '.$workPath);
+				}else{ write_cron_log("[ERROR] export function:".$name." not found", 'export');}
+				write_cron_log("End ".$name."...", 'export');
+			}
+		}else{ write_cron_log("[ERROR] export:".$name." file not found:'".PATH_EXPORT.$name.".php", 'export');}	
+	}
+}
+write_cron_log("---------END---------", 'export');
+exit;
+
+function export_log_header($scriptName){
+	import_log('-------------------------' , $scriptName);
+	import_log('----------START----------' , $scriptName);
+}
+
+function export_log_resume($scriptName, $name_log, $logs, $debug = false){
+	import_log('----------RESUME---------' , $name_log);
+	$alert = "";
+	$no_log = true;
+	if(count($logs) > 0){
+		if(isset($logs['TOTAL']) && isset($logs['DONE']) && isset($logs['FAILED'])){
+			$logs = array($logs);
+		}
+		foreach($logs as $k=>$log){
+			$k = ($k === 0 ? "" : $k.": ");
+			if($log['TOTAL'] > 0 ){
+				if($log['DONE'] > 0){ import_log($k.$log['DONE'].'/'.$log['TOTAL'].' Done' , $name_log);}
+				if($log['FAILED'] > 0){ import_log($k.$log['FAILED'].'/'.$log['TOTAL'].' Failed' , $name_log);}
+				if($log['FAILED'] > 0.2*$log['TOTAL']){
+					$alert .= '  - '.$k.'<b>'.$log['DONE'].'/'.$log['TOTAL'].'</b> Done<br />';
+					$alert .= '  - '.$k.'<b>'.$log['FAILED'].'/'.$log['TOTAL'].'</b> Failed<br />';
+				}
+			}
+			$no_log = false;
+		}
+	}
+	
+	if($no_log){
+		import_log('[ERROR] NO LOG' , $name_log);
+		$alert = "Error log not found<br />";
+	}
+
+	if(!$debug && $alert != "" && false){
+		write_cron_log("Send alert email ".$name, 'export');
+		//$phpmail = new PHPMailer();
+		//$phpmail->IsSMTP();
+		//$phpmail->IsHTML(true);
+		//$phpmail->Host      = SMTP_MAIL;
+		//$phpmail->From      = "gateway@previsite.com";
+		//$phpmail->FromName  = 'Export '.$scriptName;
+		//$phpmail->WordWrap  = 70;
+		//$phpmail->Subject   = 'Export alert - '.$scriptName;
+
+		//$body  .= "-------------DETAILS-----------<br />";
+		$body  = "Script: <b>".$scriptName."</b><br />";
+		$body  .= $alert."<br />";
+		sendAlertEmail($scriptName, $body, "export");
+		//$phpmail->Body = $body;
+		//$phpmail->AddAddress("gateway@previsite.com","Gateway");
+		//$phpmail->Send();
+	}
+}
+
+function export_log_footer($scriptName){
+	import_log('-----------END-----------' , $scriptName);
+	import_log('-------------------------' , $scriptName);
+}
+
+
+function export_log_purge($scriptName){
+	$delete_archives = array(
+		array("mask" => '-(\d{4}-\d{2}-\d{2})', "glob" => PATH_LOG."/".$scriptName."*", "date" => "Y-m-d"),
+//			array("mask" => '^(\d{4}\d{2}\d{2}\d{2}\d{2}\d{2})', "glob" => $archive_path."/*", "date" => 'YmdHis')
+	);
+	foreach($delete_archives as $delete){
+		$archives_files = glob($delete['glob']);
+		if(count($archives_files) > 0){
+			rsort($archives_files);
+			$archive_count = 0;
+			$archive_last_date = "";
+			$archive_del = false;
+			foreach($archives_files as $file){									
+				if(preg_match('/'.$delete['mask'].'/i', basename($file), $result) > 0){
+					if(!$archive_del && ($archive_last_date == "" || $archive_last_date != $result[1])){
+						$archive_last_date = $result[1];
+						$archive_del = ($archive_count++ > 1);
+					} 
+					if($archive_del && $result[1] < date($delete['date'], mktime(date("H"), date("i"), date("s"), date("n"), date("j")-7, date("Y")))){
+						write_cron_log('[LOG] delete old archive: '.$file, 'export');
+							exec('rm -r "'.$file.'"');
+					}
+				}
+			}
+		}			
+	}
+}
+?>

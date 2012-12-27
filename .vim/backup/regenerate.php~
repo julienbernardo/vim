@@ -1,0 +1,281 @@
+<?php
+
+/* code includes */
+require_once('./include/fonctions.php');
+require_once('./include/fonction.db.php');
+require_once('./include/fonction.converter.php');
+require_once('./include/fonction.images.php');
+require_once('./include/fonction.stupeflix.php');
+require_once('./include/fonction.stupeflix.createxml.php');
+require_once('./include/global.php');
+require_once('./include/stupeflix/stupeflix.php');
+require_once('./include/stupeflix/key.php');
+require_once('DB.php');
+require_once('HTTP/Request.php');
+require_once('previsite/GetDsn.php');
+if(SERVEUR_DEV) require_once('./include/fonction.stupeflix.dev.php');
+
+$id			= $_REQUEST['id'];
+$todo 		= $_REQUEST['todo'];
+$type		= $_REQUEST['type'];
+$ref		= $_REQUEST['ref'];
+$distrib	= $_REQUEST['distrib'];
+$profiles	= $_REQUEST['profiles'];
+$xml 		= $_REQUEST['xml'];
+
+$url_back = URL_HOST."detail_video.php?id=".$id."&distrib=".$distrib;
+$getDsn = new GetDsn();
+$db_data['pool'][$db_data['name']]['DSN'] = $getDsn->byDistrib($distrib);
+if($db_data['pool'][$db_data['name']]['DSN'] != ""){
+	$tab_video 	= get_video_infos($id);	
+	if($todo == 'regenerate'){
+		$xml = explode( '</movie>', $xml);
+		$tab_profiles = explode( ';', $profiles);
+		if((count($xml)-1) == count($tab_profiles)){
+			$tmp = array();
+			for($i=0;$i<count($tab_profiles);$i++){
+				$tmp[$tab_profiles[$i]] = $xml[$i]."</movie>";
+			}
+			$xml = $tmp;
+			$id = update_video_infos( $tab_video['ID_VISITE'], $ref, $type, $distrib, false);
+			if(is_guid($id)){
+				$type_reference = preg_replace('/_CORP$/i', '',$type);
+				$function_createxml = FUNCTION_CREATEXML;
+		//		$db_name = "realestate";
+				//c21
+				$options = array(
+					'ID_VISITE' => $tab_video['ID_VISITE'],
+					'ID_VIDEO' => $id, 
+					'REF_VIDEO' => $ref,
+					'TYPE' => $type, 
+					'PROFIL' => $profiles,
+					'WAIT_TTS' => false, 
+					'IS_CORPORTATE' => ($type != $type_reference),
+					'IS_DEBUG' => true,
+				);
+				$tab_xml = $function_createxml($options);
+				if($tab_xml['error_code'] == 0){
+					for($i = 0;$i<count($tab_xml['profiles']);$i++){
+						$tab_xml['profiles'][$i]['xml'] = str_replace('&','&amp;', $xml[$tab_xml['profiles'][$i]['profile']]);
+						$tab_xml['profiles'][$i]['xml'] = preg_replace('/(<!\[CDATA\[.*)&amp;(.*\]\]>)/i', '$1&$2', $tab_xml['profiles'][$i]['xml']);
+						$tab_xml['profiles'][$i]['xml'] = str_replace('&amp;#10;', '&#10;', $tab_xml['profiles'][$i]['xml']);
+					}
+					//on upload la première image de la vv pour en faire une miniature
+					if($tab_xml['bgimg'] != ""){
+						//on upload la première image de la vv pour en faire une miniature
+						$first_img = PATH_TEMP.$tour.".jpg";
+						file_put_contents($first_img, file_get_contents(str_replace('&amp;', '&', $tab_xml['bgimg'])));
+						$client = &new HTTP_Request(get_storage_path("post",$tour,"jpg")."&force=true");
+						$client->setMethod(HTTP_REQUEST_METHOD_POST);
+						$client->addFile("fichier",$first_img);
+						$client->sendRequest();
+					 	@unlink($first_img);
+					}
+
+					$conversions = post_file_stupeflix( $tab_video['ID_VISITE'], $id, $tab_xml['profiles'], URL_VIDEO_NOTIFICATION, URL_VIDEO_UPLOAD);
+			
+					if(is_array($conversions)){
+						insert_conversion( $id, $tab_xml['ref_video'], $conversions, $tab_xml['tour'], $tab_xml['user']['ID_DISTRIBUTEUR'], $tab_xml['nb_image'], $type);
+						$replace = array(
+							'search' => array('#ID#', '#DISTRIB#'),
+							'replace'=> array( $id, $distrib)
+						);
+						$url = str_replace($replace['search'], $replace['replace'], URL_VIDEO_DETAIL);
+						echo '<script type="text/javascript">window.location.href = "'.$url.'";</script>';
+					}else{ $error = "Conversion failed";}
+				}else{ $error = $tab_xml['error_code'].". XML creation failed";}
+			}else{ $error = "Video not found";}
+		}else{	$error = "XML and profiles not compatible...";}
+	}
+}else{ $error = "Data base not found";}
+include("include/security.php");
+
+if(!is_guid($id) || count($tab_video) == 0){
+	header('location:'.$url_back);
+	exit;
+}
+
+if($videos_options['TYPE'][$tab_video['TYPE_VIDEO']]['PROFIL'] == ""){
+	$videos_options['TYPE'][$tab_video['TYPE_VIDEO']]['PROFIL'] = $videos_options['DEFAULT']['PROFIL'];
+}
+
+$extensions = getProfilGroupByExt();
+$nb_ext = 0;
+foreach($extensions as $ext){
+	if($nb_ext < count($ext)-1){ $nb_ext = count($ext)-1;}
+}
+
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Previsite Video</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="/images/video.ico" rel="shortcut icon" />
+	<link href="/images/video.ico" rel="icon" type="image/x-icon" />
+	<link href="styles/styles.css" rel="stylesheet" type="text/css" />
+	<link href="styles/conv.css" rel="stylesheet" type="text/css" />
+	<script type="text/javascript" src="/scripts/prototype-1.5.0.js"></script>
+	<script type="text/javascript" src="/scripts/AC_RunActiveContent.js"></script>
+</head>
+<body>
+	<div id="barre">&nbsp;</div>
+	<div id="global">
+		<div id="logo"><a href="/"><img src="/images/logo_video.png" alt="Video" border="0" /></a></div>
+		<div id="contact">&nbsp;</div>
+		<div id="content">
+			<div id="content_header"></div>
+			<div id="content_text" class="h_auto">
+		    	<div>
+					<div class="h1">Previsite Vidéo</div>
+					<?php include('./pages/link.php');?>
+				</div>
+				<div align="center" class="pad_b_5 marg_t_20" id="conversions">
+					<form id="myForm" name="myform" method="post" action="">
+						<div style="position:relative;">
+							<table cellpadding="0" cellspacing="0" >
+								<tr class="listchoice">
+									<td>
+										<input type="checkbox" name="debug" id="debug" value="true" onchange="updateXml();"/>
+										<span style="cursor:pointer;" onclick="$('debug').checked = !$('debug').checked;">xeditor</span>
+									</td>
+									<td colspan="<?=$nb_ext+2;?>" align="center">Videos Formats</td>
+									<td align="right">
+										<span style="cursor:pointer;" onclick="$('corp').checked = !$('corp').checked;">Corporate</span><input type="checkbox" name="corp" id="corp" value="true" onchange="updateXml();"/>
+										<select id="type" name="type" style="width:100px;"  onchange="updateXml();">
+<?php
+		foreach($videos_options['TYPE'] as $k=>$v){
+			if($v['ONLY_USER']){ continue;}
+?>
+											<option <?=($tab_video['TYPE_VIDEO'] == $k ? "selected" : "");?>><?=$k;?></option>
+<?php
+		}
+?>
+										</select>
+									</td>
+								</tr>
+<?php
+		foreach($extensions as $ext=>$v){
+?>
+								<tr class="listchoice">
+									<td><?=$ext;?></td><td>:</td>
+<?php
+			$checked = false;
+			$out = "";
+			foreach($v as $k=>$value){
+				if(strpos($profil,$value) !== false){ $checked = true;}
+					$out .=  "\n<td><input type=\"radio\" name=\"".$ext."\" value=\"".$value."\" ".(strpos(';'.$videos_options['TYPE'][$tab_video['TYPE_VIDEO']]['PROFIL'].';',';'.$value.";") === false ? "" :"checked") ." onchange=\"updateXml();\"/>".$value."</td>";
+			}
+			for($i = count($v); $i <= $nb_ext;$i++){ $out .= "\n<td >&nbsp;</td>";}
+?>
+									<td><input type="radio" name="<?=$ext;?>" value="" <?=($checked ? "" :"checked") ;?>  onchange="updateXml();"/>none</td>
+									<?=$out;?>
+								</tr>
+<?php
+		}
+?>
+							</table>
+							<div id="wait" align="center" class="w_max marg_b_30 marg_t_30 disp_no"><img src="/images/ajax_wait.gif" alt="" /></div>
+							<div class="pad_r_5 marg_t_20 marg_b_30 fl_l w_max" id="xml"></div>
+						
+							<div style="position:absolute;top:155px;left:1px;">
+								<input id="button_xml" type="button" value="Show XML" onclick="toggleXml();"/>
+								<input id="button_xml_refresh" type="button" value="Refresh" onclick="updateXml();"/>
+							</div>
+							<div>
+								<input id="xml_content" type="hidden" name="xml"	 value="" />
+								<input id="profiles" type="hidden" name="profiles"	 value="" />
+								<input type="hidden" name="id"	 value="<?=$tab_video['ID_VIDEO'];?>" />
+								<input type="hidden" name="ref"	 value="<?=$tab_video['REF_VIDEO'];?>" />
+								<input type="hidden" name="distrib"	 value="<?=$distrib;?>" />
+								<input type="hidden" name="todo" value="regenerate" />
+								<input id="button_final" type="submit" name="send" value="Generate" onclick="getXmlContent();"/>
+								<div class="error pad_t_5"><?=$error;?></div>
+							</div>
+						</div>
+					</form>
+					
+					<div align="center" class="marg_t_20"> <a href="<?=$url_back;?>">back</a></div>
+				</div>
+			</div>
+			<script type="text/javascript">
+				var gb_currentXml = 0;
+				var gb_request = null;
+				
+				function toggleXml(){
+					if($('xml_'+gb_currentXml).style.display == 'block'){
+						$('xml_'+gb_currentXml).style.display = 'none';
+						$('button_xml').value = "Show XML";
+					}else{
+						$('xml_'+gb_currentXml).style.display = 'block';
+						$('button_xml').value = "Hide XML";
+					}
+				}
+				
+				function updateXml(){
+					if($('xml').style.display == 'block'){ getXml();}
+				}
+				
+				function getProfiles(){
+					tab = $('myForm').getInputs('radio');
+					params = "";
+					for(i=0;i<tab.length;i++){
+						if(tab[i].getValue() != null && tab[i].getValue() != ""){
+							params += tab[i].getValue()+";";
+						}
+					}
+					if(params.length > 0){ params = params.substr(0,params.length-1);}
+					return params;
+				}
+				
+				function getXml(){
+					if(gb_request != null){ gb_request = null;}
+					$('xml').style.display = 'none';
+					$('wait').style.display = 'block';
+					$('button_final').disable();
+					var params = "todo=get_xml&id=<?=$id;?>&tour=<?=$tab_video['ID_VISITE'];?>&distrib=<?=$distrib;?>&type="+$('type').getValue()+($('corp').checked ? '_CORP' : '')+"&profiles="+getProfiles()+"&debug="+($('debug').checked ? 'true' : '');
+					gb_request = new Ajax.Updater('xml','ajax.php', {
+					  asynchronous: true,
+					  postBody: params,
+					  method: 'post',
+					  onSuccess: function(t) {
+						$('wait').style.display = 'none';
+						$('xml').style.display = 'block';
+						gb_currentXml = 0;
+						$('button_final').enable();
+						gb_request = null;
+					  }
+					});
+				}
+				
+				function showThisXml(xmlName){
+					var i = 0;
+					while($('xml_'+i) != null){
+						$('xml_'+i).style.display = 'none';
+						$('title_'+i).removeClassName('bold');
+						i++;
+					}
+					$('title_'+xmlName).addClassName('bold');
+					gb_currentXml = xmlName;
+					toggleXml();
+				}
+				
+				function getXmlContent(){
+					var i = 0;
+					var params = "";
+					while($('xml_'+i) != null){ params += $('xml_'+(i++)).value;}
+					$('xml_content').value = params;
+					var params = "";
+					var i = 0;		
+					while($('title_'+i) != null){ params += $('title_'+(i++)).innerHTML+";";}
+					$('profiles').value = params.substr(0,params.length-1);
+				}
+				getXml();
+			</script>
+		    <div id="content_footer">    	
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+

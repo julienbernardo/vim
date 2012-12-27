@@ -1,0 +1,471 @@
+<?php
+
+/* code includes */
+require_once('./include/fonctions.php');
+require_once('./include/fonction.db.php');
+require_once('./include/fonction.converter.php');
+require_once('./include/fonction.images.php');
+require_once('./include/fonction.stupeflix.php');
+require_once('./include/global.php');
+require_once('./include/stupeflix/stupeflix.php');
+require_once('./include/stupeflix/key.php');
+require_once('DB.php');
+require_once('HTTP/Request.php');
+require_once('previsite/GetDsn.php');
+
+include("include/security.php");
+
+$id			= $_REQUEST['id'];
+$tour		= $_REQUEST['tour'];
+$user		= $_REQUEST['user'];
+$distrib	= $_REQUEST['distrib'];
+$url_back	= $_REQUEST['urlback'];
+
+$getDsn = new GetDsn();
+$isUser = false;
+if(is_guid($tour)){ $tourDsn = $getDsn->byTourID($tour);}
+else if(is_guid($user)){ $tourDsn = $getDsn->byUserID($user);$isUser = true;}
+if(is_guid($distrib) && $tourDsn == ""){$tourDsn = $getDsn->byDistrib($distrib);}
+if($tourDsn != ""){
+	$db_data['pool'][$db_data['name']]['DSN'] = $tourDsn;
+	if(!$isUser){ echo "oki";$tab_video = get_video_infos(is_guid($id) ? $id : $tour);echo "oki";}
+	else{ $tab_video = get_video_user_infos(is_guid($id) ? $id : $user);}
+
+	if(preg_match('/@(\d+\.\d+\.\d+\.\d+)\//i', $tourDsn, $result) > 0){ $tab_video['DATABASE'] = $result[1];}
+	if(is_guid($tab_video['ID_VIDEO'])){
+		$statut_complement = false;
+		$is_cron = false;
+		if($tab_video['ID_STATUT_VIDEO'] > 0){ $statut_video = "ico_ok.png"; $title_video = "Available";}
+		else if($tab_video['ID_STATUT_VIDEO'] < 0){ $statut_video = "ico_ko.png"; $title_video = "Error";}
+		else{ 
+			$statut_video = "ico_wait.gif"; 
+			$title_video = "wait";
+			if($tab_video['WAIT_TTS'] == 1){ $statut_complement = true;}
+		}
+	
+		$url_diffusion_info = str_replace( array('#ID#', '#DISTRIB#'), array($tab_video['ID_VIDEO'], $tab_video['ID_DISTRIBUTEUR']), URL_LIST_DIFFUSION);
+		
+		$url_check_in_cron = str_replace('#ID#', $tab_video['ID_VIDEO'], URL_VIDEO_CRON_CHECK);
+		if(file_get_contents($url_check_in_cron) == 'true'){
+			$is_in_cron = true;
+		}
+		if($tab_video['ID_STATUT_VIDEO'] == 2){ $is_reprocess = true;}
+		else if($tab_video['ID_STATUT_VIDEO'] != 0){ $onclickStatus = 'onclick="reprocessVid();" class="cursor"';}
+		else if($tab_video['ID_STATUT_VIDEO'] == 0){ $onclickStatus = 'onclick="forceError();" class="cursor"';}
+	
+		if($tab_video['ID_CRON'] > 0){ $is_cron = true;}
+		$tmp = explode( ',', $tab_video['PROFIL_AVAILABLE']);
+		$profils = "";
+		if(count($tmp) > 0){
+			foreach($tmp as $v){
+				if(preg_match('/VIDEOTOUR/i',$tab_video['TYPE_VIDEO']) > 0){
+					$url = str_replace('#EXT#', getProfilExt($v), str_replace('#ID#',$tab_video['ID_VIDEO'],URL_GETFILE_VIDEOTOUR));
+				}else{
+	//				$url = str_replace('#EXT#', getProfilExt($v), str_replace('#ID#',$tab_video['ID_VIDEO'],URL_GETFILE))."&r=".rand();
+					$replace = array(
+						'search' => array( '#EXT#', '#ID#'),
+						'replace' => array( getProfilExt($v), $tab_video['ID_VIDEO'])
+					);
+					$url = str_replace($replace['search'], $replace['replace'], URL_GET_VIDEO)."?r=".rand();
+				}
+				$profils .= ", <a href=\"".$url."\">".$v."</a>";
+			}
+		}
+
+		$informations = "";
+		if($tab_video['NB_BEDROOM'] != "" || $tab_video['NB_BATHROOM']){ 
+			if($tab_video['NB_BEDROOM'] != "" && $tab_video['NB_BATHROOM'] != ""){
+				$informations .=  $tab_video['NB_BEDROOM']." Bedroom / ".$tab_video['NB_BATHROOM']." Bath";
+			}else if($tab_video['NB_BATHROOM'] != ""){ 
+				$informations .= $tab_video['NB_BATHROOM']." Bath";
+			}
+		}
+		if($tab_video['PRIX_BIEN'] != ""){
+			$informations .= ($informations != "" ? " - " : "" );
+			if(preg_match('/VIDEOTOUR/i',$tab_video['TYPE_VIDEO']) > 0){
+				$informations .= $tab_video['PRIX_BIEN'];
+			}else{
+				if($tab_video['ID_PAYS'] == "FR"){
+					$informations .=  number_format($tab_video['PRIX_BIEN'], 0, ',', ' ').$tab_video['SYMBOLE_DEVISE'];
+				}else{
+					$informations .=  $tab_video['SYMBOLE_DEVISE'].number_format($tab_video['PRIX_BIEN'], 0, '.', ',');
+				}
+			}
+		}
+		if($tab_video['TYPE_BIEN'] != ""){ 	$informations .= ($informations != "" ? " - " : "" ).$tab_video['TYPE_BIEN'];}
+		$address = "";
+		if($tab_video['ADRESSE'] != ""){ $address .=  $tab_video['ADRESSE'];}
+		if($tab_video['VILLE'] != ""){ 
+			if($tab_video['ID_PAYS'] == "US"){
+				$address .= ($address != "" ? " - " : "" ).$tab_video['VILLE'].", ".$tab_video['REF_ETAT']." ".$tab_video['CODE_POSTAL'];
+			}else{
+				$address .= ($address != "" ? " - " : "" ).$tab_video['CODE_POSTAL']." ".$tab_video['VILLE'];
+			}
+		}
+
+		if(preg_match('/VIDEOTOUR/i',$tab_video['TYPE_VIDEO']) > 0){ $url_vids = "http://".(SERVEUR_DEV ? "dev." : "")."www.videotour.com/v/".$tab_video['ID_VIDEO'];}
+		else{ $url_vids = "http://".(SERVEUR_DEV ? "dev." : "")."m.previsite.com/".str_replace('-','/',$tab_video['REF_VIDEO']);}
+
+		$url_diffusion = "";
+		if(is_array($tab_video['DIFFUSION']) && count($tab_video['DIFFUSION']) > 0){
+			foreach($tab_video['DIFFUSION'] as $row){
+				if($row['RESULT_CODE_DIFFUSION'] == "0"){
+					$url_diffusion .= ", <a href=\"".$row['URL_VIDEO_DIFFUSION']."\" target=\"_blank\">".ucfirst(strtolower($row['SITE_DIFFUSION']))."</a>";
+				}else if($row['RESULT_CODE_DIFFUSION'] > "0"){
+					$url_diffusion .= ", <span title=\"".$row['RESULT_DESCRIPTION_DIFFUSION']."\">".ucfirst(strtolower($row['SITE_DIFFUSION'])).": ".$row['RESULT_CODE_DIFFUSION'].". ".$row['RESULT_TEXT_DIFFUSION']."</span>";
+				}
+			}
+			if($url_diffusion != ""){ $url_diffusion = substr($url_diffusion,2);}
+		}
+
+		//if($url_back == ""){ $url_back = URL_HOST."index.php";}
+	}
+}
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Previsite Video</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="/images/video.ico" rel="shortcut icon" />
+	<link href="/images/video.ico" rel="icon" type="image/x-icon" />
+	<link href="styles/styles.css" rel="stylesheet" type="text/css" />
+	<link href="styles/conv.css" rel="stylesheet" type="text/css" />
+	<script type="text/javascript" src="/scripts/prototype-1.5.0.js"></script>
+	<script type="text/javascript" src="/scripts/AC_RunActiveContent.js"></script>
+</head>
+<body>
+	<div id="barre">&nbsp;</div>
+	<div id="global">
+		<div id="logo"><a href="/"><img src="/images/logo_video.png" alt="Video" border="0" /></a></div>
+		<div id="contact">&nbsp;</div>
+		<div id="content">
+			<div id="content_header"></div>
+			<div id="content_text" class="h_auto">
+		    	<div>
+					<div class="h1">Previsite Vidéo</div>
+					<?php include('./pages/link.php');?>
+				</div>
+<?php
+	if(is_guid($tab_video['ID_VIDEO'])){
+?>
+				<div>
+					<table cellspacing="5" width="100%">
+<?php
+	if(!$isUser){
+?>
+						<tr>
+							<td width="120px">Ref.: </td><td><b><a target="_blank" href="<?=$url_vids;?>" ><?=$tab_video['REF_VIDEO'];?></a></b></td>
+						</tr>
+<?php 
+	}
+?>
+						<tr>
+							<td>Last update: </td><td title="creation: <?=$tab_video['DATE_CREATION_VIDEO'];?>"><b><?=$tab_video['DATE_MODIFICATION_VIDEO'];?></b></td>
+						</tr>
+						<tr>
+							<td>Nb conversions: </td><td><b><?=$tab_video['NB_CONVERSIONS'];?></b></td>
+						</tr>
+						<tr>
+							<td>Profil available: </td><td><b><?=substr( $profils, 1);?></b></td>
+						</tr>
+						<tr>
+							<td>Type: </td>
+							<td>
+<?php
+	if(count($tab_video['TYPE_VIDEO_AVAILABLE']) > 1){
+		echo '<select id="id_video" name="id_video" onchange="changeVideo();">';
+		$already_selected = false;
+		foreach($tab_video['TYPE_VIDEO_AVAILABLE'] as $k=>$v){ 
+			$selected = ($k == $tab_video['ID_VIDEO'] && !$already_selected ? 'selected' : '');
+			if($selected != ""){ $already_selected = true;}
+			echo '<option value="'.$k.'" '.$selected.'>'.$v.'</option>';
+		}
+		echo "</select>";
+	}else{
+		echo "<b>".$tab_video['TYPE_VIDEO']."</b>";
+		echo '<input type="hidden" name="id_video" id="id_video" value="'.$tab_video['ID_VIDEO'].'"/>';
+	}
+?>
+							</td>
+						</tr>
+						<tr>
+<?php
+	if(!$isUser){
+?>
+							<td>Langue: </td><td><b><?=$tab_video['ID_LANGUE'];?></b></td>
+<?php
+	}else{
+?>
+							<td>Pays: </td><td><b><?=$tab_video['ID_PAYS'];?></b></td>
+<?php
+	}
+?>
+						</tr>
+						<tr>
+							<td>Status: </td>
+							<td>
+								<img src="/images/<?=$statut_video;?>" title="<?=$title_video;?>" <?=$onclickStatus;?>/>
+<?php 
+	if($statut_complement){
+?>
+								<img src="/images/stitch_error.gif" title="Waiting for TTS" />
+<?php
+	}
+?>
+<?php 
+	if($is_cron){
+?>
+								<img src="/images/action_generate.png" title="diffusion automatique" />
+<?php
+	}
+	if($is_reprocess){
+?>
+								<img src="/images/stitch_update.gif" title="reprocess" />
+<?php
+	}
+	if($is_in_cron){
+?>
+								<img src="/images/bullet_orange.png" title="is in cron" />
+<?php
+	}
+
+?>
+							</td>
+						</tr>
+
+						<tr><td >Video:  </td><td><span id="vid" class="bold"><a href="<?=$url_diffusion_info;?>"><?=$tab_video['ID_VIDEO'];?></a></span></td></tr>
+<?php 
+	if(!$isUser){
+?>
+					<tr><td >Tour: </td><td><b><a href="<?=str_replace('#TOUR#', $tab_video['ID_VISITE'], URL_GET_TOUR_INFOS);?>" target="_blank"><?=$tab_video['ID_VISITE'];?></a></b></td></tr>
+<?php
+	}else{
+?>
+						<tr><td >Utilisateur: </td><td><b><?=$tab_video['ID_UTILISATEUR'];?></b></td></tr>
+<?php
+	}
+	if($tab_video['DATABASE'] != ""){
+?>
+						<tr><td>Database: </td><td><b><?=$tab_video['DATABASE'];?></b></tr>
+<?php
+	}
+	if($url_diffusion != ""){
+?>
+						<tr><td > Diffusion :<a href="<?=$url_diffusion_info;?>"><img src="/images/stitch_info.gif"/></a></td><td><b><?=$url_diffusion;?></b></td></tr>
+<?php
+	}
+	if($tab_video['ID_DISTRIBUTEUR'] != ""){
+?>
+						<tr><td >Distributor: </td><td><b><?=$tab_video['ID_DISTRIBUTEUR']." (".$tab_video['NOM_DISTRIBUTEUR'].")";?></b></td></tr>
+<?php
+	}
+	if($tab_video['NOM_VISITE'] != ""){
+?>
+						<tr><td >Title: </td><td><b><?=$tab_video['NOM_VISITE'];?></b></td></tr>
+<?php
+	}
+	if($informations != ""){
+?>								
+						<tr><td >Informations: </td><td><b><?=$informations;?></b></td></tr>
+<?php
+	}
+	if($address != ""){
+?>
+						<tr><td >Address:  </td><td><b><?=$address;?><b></td></tr>
+<?php 
+	}
+	if($tab_video['URL_ANNONCE'] != ""){
+?>
+						<tr><td >Url detail: </td><td><b><?=$tab_video['URL_ANNONCE'];?></b></td></tr>
+<?php
+	}
+	if($tab_video['DESCRIPTION'] != ""){
+//		if(file_get_contents(get_storage_path('exist', $tab_video['ID_VIDEO'], 'mp3'))){
+		if(get_tts_statut($tab_video['ID_VISITE']) == "1" && file_get_contents(str_replace('#ID#', $tab_video['ID_VISITE'], URL_CHECK_MP3)) == "true"){
+			$VoiceUrl = "<a href=\"".str_replace('#ID#', $tab_video['ID_VISITE'], URL_TTS)."?r=".rand()."\" >sound version</a>";
+		}
+?>
+						<tr><td colspan="2">Description: <?=$VoiceUrl;?><br/><b><?=$tab_video['DESCRIPTION'];?></b></td></tr>
+<?php
+	}
+?>
+
+					</table>
+				</div>
+
+				<div id="wait" align="center" class="w_max marg_b_30 marg_t_30 disp_no"><img src="/images/ajax_wait.gif" alt="" /></div>
+				<div class="disp_no pad_b_5 marg_t_20" id="conversions"></div>
+
+				<div align="center"> <a href="<?=URL_HOST;?>conv.php">back</a></div>
+				<div style="position:absolute;top:240px;right:50px;" >
+					<input class="w_90" id="regenerate" type='button' value='Re-generate' onclick="getRegenerateForm(<?=$isUser ? "true" : "false";?>);"/>
+<?php if(!$isUser){ ?>
+					<input class="w_90" id="diffuse" type='button' value='Diffuse' onclick="getDiffuseForm();"/>
+<?php } ?>
+				</div>
+				<div id="preview" class="preview disp_no">
+				</div>
+				<div id="preview_wait" class="preview marg_t_30" align="center">
+					<img src="/images/snake.gif" alt="" />
+				</div>
+				
+			</div>			
+			<script style="text/javascript">
+				var gb_detail = null;
+				var gb_vid = null;
+				function showDetailConversion(nb, myId, typeConv, distrib){
+					if(gb_detail != null){
+							$('detail_'+gb_detail+'_wait').style.display = 'none';
+							$('detail_'+gb_detail).style.display = 'none';
+						if(gb_detail == nb){
+							gb_detail = null;
+							return;
+						}
+					}
+					$('detail_'+nb+'_wait').style.display = 'block';
+					$('detail_'+nb).style.display = 'none';
+					var params = 'todo=get_detail&id='+myId+'&type='+typeConv+'&distrib='+distrib<?=($isUser ? "+'&type=user'" : "");?>;
+					new Ajax.Updater('detail_'+nb,'ajax.php', {
+					  asynchronous: true,
+					  postBody: params,
+					  method: 'post',
+					  onSuccess: function(t) {
+					  	$('detail_'+nb).innerHTML = t.responseText;
+					  	$('detail_'+nb+'_wait').style.display = 'none';
+							$('detail_'+nb).style.display = 'block';
+							gb_detail = nb;
+					  }
+					});
+				}
+				
+				function getLastConversions(old){
+					var vid = $('id_video').value;
+					$('conversions').style.display = 'none';
+					$('wait').style.display = 'block';
+					var params = 'todo=get_video_conversions&id='+vid+'&distrib=<?=$tab_video['ID_DISTRIBUTEUR'];?>&old='+(old ? 'true' : 'false');
+					new Ajax.Updater('conversions','ajax.php', {
+					  asynchronous: true,
+					  postBody: params,
+					  method: 'post',
+					  onSuccess: function(t) {
+							$('wait').style.display = 'none';
+							$('conversions').style.display = 'block';
+					  }
+					});
+				}
+				
+				function getRegenerateForm(isUser){
+					if(isUser){
+						window.location.href = "<?=URL_HOST;?>generation_video_user.php?id=<?=$tab_video['ID_VIDEO'];?>&user=<?=$tab_video['ID_UTILISATEUR'];?>";
+					}else{
+						window.location.href = "<?=URL_HOST;?>regenerate.php?id=<?=$tab_video['ID_VIDEO'];?>&distrib=<?=$tab_video['ID_DISTRIBUTEUR'];?>";
+					}
+				}
+				
+				function getDiffuseForm(){
+					window.location.href = "<?=URL_HOST;?>rediffuse.php?id=<?=$tab_video['ID_VIDEO'];?>&distrib=<?=$tab_video['ID_DISTRIBUTEUR'];?>&type=<?=$tab_video['TYPE_VIDEO'];?>";
+				}
+						
+				var gb_xml = null;
+				function showXml(myId){
+					if(gb_xml != null){
+						$('xml_'+gb_xml+'_img').src="/images/plus.png";
+						$('xml_'+gb_xml).style.display="none";
+						if(gb_xml = myId){
+							gb_xml = null;
+							return;
+						}
+					}
+					$('xml_'+myId+'_img').src="/images/minus.png";
+					$('xml_'+myId).style.display="block";
+					gb_xml = myId;
+				}
+				
+				function getPreviewVid(){
+					var vid = $('id_video').value;
+					if(gb_vid == null || gb_vid != vid){
+						gb_vid = vid;
+						var params = 'todo=get_video_preview&id='+vid+'&distrib=<?=$tab_video['ID_DISTRIBUTEUR'];?>';
+						$('preview').style.display = 'none';
+						$('preview_wait').style.display = 'block';
+						new Ajax.Updater('preview','ajax.php', {
+						  asynchronous: true,
+						  postBody: params,
+						  method: 'post',
+						  onSuccess: function(t) {
+							$('preview_wait').style.display = 'none';
+							$('preview').style.display = 'block';
+						  }
+						});
+					}
+				}
+				
+				function reprocessVid(){
+					if(confirm('Do you really want to reprocess this video?')){
+						var params = 'ids='+$('id_video').value+'&distrib=<?=$tab_video['ID_DISTRIBUTEUR'];?>';
+						new Ajax.Request('reprocess.php', {
+							  asynchronous: true,
+							  postBody: params,
+							  method: 'post',
+							  onSuccess: function(t) {
+								if(t.responseText == "true"){
+									changeVideo();
+								}else{
+									alert('Reprocess not available for this video');
+								}
+							  }
+						});
+					}
+				}
+				
+				function forceError(){
+					if(confirm('Do you really want to deactivate this video?')){
+						var params = 'todo=deactivate&id='+$('id_video').value+'&distrib=<?=$tab_video['ID_DISTRIBUTEUR'];?>';
+						new Ajax.Request('ajax.php', {
+							  asynchronous: true,
+							  postBody: params,
+							  method: 'post',
+							  onSuccess: function(t) {
+								if(t.responseText == "true"){
+									changeVideo();
+								}else{
+									alert('Update error');
+								}
+							  }
+						});
+					}
+				}
+				
+				function changeVideo(){
+					window.location.href = '<?=URL_HOST;?>detail_video.php?id='+$('id_video').value+'&distrib=<?=$tab_video['ID_DISTRIBUTEUR'];?>';
+				}
+				getPreviewVid()
+				getLastConversions(false);
+			</script>
+<?php
+}else{
+?>
+				<div style="height:50px;margin:40px;" align="center">
+					<table>
+					<tr><td colspan="2" align="center">Video not exist</td></tr>
+					<tr><td>id:<b> <?=$id;?></b></td></tr>
+<?php 
+	if($tourDsn != ""){ 
+		preg_match('/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/([^\?]+)/i', $tourDsn, $result);
+?>					
+					<tr><td>database: <b><?=$result[2].":".$result[1];?></b></td></tr>
+<?php }?>
+					</table>
+				</div>
+			</div>
+<?php
+}
+?>
+		    <div id="content_footer">    	
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+

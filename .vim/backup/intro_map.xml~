@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<movie service="craftsman-1.0">
+<body>		
+	<stack>
+		<sequence>
+			<effect type="none" duration="3.0">
+				<image filename="http://maps.google.com/staticmap?center=48.766249,2.44755&zoom=7&scale=2&size=640x480&maptype=satellite&key=ABQIAAAAWwEis_juCmJ9anicMOCDqxTWNGeFwNHgMXpCK2-bh6l3YhEZrhQSnxG2FWmjXhXRBdvuxaoctU_WOA" />
+				<animator type="custom">
+					<key scale="1,1,1" pos="0.0,0.0,0.0" time="1.0"/>
+					<key scale="1.4,1.4,1.40" pos="0.0,0.0,0.0" time="3.0"/>
+				</animator>
+			</effect>
+			<transition	type="crossfade" duration="0.5" />
+			<effect type="none" duration="4.0">
+				<image filename="http://maps.google.com/staticmap?center=48.766249,2.44755&zoom=10&scale=2&size=640x480&maptype=mobile&key=ABQIAAAAWwEis_juCmJ9anicMOCDqxTWNGeFwNHgMXpCK2-bh6l3YhEZrhQSnxG2FWmjXhXRBdvuxaoctU_WOA" />
+				<animator type="custom">
+					<key scale="1,1,1" pos="0.0,0.0,0.0" time="0.0"/>
+					<key scale="1.34,1.34,1.34" pos="0.0,0.0,0.0" time="4.0"/>
+				</animator>
+			</effect>
+			<transition	type="crossfade" duration="0.5" />
+			<effect type="none" duration="3.0">
+				<image filename="http://maps.google.com/staticmap?center=48.766249,2.44755&zoom=14&scale=2&size=640x480&maptype=satellite&key=ABQIAAAAWwEis_juCmJ9anicMOCDqxTWNGeFwNHgMXpCK2-bh6l3YhEZrhQSnxG2FWmjXhXRBdvuxaoctU_WOA" />
+				<animator type="custom">
+					<key scale="1,1,1" pos="0.0,0.0,0.0" time="0.0"/>
+					<key scale="1.34,1.34,1.34" pos="0.0,0.0,0.0" time="1.9"/>
+				</animator>
+			</effect>
+		</sequence>
+		<effect type="none">
+			<image filename="http://dev.m.previsite.com/logo_bnp.png" />
+		</effect>
+	</stack>
+</body>
+</movie>
+
+http://maps.google.com/staticmap?center=48.766249,2.44755&zoom=7&scale=2&size=640x480&maptype=satellite&markers=color:blue|label:S|48.766249,2.44755
+
+http://maps.google.com/maps/api/staticmap?center=48.766249,2.44755&zoom=7&scale=2&size=640x480&maptype=satellite&sensor=false&markers=color:blue|label:S|48.766249,2.44755
+
+http%3A%2F%2Fdev.m.previsite.com%2Flogo_bnp.png

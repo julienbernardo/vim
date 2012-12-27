@@ -1,0 +1,113 @@
+<?php
+
+session_start();
+
+/* Params generaux */
+$action  = $_REQUEST['todo'];
+$lang	= $_SESSION['ID_LANGUE'];
+$tour	= $_REQUEST['tour'];
+$state   = $_REQUEST['state'];
+$id_mls  = $_REQUEST['id_mls'];
+$num_mls = $_REQUEST['num_mls'];
+$country = $_REQUEST['country'];
+
+require_once('../../include/global.php');
+require_once('../../include/fonctions.php');
+require_once('../../include/fonction.db.php');
+require_once('../../include/fonction.sms.php');
+require_once('DB.php');
+require_once('include/header.php');
+require_once('include/dico.php');
+require_once('phpmailer/class.phpmailer.php');
+
+if(!in_array($action, array('get_mail', 'retraite_image'))){
+	require_once('include/security.php');
+}
+
+$tab_pays = get_country_list_phone();
+
+switch($action) {
+	case 'send_sms':
+	  if($tab_credits['ACCESS']) {
+//	  $waptitle  = $_REQUEST['title'];
+	  $phone	 = $_REQUEST['phone'];
+	  $tour	  = $_REQUEST['tour'];
+//	  $extension = $_REQUEST['ext'];
+//	  $operator  = $_REQUEST['operator'];
+
+	  // fr
+	  $phone = preg_replace('/^3306(.*)$/', '336$1', $phone);
+
+	  if(is_guid($tour) /*&& !empty($waptitle)*/) {
+			require_once 'HTTP/Request.php';
+
+			$waptitle = "Previsite Video ".substr($tour, 0, 6);
+//			$wapurl = str_replace(array('#ID#', '#EXT#'), array($tour, $extension), URL_VIDEO_MOBILE);
+			$wapurl = str_replace('#ID#', $tour, URL_MOBILETOUR);
+
+			$text = str_replace('%URL%', $wapurl, $dico['service_mobile']['text_mobile_sms']);
+
+			write_log($action,"Send Sms D :".$phone."/".$wapurl);
+
+			list( $country, $pref) = explode("#",$country);
+//			if($country == "FR"){ $url_req = URL_SEND_SMS_FR;}
+//			else
+			if($country == "US"){ $url_req = URL_SEND_SMS_US;}
+			else{ $url_req = URL_SEND_SMS;} 
+
+		 	$req = &new HTTP_Request($url_req);
+
+			$req->setHttpVer("1.0");
+			$req->setMethod(POST);
+			$req->addPostData('numero',$phone);
+			$req->addPostData('titre',$waptitle);
+			$req->addPostData('wap',"false");
+			$req->addPostData('texte',$text);
+			$req->addPostData('id',$_SESSION['ID_UTILISATEUR']);
+			$req->addPostData('tour',$tour);
+			$req->addPostData('lang',$lang);
+			$req->addPostData('country', $country);
+			$req->addPostData('type', $_SESSION['OPTIONS']['PROFILVIDEO']);
+			$req->sendRequest();
+			$page = $req->getResponseBody();
+
+			write_log($action,"envoi sms D");
+			write_log($action,"num : ".$phone);
+			write_log($action,"title : ".$waptitle);
+			write_log($action,"url : ".$wapurl);
+			$xml = new SimpleXMLElement($page);
+
+			if($xml->RequestResultCode == 0){
+				echo 'success';
+				$_SESSION['SMS_CREDITS'] = null;
+			}else{
+				echo 'false';
+			}
+	  } else {
+		  echo 'false';
+	  }
+	  }
+	  break;
+
+
+
+//	case 'check_sms_ready':
+//		if(!$tab_credits['ACCESS']) {
+//			$result = 'You need to have credits to use this option';
+//		} else {
+//			$result   = 'generate';
+//			$exists   = file_get_contents(get_storage_path('exist', $tour, '3gp'));
+//			$creation = file_get_contents(get_storage_path('date', $tour, '3gp'));
+//			if($exists === 'true') {
+//				$result =  'exists';
+//				if($creation > $tab_tour['DATE_MODIFICATION_VISITE']) {
+//					$result = 'ready';
+//				}
+//			}
+//		}
+//		echo $result;
+//	  break;
+}
+db_close();
+write_bench();
+?>

@@ -1,0 +1,478 @@
+function togglePart(myId){
+	$('#'+myId).toggle();
+	$('#'+myId+'_check').attr('checked', !$('#'+myId+'_check').attr('checked'));
+}
+
+//getLogs
+function getLogs( script, date, short){
+	$.post('ajax_export.php', {todo: 'get_log', script:$('#export_code').val(), file:date, short:(short ? 'true' : 'false')},
+        function(data){
+        	if(data != 'false'){
+		       $('#logs_list textarea').val(data);
+    	    }
+        }
+    );
+}
+
+
+//options
+function deleteOptions(row){
+	$('#'+row).addClass("hidden");
+}
+
+function addOptions(target, ref, val){
+	if(ref != ""){
+		var table_id = '#'+target;
+		var row_id = table_id+'_'+ref;
+		if($(row_id).hasClass("hidden")){
+			$(row_id).removeClass("hidden");
+			$(row_id+' td input:text').val(val);
+		}
+		$(row_id+' td input:text').focus();
+		$('#options_choice').val('');
+	}
+}
+
+//portals
+function deletePortail(portail){
+	var table = $('#'+portail).parent();
+	$('#'+portail).remove();
+	if(table.find('tr:visible').length == 1){
+		table.find('tr.header').addClass('hidden');
+	}
+}
+
+function addPortail(value){
+	if(value != "" && value.indexOf('#') > 0){
+		val = value.split('#');
+		if(!$('#'+val[0]+'_partners_portail').is('tr')){
+		    var table = $('#partners_portail').parent();
+			var portail = $('#partners_portail').clone();
+	
+			portail.removeClass('hidden');
+			portail.attr('id', val[0]+'_'+portail.attr('id'));
+			portail.find('.name').html('<span title=\''+val[1]+'\'>'+val[1]+'</span>');
+			portail.find('input:checkbox').attr('checked', (val.length == 2 ||(val.length == 3 && val[2] > 0)));
+			portail.find('.img img').click(new Function('deletePortail(\''+portail.attr('id')+'\')'));
+			portail.find('.infos span').html(val[0]);
+
+			table.find('.header').removeClass('hidden');
+			table.append(portail);
+		}else{
+			$('#'+val[0]+'_partners_portail input:checkbox').focus();
+		}
+		$('#partners_choice').val('');
+	}
+}
+
+//old export
+function showBoxExport(){
+	$('#box_export select[name="server"]').val('');
+	$('#box_export select[name="export"]').addClass('hidden');
+	$('#box_export input.save').addClass('hidden');
+	$('#box_export div.wait').addClass('hidden');
+	$('#box_export').removeClass('hidden');
+//	getExports();
+	$('html, body').animate({ scrollTop: 0 }, 0);
+	$('#box').removeClass('hidden');
+}
+
+function hideBoxExport(){
+	$('#box').addClass('hidden');
+}
+
+function getExportsByServer(server){
+	$('#box_export select[name="export"]').addClass('hidden');	
+	$('#box_export div.last div.wait').addClass('hidden');
+	$('#box_export div.last input.save').addClass('hidden');
+    if(server != ""){
+		$('#box_export div.last input').addClass('hidden');
+		$('#box_export div.last div.wait').removeClass('hidden');
+		$('#box_export select[name="export"]').addClass('hidden');
+		$.post('ajax_export.php', { todo: 'get_export', server: server},
+			function(data){
+		    	if(data != 'false'){
+				    $('#box_export select[name="export"]').html(data);
+			    }
+				$('#box_export div.last div.wait').addClass('hidden');
+	  	    	$('#box_export div.last input.cancel').removeClass('hidden');
+				$('#box_export select[name="export"]').removeClass('hidden');
+		    }
+		);
+	}
+}
+
+function showValidationExport(imp){
+	$('#box div.last div.wait').addClass('hidden');
+	$('#box div.last input.save').addClass('hidden');
+	if(imp != ""){ $('#box div.last input.save').removeClass('hidden');}
+}
+
+function loadExportInfos(){
+	$('#box div.last input').addClass('hidden');
+	$('#box div.last div.wait').removeClass('hidden');
+	$.post('ajax_export.php', 
+		{ todo:'export_config', server: $('#box select[name="server"]').val(), script:$('#box select[name="export"]').val()},
+		function(data){
+			json = jQuery.parseJSON(data);
+			if(json != undefined){
+				if(json.error != undefined){
+					for(var i=0; i < json.error.length; i++){
+						$('#'+json.error[i]).addClass('error');
+					}
+					alert(json.text);
+				}else{
+					hideBoxExport();
+					var new_old = gb_new;
+					loadScriptInfos(json);
+					setNew(new_old);
+					return;
+				}
+			}else{
+				alert('An error has occured');
+			}
+			$('#box div.last div.wait').addClass('hidden');
+			$('#box div.last input').removeClass('hidden');
+		}
+	);	
+}
+
+
+//infos
+
+
+function manageWait(isWaiting){
+	if(isWaiting){
+		$('#content_text div.content').addClass('hidden');
+		$('#end input:button').each(function(index){ $(this).addClass('hidden')});
+		$('#end div').removeClass('hidden');
+	}else{
+		$('#end div').addClass('hidden');
+		$('#content_text div.content').removeClass('hidden');
+		$('#end input:button').each(function(index){ $(this).removeClass('hidden')});
+	}
+}
+
+function reset(){
+	$('.error').each(function(index){ $(this).removeClass('error');});
+	$('select').each(function(index){ $(this).val('');});
+	$('#export_update').html('');
+	$('input:text').each(function(index){ $(this).val('');});
+		
+	$('#export_description').val('');
+	
+	$('#part_execution div.list ul li').each(function(index){ $(this).hide();});
+	$('#part_execution span.pid').html('').addClass('hidden').unbind("click");
+	$('#execution_steps input:checkbox').each(function(index){ $(this).attr('checked', false);});
+
+	$('#partners_portail').nextAll().each(function(index){ $(this).remove();});
+
+	$('#options_table tr').each(function(index){ 
+		if(!$(this).hasClass('hidden')){
+			$(this).addClass('hidden');
+		}
+	});
+	
+	$('#logs_list ul').html('');
+	$('#logs_list textarea').val('');
+
+	$('#part_logs table.resume tr.sample').each(function(index){ $(this).remove();});
+	$('#part_logs table.resume').addClass('hidden');
+	$('#part_logs input.save').attr('value', 'Execute');
+	
+	setNew(true);
+}
+
+function loadScript(script){
+	manageWait(true);
+	if(script != ''){
+		$.post('ajax_export.php',
+			{ todo: 'load_export', script: script},
+			function(data){
+				json = jQuery.parseJSON(data);
+				if(json != undefined){
+					setNew(false)
+					loadScriptInfos(json);
+					return;
+				}else{
+					alert('An error has occured');
+				}
+				manageWait(false);
+			}
+		);
+	}else{
+		manageWait(false);
+		reset();
+		setNew(true);
+	}
+}
+
+function loadScriptInfos(json){
+	manageWait(true);
+	reset();
+	if(json != "" && json != undefined){ 
+		for(var key in json.fields){
+			if(key != ""){
+				if($('#'+key).is('span')){
+					eval('$(\'#'+key+'\').html(json.fields.'+key+')');
+				}else if($('#'+key).is('input:checkbox')){
+					eval('$(\'#'+key+'\').attr(\'checked\', (json.fields.'+key+' == 1 ? true : false))');
+				}else if($('#'+key).is('input') || $('#'+key).is('select') || $('#'+key).is('textarea')){
+					eval('$(\'#'+key+'\').val(json.fields.'+key+')');
+				}else if($('#'+key).is('img')){
+					eval('$(\'#'+key+'\').attr(\'src\', json.fields.'+key+')');
+				}
+			}
+		}
+		
+		if(json.fields != undefined && json.fields.execution_state != undefined && json.fields.execution_state.indexOf('working') > 0){
+			$('#part_logs input.save').attr('value', 'Reset');
+		}
+		 
+		for(var key in json.options){	
+			eval('addOptions(\'options_table\', \''+key+'\',json.options.'+key+')');
+		}
+		if(json.portals != undefined){
+			for(var i=0; i < json.portals.length; i++){	
+				addPortail(json.portals[i]);
+			}
+		}
+
+		if(json.last_exec != undefined && json.last_exec.length > 0){
+			for(var i =0; i < json.last_exec.length; i++){
+				addLastExec(json.last_exec[i]);
+			}
+			$('#part_logs table.resume').removeClass('hidden');
+		}else{ $('#part_logs table.resume').addClass('hidden');}
+	
+		if(json.logs != undefined && json.logs.length > 0){
+			for(var i=0; i< json.logs.length;i++){
+				$('#logs_list ul').append('<li onclick="getLogs(\''+$('#export_code').val()+'\', \''+json.logs[i]+'\', false)">'+json.logs[i]+'</li>');
+			}
+			getLogs($('#export_code').val(), json.logs[0], true);
+			$('#part_logs').parent().removeClass('hidden');
+		}else{ $('#logs_list').addClass('hidden');}
+		
+		if(json.pid != undefined){
+			$('#part_execution span.pid').html('PID: '+json.pid).click(function(){ killProcess(json.fields.import_server, json.pid);});
+		}
+
+		setNew($('#export_code').val() == '');
+		if(gb_new){
+			$('#part_logs').parent().addClass('hidden');
+		}else{	$('#part_logs').parent().removeClass('hidden');}
+		
+	}
+	manageWait(false);
+	$('input').each(function(index){ $(this).blur();});
+	$('html, body').animate({ scrollTop: 0 }, 0);
+}
+
+
+function setNew(isNew){
+	gb_new = isNew;
+//	$('#export_code').attr('readonly', !isNew);
+	if(isNew){ 
+//		$('#export_code').removeClass('readonly');
+		gb_export_code = '';
+		$('#part_logs').parent().hide();
+	}else{ 
+		gb_export_code = $('#export_code').val();
+//		$('#export_code').addClass('readonly');
+		$('#part_logs').parent().show();
+	}
+}
+
+
+//saveExport
+function saveExport(){
+	$('.error').each(function(index){ $(this).removeClass('error');});
+	
+	var params = {};
+	var focus = undefined;
+	
+	//options_table
+	var options = {};
+	
+	$('#options_table tr[class!="hidden"]').each(function(index){
+		options[index] ={
+			'ref': $(this).find('.name').text(),
+			'cat': $(this).find('input:hidden').val(),
+			'value': $(this).find('input:text').val(),
+		};
+	});
+	params['options'] = $.toJSON(options);
+
+	//partners_table
+	var portals = {};
+	var portal_activate = false;
+	$('#partners_table tr[id$="_partners_portail"]').each(function(index){
+		portal_activate |= $(this).find('input:checkbox').attr('checked');
+		portals[index] = {
+			'id': $(this).attr('id').replace('_partners_portail',''), 
+			'usercode':$(this).find('input[name="login"]').val(), 
+			'password':$(this).find('input[name="password"]').val(), 
+			'limit':$(this).find('input[name="limit"]').val(), 
+			'activate':$(this).find('input:checkbox').attr('checked'), 
+		};
+	});
+	if(portal_activate){
+		params['portals'] = $.toJSON(portals);
+	}else{ focus = $('#part_partners select');}
+
+	if(!$('#execution_time').val().match(/^[0-9]+(\.[0-9]+)?$/i)){
+		$('#execution_time').addClass('error');
+		focus = $('#execution_time');
+	}else{ params['execution_time'] = $('#execution_time').val();}	
+	
+	if(!$('#execution_archive').val().match(/^[0-9]+$/i)){
+		$('#execution_archive').addClass('error');
+		focus = $('#execution_archive');
+	}else{ params['execution_archive'] = $('#execution_archive').val();}
+	
+	if(!$('#execution_period').val().match(/^(\*\/[1-9][0-9]?|\*|[1-9]?[0-9]-[1-9]?[0-9](;[1-9]?[0-9]-[1-9]?[0-9])*)$/i)){
+		$('#execution_period').addClass('error');
+		focus = $('#execution_period');
+	}else{ params['execution_period'] = $('#execution_period').val();}
+	
+	
+	var fieldsNotEmpty = [
+		'export_server', 'export_name'
+	];
+	for(var i=0;i < fieldsNotEmpty.length; i++){
+		if($('#'+fieldsNotEmpty[i]).val() == ""){
+			$('#'+fieldsNotEmpty[i]).addClass('error');
+			focus = $('#'+fieldsNotEmpty[i]);
+		}else{ params[fieldsNotEmpty[i]] = $('#'+fieldsNotEmpty[i]).val();}
+	}
+	
+	if(!$('#export_code').val().match(/^([^ \/*:-><#]+)$/i)){
+		$('#export_code').addClass('error');
+		focus = $('#export_code');
+	}else{ params['export_code'] = $('#export_code').val();}
+	
+	params['export_description'] = $('#export_description').val();
+	params['export_activate'] = $('#export_activate').attr('checked');
+	params['new'] = (gb_new ? "true" : "false");
+	params['export_code_old'] = gb_export_code;
+	if(focus == undefined){
+		var rename = false;
+		if(!gb_new && gb_export_code != $('#export_code').val()){
+			if(!confirm('Do you really want to rename '+gb_export_code+' in '+$('#export_code').val()+'?')){
+				return false;
+			}else{ rename = true;}
+		}
+		manageWait(true);
+		params['todo'] = 'save_export';
+		$.post('ajax_export.php', params,
+			function(data){
+				if(data != "false"){
+					json = jQuery.parseJSON(data);
+					if(json != undefined){
+						if(json.error != undefined){
+							for(var i=0; i < json.error.length; i++){
+								$('#'+json.error[i]).addClass('error');
+							}
+							alert(json.text);
+						}else{
+							if(rename){
+								window.location = '/manage_export?script='+$('#import_code').val();
+							}else{
+								setNew(false);
+								loadScriptInfos(json);
+							}
+							return;
+						}
+					}
+				}else{
+					alert('An error has occured');
+				}
+				manageWait(false);
+			}
+		);
+	}else{	focus.focus();}	
+}
+
+
+// action
+function checkExport(){
+	if($('#export_code').val() != ""){
+		var newWindow = window.open('/cron_export?test='+$('#export_code').val(), '_blank');
+		newWindow.focus();
+	}
+}
+
+function checkExport(){
+	if($('#export_code').val() != ""){
+		var newWindow = window.open('/cron_export?test='+$('#export_code').val(), '_blank');
+		newWindow.focus();
+	}
+}
+
+function executeExport(action){
+	if($('#export_code').val() != ""){
+		if(confirm("Do you really want to "+(action == "Execute" ? "launch" : "reset")+" "+$('#export_code').val()+" script?")){
+		    $.post('ajax_export.php', { todo:'force_'+(action == 'Execute' ? 'execute' : 'reset'), script: $('#export_code').val()},
+		        function(data){
+		            if(data == "true"){
+		                 loadScript($('#export_code').val());
+		            }else{
+		                alert('An error as occured');
+		            }
+		        }
+		    );
+		}
+	}
+}
+
+//
+
+function limitLastExec(limit){
+	$('#part_logs table.resume tr[class!="header"]').each(
+		function(index){ 
+			if(!$(this).hasClass('footer')){
+				if(index > 5 && limit){ $(this).addClass('hidden');}
+				else{ $(this).removeClass('hidden');}
+			}else{
+				if(index > 5){ 
+					$(this).find('td').html('<span class="link">'+(limit ? 'See more' : 'Hide few')+'</span>');
+					$(this).removeClass('hidden');
+					$(this).click(new Function('limitLastExec('+(limit ? false : true)+')'));
+				}else{ $(this).addClass('hidden');}
+			}
+		}	
+	);
+} 
+
+function addLastExec(json){
+	if(json != undefined){
+		$('#part_logs table.resume tr.footer').before('<tr class="sample"><td colspan="7" class="sep"></td>'
+									+'<tr class="sample">'
+									+'	<td>'+json.DATE_DEBUT_CRON+'</td>'
+									+'	<td>'+(json.DURATION == undefined ? '-' : json.DURATION)+'</td>'
+									+'	<td>'+(json.DONE == undefined ? '-' : json.DONE)+'</td>'
+									+'	<td>'+(json.FAILED == undefined ? '-' : json.FAILED)+'</td>'
+									+'</tr>')
+		limitLastExec(true);
+	}
+}
+
+function goToHome(){
+	window.location = "/manage?srv="+$('#export_server').val();
+}
+
+function killProcess(server, pid){
+	if(server != "" && pid != "" && gb_export_code != ""){
+		if(confirm("Do you really want to kill this process?")){
+		    $.post('ajax_export.php', {todo: 'kill', script: gb_export_code, server: server, pid: pid},
+		        function(data){
+		            if(data == "true"){
+		                 loadScript(gb_export_code);
+		            }else{
+		                alert('An error as occured');
+		            }
+		        }
+		    );
+		}
+	}
+}

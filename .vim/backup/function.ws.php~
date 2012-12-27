@@ -1,0 +1,106 @@
+<?php
+/**
+* Util
+***/
+function get_tour_infos($script_name, $ref_portail, $partner_id, $password, $get_url = false){
+	$return = array();
+	$url = str_replace('#REF_PORTAIL#', urlAPIencode($ref_portail), WS_GET_TOUR);
+	$params = array('partnerID' => $partner_id, 'password' => $password);
+	$response = make_ws_request($script_name, $url, $params, "POST");
+	if($get_url){ return make_ws_request($script_name, $url, $params, "GET", true).":".$response;}
+	$xml = @simplexml_load_string($response);
+	if($xml !== false){
+		$return = array('desc' => (string)$xml->desc, 'lock_tts' => (string)$xml->lock_tts, 'lock' => (string)$xml->lock, 'nb_images' => (string)$xml->images, 'id' => (string)$xml->tourID, 'user' => (string)$xml->userID);
+	}
+	return $return;
+}
+
+function make_ws_request($script_name, $url, $data = array(), $method = "POST", $get_url = false, $tour_update = true, $nolog = true){
+	$params = "";
+	if(is_array($data) && count($data) >0){
+		foreach($data as $k=>$v){ $data[$k] = str_replace('\'\'', '\'', $v);}
+	}
+	if($nolog) $data['nolog'] = 1; 
+	//if($method == "GET" && is_array($data) && count($data) >0){
+	if(is_array($data) && count($data) >0){
+		$params = "?".http_build_query($data);
+	}
+	if($get_url) return $url.$params;
+	$nbTry = 0;
+	do{
+		$retry = false;
+		if($tour_update && $method == "POST"){
+			$c = curl_init($url);
+			//curl_setopt($c, CURLOPT_URL, $url);
+			curl_setopt($c, CURLOPT_HEADER, 0);
+			curl_setopt($c, CURLOPT_POST, count($data));
+			curl_setopt($c, CURLOPT_POSTFIELDS, http_build_query($data));
+			curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
+			$response = curl_exec ($c);
+			curl_close ($c);
+		}else{
+			$req = new HTTP_Request($url.($method == "GET" ? $params : "" ));
+			$req->setMethod($method);
+			if($method == "POST" && is_array($data) && count($data) >0){
+				foreach($data as $k=>$v){ $req->addPostData( $k, $v);}
+			}
+			$req->sendRequest();
+			$response = $req->getResponseBody();
+		}
+		if((preg_match('#<errorMess>DB error</errorMess>#i', $response) > 0) && $nbTry++ < 3 ){
+			import_log('[WS_ERROR][MAKE_WS_REQUEST] Try:'.($nbTry).' - '.$url.$params.":".$response, $script_name);
+			$retry = true;
+			sleep(10);
+		}
+	}while($retry);
+	return $response;
+}
+
+function urlAPIencode($text){
+	$text = urlencode($text);
+	$text = str_replace('%2F', '/', $text);
+	return $text;
+}
+
+function replace_diffusions_usercode($user, $diffusion, $checkAllowed = false){
+	$return = array('usercode'=>'', 'password'=>'', 'prefixe_diffusion'=>'', 'dsn_imap' =>'', 'pub_limit'=> '', 'pub_limit_order' => '');
+	$portail = $diffusion['ID_PORTAIL'];
+
+	if(count($diffusion['USERS'][$user['USERCODE']]) > 0){
+		$diffusion = $diffusion['USERS'][$user['USERCODE']];
+	}
+
+	if($diffusion['ID_STATUT_IMPORT_DIFFUSION'] > 0){
+		$replace = array(
+			'search' => array('#PASSWORD#'),
+			'replace'=> array($user['DIFFUSIONS'][$portail]['PASSWORD'])
+		);
+		$return['password'] = str_replace($replace['search'], $replace['replace'], $diffusion['PASSWORD_PORTAIL']);
+		if($checkAllowed === true &&  preg_match('/(#ID_UTILISATEUR#)/', $diffusion['PREFIXE_PORTAIL']) > 0){
+			$return['usercode'] = $diffusion['PREFIXE_PORTAIL'];
+		}else{
+			$replace = array(
+				'search' => array('#LOGIN#', '#USERCODE#', '#ID_UTILISATEUR#'),
+				'replace'=> array($user['DIFFUSIONS'][$portail]['LOGIN'], $user['USERCODE'], $user['ID_UTILISATEUR'])
+			);
+			$return['usercode'] = str_replace($replace['search'], $replace['replace'], $diffusion['PREFIXE_PORTAIL']);
+		}
+	
+		$replace = array(
+			'search' => array('#LOGIN#', '#USERCODE#', '#PREFIXE_DIFFUSION#'),
+			'replace'=> array($user['DIFFUSIONS'][$portail]['LOGIN'], $user['USERCODE'], $user['DIFFUSIONS'][$portail]['PREFIXE_DIFFUSION'])
+		);
+		$return['prefixe_diffusion'] = str_replace($replace['search'], $replace['replace'], $diffusion['PREFIXE_DIFFUSION']);
+		$return['dsn_imap'] = $diffusion['DSN_IMAP'];
+		if($user['DIFFUSIONS'][$portail]['DSN_IMAP'] != ""){
+			$return['dsn_imap'] = $user['DIFFUSIONS'][$portail]['DSN_IMAP'];
+		}
+		
+		$return['pub_limit'] = str_replace( '#LIMIT#', $user['DIFFUSIONS'][$portail]['LIMIT'], $diffusion['LIMIT']);
+		$return['pub_limit_order'] = str_replace( '#LIMIT_ORDER#', $user['DIFFUSIONS'][$portail]['LIMIT_ORDER'], $diffusion['LIMIT_ORDER']);
+		$return['diffusion_forced'] = ($diffusion['ID_STATUT_IMPORT_DIFFUSION'] > 1);
+	}
+	return $return;
+}
+
+?>

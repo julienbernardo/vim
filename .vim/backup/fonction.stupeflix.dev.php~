@@ -1,0 +1,15 @@
+<?php
+
+$videos_options['TYPE']['PACIFIC'] = array('MAIN_TEMPLATE' => 'US');
+/**
+*	US -> DEFAULT
+**/
+function create_stupeflix_xml_PACIFIC(&$options){
+	$options['MAIN_TEMPLATE'] = 'US';
+	$options['TEMPLATE'] = "PACIFIC";
+	$options['COUNTRY'] = "US";
+	$options['MAP_ACTIVE'] = true;
+	return create_stupeflix_xml_DEFAULT($options);
+}
+
+?>

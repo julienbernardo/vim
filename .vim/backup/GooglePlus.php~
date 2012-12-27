@@ -1,0 +1,304 @@
+<?php
+
+require_once 'HTTP/Client.php';
+require_once 'HTTP/Request.php';
+require_once 'HTTP/Client/CookieManager.php';
+
+class GooglePlus{
+
+	protected $_defaultOptions = array(
+		//data
+		'at' => null,
+		'page_id' => null,
+		'debug' => false,
+        'post_id' => '',
+        'login' => '',
+        'password' => '',
+		//url
+        'login_url' => 'https://accounts.google.com/ServiceLogin',
+        'home_url' => 'https://plus.google.com/',
+        'logout_url' => 'https://www.google.com/m/logout',
+		'post_url' => 'https://plus.google.com/_/sharebox/post',
+        'post_page' => 'https://plus.google.com/#PAGE_ID#/posts',
+		'final_url' => 'https://plus.google.com/#ID#',
+		'edit_url' => 'https://plus.google.com/_/stream/edit/',
+		//https://plus.google.com/_/stream/deleteactivity/?hl=en&ozv=es_oz_20121017.06_p1&avw=pr%3Aplu&_reqid=1151663&rt=j
+		'delete_url' => 'https://plus.google.com/_/stream/deleteactivity/',
+		//form
+        'auth_email_field' => 'Email',
+		'auth_pass_field' => 'Passwd',
+		'errors' => array(),
+    );
+
+	protected $_cookiesManager = null;
+	protected $_options = array();
+	protected $_errors = array();
+
+	protected function _addError($step, $error){
+		if($step != "" && $error != ""){
+			if(!is_array($this->errors[$step])) $this->_errors[$step] = array();
+			$this->_errors[$step][] = $error;
+		}
+	}
+
+	protected function _getPageId(){
+		$response = $this->_getRequestResult($this->_getOption('home_url'));
+		if($response['code'] == '200' && preg_match('#data:[^\[]*\["([0-9]+)",#i', $response['body'], $result) > 0){
+			$this->_setOption('page_id', $result[1]);
+			return true;
+		}
+		if($this->_getOption('debug')) print_r($response);
+		return false;
+	}
+
+    protected function _getAtToken($code = ''){
+        if($this->_getOption('at') == ""){
+            if(preg_match('#AObGSA.*:\d+#', $code, $match) && isset($match[0]) && $match[0]){
+				$this->_setOption('at' , $match[0]);
+            }else{
+                $this->_addError( 'getAtToken', 'Access token parsing error');
+            }
+        }
+		return ($this->_getOption('at') != "");
+	}
+
+	protected function _getOption($name){
+		return $this->_options[$name];
+	}
+
+	protected function _setOption($name, $value){
+		$this->_options[$name] = $value;
+	}
+
+	protected function _init(){
+		$this->_options = array_merge($this->_options, $this->_defaultOptions);
+		$this->_cookiesManager = new HTTP_Client_CookieManager();
+	}
+
+	function GooglePlus($login, $password, $debug = false){
+		$this->_init();
+		$this->_setOption('login', $login);
+		$this->_setOption('password', $password);
+		$this->_setOption('debug', $debug);
+	}
+	
+	protected function _connexion(){
+		$url_login = $this->_getOption('login_url');
+		$response = $this->_getRequestResult( $url_login, "GET", array(), array(), true);
+		if(preg_match('/<a[^>]*href="(https:\/\/[^"]+ServiceLogin[^"]+)"/i', $response['body'], $result) > 0){
+			$response = $this->_getRequestResult($result[1]);
+		}	
+		if($response['code'] == 200){
+			$doc = new DOMDocument;
+			@$doc->loadHTML($response['body']);
+			$inputs = $doc->getElementsByTagName('input');
+			$auth_email_field = $this->_getOption('auth_email_field');
+			$auth_pass_field = $this->_getOption('auth_pass_field');
+			$params = array();
+			if(count($inputs) > 0){
+				foreach ($inputs as $input) {
+					switch ($input->getAttribute('name')) {
+					case $auth_email_field:
+						$params[$auth_email_field] = $this->_getOption('login');
+						break;
+					case $auth_pass_field:
+						$params[$auth_pass_field] = $this->_getOption('password');
+						break;
+					default:
+						$params[$input->getAttribute('name')] = $input->getAttribute('value');
+					}
+				}
+
+				$response = $this->_getRequestResult($url_login, "POST", $params, array(), true);
+				if($response['code'] == '200' && $this->_getCookie('SSID') != ""){
+					return true;
+				}else  $this->_addError('connexion', 'connexion failed');
+			}else  $this->_addError('connexion', 'login form data not found');
+		}else $this->_addError('connexion', 'connexion form not found');
+		if($this->_getOption('debug')) print_r($response);
+		return false;
+	}
+
+	protected function _quoteMessage($message = ''){
+        $message = addslashes($message);
+        $message = strip_tags($message);
+        $message = preg_replace("#\t#si",' ',$message);
+        $message = preg_replace("#\n|\r#si",'\n',$message);
+        $message = preg_replace('#(\\\n)+#si','\n',$message);
+        return trim($message);
+    }
+	
+	protected  function _getPostParams($title, $description, $image, $url, $message){
+		$post = array(
+			'source' => 'frameless',
+			'at' => $this->_getOption('at'),
+			'f.req' => '["'.$this->_quoteMessage($message).'","oz:'.$this->_getOption('page_id').'.'.(time()).'.0",null,null,null,null,"[]",null,null,true,[],false,null,null,[],null,false,null,null,null,null,null,null,null,null,null,null,false,false,false,null,null,null,null,null,null,[],[[[null,null,1]],null]]',
+		);
+		$link_infos = json_decode( '["[null,null,null,\"Called to Darkness by *michalivan on deviantART\",null,null,null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,\"cover for Pathfinder Tales: Called to Darkness ([link]) \\u00a9 Paizo Publishing, LLC\\u00ae\",null,null,[null,\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\",null,\"text/html\",\"document\"],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[],null,null,null,null,null,[[null,\"\",\"http://google.com/profiles/media/provider\",\"\"]]]","[null,null,null,null,null,[null,\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\"],null,null,null,[],null,null,null,null,null,null,null,null,null,null,null,null,null,null,[null,\"http://michalivan.deviantart.com/art/Called-to-Darkness-331656344\",null,\"image/jpeg\",\"photo\",null,null,null,null,null,null,null,1009,791],null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,[[null,\"http://th00.deviantart.net/fs70/PRE/f/2012/284/3/5/called_to_darkness_by_michalivan-d5hgjo8.jpg\",null,null]],null,null,null,null,null,[[null,\"images\",\"http://google.com/profiles/media/provider\",\"\"]]]"]');
+
+		$isVideo = (preg_match('#^http://www\.youtube\.com/watch\?v=#i',$url) > 0);
+		$link_infos[0] = json_decode($link_infos[0], true);
+		$link_infos[0][3] = $title;
+		$link_infos[0][21] = $description;
+		$link_infos[0][24][1] = $url;
+		$link_infos[0][24][3] = 'text/html';
+		$link_infos[0][24][4] = 'document';
+		$link_infos[0] = json_encode($link_infos[0]);
+
+		$link_infos[1] = json_decode($link_infos[1], true);
+		if($isVideo){
+			$link_infos[1][5] = array(null, $url.'?hl=en&fs=1&autoplay=1', 385, 640);
+			$link_infos[1][24] = array(null, $url, null, 'application/x-shockwave-flash', 'video');
+			$link_infos[1][41][0][1] = $image['url'];
+			$link_infos[1][47][0][1] = 'youtube';
+		}else{
+			$link_infos[1][5][1] = $image['url'];
+			$link_infos[1][24][1] = '';
+			$link_infos[1][24][3] = 'image/jpeg';
+			$link_infos[1][24][4] = 'photo';
+			$link_infos[1][24][12] = $image['width'];
+			$link_infos[1][24][13] = $image['height'];
+			$link_infos[1][24] = array(null, '', null, 'image/jpeg', 'photo', null, null, null, null, null, null, null, $image['width'], $image['height']);
+			$link_infos[1][41][0][1] = $link_infos[1][5][1];
+		}
+		$link_infos[1] = json_encode($link_infos[1]);
+
+		$link_infos = json_encode($link_infos);
+		$json = json_decode($post['f.req']);
+		$json[6] = $link_infos;
+		$post['f.req'] = json_encode($json);
+		return $post;
+	}
+
+	function postIt($title, $description, $image, $link, $message = ""){
+		if($link != "" && $message != ""){
+			if($this->_connexion()){
+				if($this->_getPageId()){
+					$response = $this->_getRequestResult(str_replace('#PAGE_ID#', $this->_getOption('page_id'), $this->_getOption('post_page')));
+					if($response['code'] == '200' ){ 
+						if($this->_getAtToken($response['body'])){
+							$post_url = $this->_getOption('post_url')."/?spam=20&_reqid=".(time() % 1e6)."&rt=j";
+							$response = $this->_getRequestResult($post_url,"POST", $this->_getPostParams($title, $description, $image, $link, $message));
+							if($response['code'] != '200'){
+								$this->_addError('postIt', 'Posting Error');
+							}else if(preg_match('/,"('.$this->_getOption('page_id').'\/posts\/[^"]+)",/iU', $response['body'], $postId) > 0){
+								$this->_setOption('post_id', $postId[1]);
+								return true;
+							}else{
+								$this->_addError('postIt', 'Parsing Error');
+							}
+						}else $this->_addError("postIt", "at token not found");
+					}else $this->_addError("postIt", "form post not found");
+				}else $this->_addError("postIt", "PageId not found");
+			}else $this->_addError("postIt", "Login failed");
+		}else $this->_addError("postIt", "Missing Url Or Message");
+		if($this->_getOPtion('debug')){ print_r($response);}
+		return false;
+	}
+	
+	function deletePost($ref){
+		if($ref != ""){
+			if($this->_connexion()){
+				if($this->_getPageId()){
+					if(preg_match('#^'.$this->_getOption('page_id').'#i', $ref) > 0){
+						$this->_setOption('post_id', $ref);
+						$response = $this->_getRequestResult($this->getUrl());
+						if($response['code'] == 200){
+							if($this->_getAtToken($response['body']) 
+								&& preg_match( '#<div[^>]*id="update-([^"]+)"#i', $response['body'], $postId) > 0 
+								&& preg_match('#var OZ_buildLabel = \'([^\']+)\';#i', $response['body'], $ozv) > 0){
+								$params = array(
+									'itemId' => $postId[1],
+									'at' => $this->_getOption('at'),
+								);
+								$post_url = $this->_getOption('delete_url')."?hl=en&ozv=".urlencode($ozv[1])."&avw=pr%3Apr&_reqid=".(time() % 1e6)."&rt=j";
+								$response = $this->_getRequestResult($post_url, 'POST', $params);
+								if($response['code'] == 200){
+									return true;
+								}else $this->_addError("deletePost", "Delete post failed");
+							}else $this->_addError("deletePost", "at token or post id not found");
+						}else return true;
+					}else $this->_addError("deletePost", "Post not own by this user");
+				}else $this->_addError("deletePost", "PageId not found");
+			}else $this->_addError("deletePost", "Login failed");
+		}else $this->_addError("deletePost", "Missing Id post");
+		if($this->_getOPtion('debug')){ print_r($response);}
+		return false;
+	}
+
+	function getId(){
+		return $this->_getOption('post_id');
+	}
+	function getUrl(){
+		return str_replace('#ID#',$this->getId(),  $this->_getOption('final_url'));
+	}
+	function getErrors(){
+		$return = "";
+		if(count($this->_errors) > 0){
+			foreach($this->_errors as $step=> $errors){
+				for ($i = 0; $i < count($errors); $i++) {
+					 $return = ($i+1).".".$step.":".$errors[$i]."\n";
+				}
+			}
+		}
+		return $return;
+	}
+
+	protected function _getCookie($name){
+		if( $name != "" && count($this->_cookiesManager->_cookies) > 0){
+			foreach($this->_cookiesManager->_cookies as $cookie){
+				if($cookie['name'] == $name){
+					return $cookie['value'];
+				}
+			}
+			return 	$this->_cookiesManager->_cookies[$name]['value'];
+		}
+		return "";
+	}
+	
+	protected function _sendRequest(&$req){
+		$this->_cookiesManager->passCookies($req);
+		$req->sendRequest();
+		$this->_cookiesManager->updateCookies($req);
+	}
+	
+	protected function _getRequestResult($url, $method = "GET", $params = array(), $headers = array(), $follow = false){
+		$req = new HTTP_Request($url);
+		$req->setMethod($method);
+		$req->addHeader("User-Agent", "Mozilla/5.0 (Windows NT 5.1; rv:14.0) Gecko/20100101 Firefox/14.0.1");
+		$req->addHeader("Accept", 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8');
+		$req->addHeader("Accept-Language", "fr,fr-fr;q=0.8,en-us;q=0.5,en;q=0.3");
+		$req->addHeader("Accept-Encoding", "gzip,deflate");
+		$req->addHeader("Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.7");
+		if(is_array($params) && count($params) > 0){
+			if($method == "POST"){
+				foreach($params as $k=>$v){ $req->addPostData( $k, $v);}
+			}else{
+				$tmp = "";
+				foreach($params as $k=>$v){ $tmp .= "&".urlencode($k)."=".urlencode($v);}
+				$url .= preg_replace('/^&/i', '?', $tmp);
+				$req->setURL($url);
+			}
+		}
+		if(is_array($headers) && count($headers) > 0){
+			foreach($headers as $k => $v){ $req->addHeader( $k, $v);}
+		}
+//		if(file_exists($file)){ $req->addFile( "file", $file);}
+		$this->_sendRequest($req);
+		while($follow && preg_match('/30(2|1)/i', $req->getResponseCode()) > 0){
+			$header = $req->getResponseHeader();
+			//echo $header['location']. " -> ";
+			if(preg_match('/^https?:\/\//i', $header['location']) == 0){
+				if(preg_match('#^/#i', $header['location']) > 0){
+					$url = preg_replace('#^(https?://[^/]+).*#', '$1', $url);
+				}
+				$header['location'] = $url.$header['location'];
+			}
+			//echo $header['location'].'<br />';
+			return $this->_getRequestResult($header['location'], "GET", array(), array(), true);
+		}
+		return array('body'=>$req->getResponseBody(), 'header'=>$req->getResponseHeader(), 'code'=>$req->getResponseCode(), 'url'=>$url, 'params' => $params, 'headers' => $headers);
+	}
+}
+
+?>

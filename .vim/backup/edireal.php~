@@ -1,0 +1,1061 @@
+<?php
+function edireal($script_name = '', $diffusions, $workPath = '', $archive_path = '', $archive_file = '', $prefixe_archive = '') {
+	//ini_set('memory_limit','100M');
+	if ($debug)
+		$ionice = "nice -n 19";
+	else
+		$ionice = "ionice -c 3 nice -n 19";
+	if (strpos($_SERVER['REQUEST_URI'], 'test='))
+		$archive = false;
+	else
+		$archive = true;
+	$need_images = 'true';
+	$filter_price = 700000;
+	$limit = 0;
+	if (!is_dir(PATH_FTP_ARCHIVES . 'edireal/'))
+		mkdir(PATH_FTP_ARCHIVES . 'edireal/');
+	$return = array('USERS' => array(), 'TOURS' => array(), 'IMAGES' => array());
+	$iso3166b = array('AND' => "AD", 'ARE' => "AE", 'AFG' => "AF", 'ATG' => "AG", 'AIA' => "AI", 'ALB' => "AL", 'ARM' => "AM", 'ANT' => "AN", 'AGO' => "AO", 'ATA' => "AQ", 'ARG' => "AR", 'ASM' => "AS", 'AUT' => "AT", 'AUS' => "AU", 'ABW' => "AW", 'ALA' => "AX", 'AZE' => "AZ", 'BIH' => "BA", 'BRB' => "BB", 'BGD' => "BD", 'BEL' => "BE", 'BFA' => "BF", 'BGR' => "BG", 'BHR' => "BH", 'BDI' => "BI", 'BEN' => "BJ", 'BMU' => "BM", 'BRN' => "BN", 'BOL' => "BO", 'BRA' => "BR", 'BHS' => "BS", 'BTN' => "BT", 'BVT' => "BV", 'BWA' => "BW", 'BLR' => "BY", 'BLZ' => "BZ", 'CAN' => "CA", 'CCK' => "CC", 'COD' => "CD", 'CAF' => "CF", 'COG' => "CG", 'CHE' => "CH", 'CIV' => "CI", 'COK' => "CK", 'CHL' => "CL", 'CMR' => "CM", 'CHN' => "CN", 'COL' => "CO", 'CRI' => "CR", 'SCG' => "CS", 'CUB' => "CU", 'CPV' => "CV", 'CXR' => "CX", 'CYP' => "CY", 'CZE' => "CZ", 'DEU' => "DE", 'DJI' => "DJ", 'DNK' => "DK", 'DMA' => "DM", 'DOM' => "DO", 'DZA' => "DZ", 'ECU' => "EC", 'EST' => "EE", 'EGY' => "EG", 'ESH' => "EH", 'ERI' => "ER", 'ESP' => "ES", 'ETH' => "ET", 'FIN' => "FI", 'FJI' => "FJ", 'FLK' => "FK", 'FSM' => "FM", 'FRO' => "FO", 'FRA' => "FR", 'GAB' => "GA", 'GBR' => "GB", 'GRD' => "GD", 'GEO' => "GE", 'GUF' => "GF", 'GGY' => "GG", 'GHA' => "GH", 'GIB' => "GI", 'GRL' => "GL", 'GMB' => "GM", 'GIN' => "GN", 'GLP' => "GP", 'GNQ' => "GQ", 'GRC' => "GR", 'SGS' => "GS", 'GTM' => "GT", 'GUM' => "GU", 'GNB' => "GW", 'GUY' => "GY", 'HKG' => "HK", 'HMD' => "HM", 'HND' => "HN", 'HRV' => "HR", 'HTI' => "HT", 'HUN' => "HU", 'IDN' => "ID", 'IRL' => "IE", 'ISR' => "IL", 'IMN' => "IM", 'IND' => "IN", 'IOT' => "IO", 'IRQ' => "IQ", 'IRN' => "IR", 'ISL' => "IS", 'ITA' => "IT", 'JEY' => "JE", 'JAM' => "JM", 'JOR' => "JO", 'JPN' => "JP", 'KEN' => "KE", 'KGZ' => "KG", 'KHM' => "KH", 'KIR' => "KI", 'COM' => "KM", 'KNA' => "KN", 'PRK' => "KP", 'KOR' => "KR", 'KWT' => "KW", 'CYM' => "KY", 'KAZ' => "KZ", 'LAO' => "LA", 'LBN' => "LB", 'LCA' => "LC", 'LIE' => "LI", 'LKA' => "LK", 'LBR' => "LR", 'LSO' => "LS", 'LTU' => "LT", 'LUX' => "LU", 'LVA' => "LV", 'LBY' => "LY", 'MAR' => "MA", 'MCO' => "MC", 'MDA' => "MD", 'MDG' => "MG", 'MHL' => "MH", 'MKD' => "MK", 'MLI' => "ML", 'MMR' => "MM", 'MNG' => "MN", 'MAC' => "MO", 'MNP' => "MP", 'MTQ' => "MQ", 'MRT' => "MR", 'MSR' => "MS", 'MLT' => "MT", 'MUS' => "MU", 'MDV' => "MV", 'MWI' => "MW", 'MEX' => "MX", 'MYS' => "MY", 'MOZ' => "MZ", 'NAM' => "NA", 'NCL' => "NC", 'NER' => "NE", 'NFK' => "NF", 'NGA' => "NG", 'NIC' => "NI", 'NLD' => "NL", 'NOR' => "NO", 'NPL' => "NP", 'NRU' => "NR", 'NIU' => "NU", 'NZL' => "NZ", 'OMN' => "OM", 'PAN' => "PA", 'PER' => "PE", 'PYF' => "PF", 'PNG' => "PG", 'PHL' => "PH", 'PAK' => "PK", 'POL' => "PL", 'SPM' => "PM", 'PCN' => "PN", 'PRI' => "PR", 'PSE' => "PS", 'PRT' => "PT", 'PLW' => "PW", 'PRY' => "PY", 'QAT' => "QA", 'REU' => "RE", 'ROU' => "RO", 'RUS' => "RU", 'RWA' => "RW", 'SAU' => "SA", 'SLB' => "SB", 'SYC' => "SC", 'SDN' => "SD", 'SWE' => "SE", 'SGP' => "SG", 'SHN' => "SH", 'SVN' => "SI", 'SJM' => "SJ", 'SVK' => "SK", 'SLE' => "SL", 'SMR' => "SM", 'SEN' => "SN", 'SOM' => "SO", 'SUR' => "SR", 'STP' => "ST", 'SLV' => "SV", 'SYR' => "SY", 'SWZ' => "SZ", 'TCA' => "TC", 'TCD' => "TD", 'ATF' => "TF", 'TGO' => "TG", 'THA' => "TH", 'TJK' => "TJ", 'TKL' => "TK", 'TLS' => "TL", 'TKM' => "TM", 'TUN' => "TN", 'TON' => "TO", 'TUR' => "TR", 'TTO' => "TT", 'TUV' => "TV", 'TWN' => "TW", 'TZA' => "TZ", 'UKR' => "UA", 'UGA' => "UG", 'UMI' => "UM", 'USA' => "US", 'URY' => "UY", 'UZB' => "UZ", 'VAT' => "VA", 'VCT' => "VC", 'VEN' => "VE", 'VGB' => "VG", 'VIR' => "VI", 'VNM' => "VN", 'VUT' => "VU", 'WLF' => "WF", 'WSM' => "WS", 'YEM' => "YE", 'MYT' => "YT", 'ZAF' => "ZA", 'ZMB' => "ZM", 'ZWE' => "ZW");
+
+	$codeUsers = array();
+	foreach ($diffusions as $login => $content) {
+		array_push($codeUsers, $login);
+	}
+
+	$filenames = glob(PATH_FTP . "edireal/*.zip");
+	$tmp = $files = array();
+	if (count($filenames) > 0) {
+		foreach ($filenames as $file) {
+			$files[] = array('ZIP', $file);
+		}
+	}
+	$filenames = glob(PATH_FTP . "edireal/*.xml");
+	if (count($filenames) > 0) {
+		foreach ($filenames as $file) {
+			$files[] = array('XML', $file);
+		}
+	}
+	if (count($files) < 1) {
+		return $return;
+	}
+	
+	if (!is_dir(PATH_TMP . 'edireal/'))
+		mkdir(PATH_TMP . 'edireal/');
+	if (!is_dir(PATH_TMP . 'edireal/archives/'))
+		mkdir(PATH_TMP . 'edireal/archives/');
+	$portailDone = $tourCount = array();
+	$emailDone = array();
+	$basename = 'edireal';
+	$xmlFile = glob(PATH_TMP . 'edireal/*.xml');
+	$xmlFile = $xmlFile[0];
+	foreach ($files as $list) {
+		$type = $list[0];
+		$file = $list[1];
+		if ($type == "XML") {
+			if (!is_dir(PATH_TMP . 'edireal'))
+				mkdir(PATH_TMP . 'edireal');
+			$xmlFile = PATH_FTP_ARCHIVES . 'edireal/' . date('Ymd') . '-' . basename($file);
+			rename($file,$xmlFile);
+			//exec('mv -f ' . $file . ' ' . $xmlFile);
+		}
+		elseif ($type == "ZIP") {			
+			if (!is_dir(PATH_TMP . 'edireal/')){
+				mkdir(PATH_TMP . 'edireal/');
+			}
+			else{				
+				exec('rm '.PATH_TMP.'edireal/*.xml',$res);				
+			}
+			//exec('rm ' . PATH_TMP . 'edireal/*.xml');				
+			//exec('cp -f ' . $file . ' ' . PATH_FTP_ARCHIVES . 'edireal/' . basename($file));
+			copy($file, PATH_FTP_ARCHIVES . 'edireal/' . basename($file));
+			//exec('cp -f ' . $file . ' ' . PATH_TMP . 'edireal/');
+			copy($file, PATH_TMP . 'edireal/'.basename($file));
+			$filename = PATH_TMP . 'edireal/' . basename($file);
+			/*die();*/
+			if (!exec('cd ' . PATH_TMP . "edireal/ && unzip -u " . $filename,$res)) {
+				import_log("abort : couldn't unzip $filename",$script_name);
+				return $return;
+			}
+			
+			$xmlFile = glob(PATH_TMP . 'edireal/*.xml');
+			$xmlFile = $xmlFile[0];				
+			unlink($filename);
+		}
+		$datas = simplexml_load_file($xmlFile);
+		if (isset($datas->uebertragung)) {
+			$typeImport = $datas->uebertragung->attributes();
+			if ((string) $typeImport['umfang'] == 'TEIL') {
+				if ($archive)
+					import_log("$file  Partiel, Fichier Ignoré", $script_name);
+				continue;
+			}
+			elseif ($archive)
+				import_log("$file Complet, Fichier Sera traité", $script_name);
+			$userCode = $typeImport['sendersoftware'] . '';
+		}
+		if ($archive) {
+			exec('rm ' . $file);
+		}
+		$balisesTYPEBien = array(
+			'wohnung' => 'wohnungtyp',
+			'haus' => 'haustyp',
+			'grundstueck' => 'grundst_typ',
+			'buero_praxen' => 'buero_typ',
+			'gastgewerbe' => 'gastgew_typ',
+			'hallen_lager_prod' => 'hallen_typ',
+			'einzelhandel' => 'handel_typ',
+			'land_und_forstwirtschaft' => 'land_typ',
+			'sonstige' => 'sonstige_typ',
+			'freizeitimmobilie_gewerblich' => 'freizeit_typ',
+			'zinshaus_renditeobjekt' => 'zins_typ',
+			'zimmer' => 'zimmertyp'
+		);
+		$idTypeBien = array('wohnung' => 1,
+			'haus' => 2,
+			'grundstueck' => 3,
+			'buero_praxen' => 4,
+			'gastgewerbe' => 5,
+			'einzelhandel' => 6,
+			'hallen_lager_prod' => 7,
+			'land_und_forstwirtschaft' => 8,
+			'sonstige' => 0,
+			'freizeitimmobilie_gewerblich' => 9,
+			'zinshaus_renditeobjekt' => 10,
+			'zimmer' => 11
+		);
+		$array['zimmer'] = array(
+			'ZIMMER' => 41
+		);
+		$array['wohnung'] = array(
+			'DACHGESCHOSS' => 42,
+			'MAISONETTE' => 43,
+			'PENTHOUSE' => 44,
+			'TERRASSEN' => 45,
+			'ETAGE' => 46,
+			'ERDGESCHOSS' => 47,
+			'SOUTERRAIN' => 48
+		);
+		$array['haus'] = array(
+			'REIHENHAUS' => 49,
+			'REIHENEND' => 50,
+			'REIHENMITTEL' => 51,
+			'REIHENECK' => 52,
+			'DOPPELHAUSHAELFTE' => 53,
+			'EINFAMILIENHAUS' => 2,
+			'STADTHAUS' => 55,
+			'VILLA' => 56,
+			'RESTHOF' => 57,
+			'BAUERNHAUS' => 58,
+			'LANDHAUS' => 59,
+			'SCHLOSS' => 60,
+			'ZWEIFAMILIENHAUS' => 61,
+			'MEHRFAMILIENHAUS' => 62,
+			'FERIENHAUS' => 63,
+			'BERGHUETTE' => 64,
+			'CHALET' => 65,
+			'STRANDHAUS' => 66,
+			'LAUBE-DATSCHE-GARTENHAUS' => 67
+		);
+		$array['grundstueck'] = array(
+			'WOHNEN' => 68,
+			'GEWERBE' => 69,
+			'INDUSTRIE' => 70,
+			'FREIZEIT' => 71,
+			'GEMISCHT' => 72,
+			'SONDERNUTZUNG' => 73
+		);
+		$array['buero_praxen'] = array(
+			'BUEROFLAECHE' => 74,
+			'BUEROHAUS' => 75,
+			'PRAXIS' => 76,
+			'AUSSTELLUNGSFLAECHE' => 77
+		);
+		$array['einzelhandel'] = array(
+			'LADENLOKAL' => 78,
+			'EINZELHANDELSLADEN' => 79,
+			'VERBRAUCHERMARKT' => 80,
+			'EINKAUFSZENTRUM' => 81
+		);
+		$array['gastgewerbe'] = array(
+			'GASTRONOMIE' => 82,
+			'GASTRONOMIE_UND_WOHNUNG' => 83,
+			'PENSIONEN' => 84,
+			'HOTELS' => 85,
+			'WEITERE_BEHERBERGUNGSBETRIEBE' => 86
+		);
+		$array['hallen_lager_prod'] = array(
+			'HALLE' => 87,
+			'LAGER' => 88,
+			'PRODUKTION' => 89,
+			'WERKSTATT' => 90,
+			'HOCHREGALLAGER' => 91,
+			'SERVICE' => 52,
+			'FREIFLAECHEN' => 93
+		);
+
+		$array['land_und_forstwirtschaft'] = array(
+			'LANDWIRTSCHAFTLICHE_BETRIEBE' => 94,
+			'BAUERNHOF' => 95,
+			'AUSSIEDLERHOF' => 96,
+			'GARTENBAU' => 97,
+			'ACKERBAU' => 98,
+			'WEINBAU' => 99,
+			'VIEHWIRTSCHAFT' => 100,
+			'JAGD_UND_FORSTWIRTSCHAFT' => 101,
+			'TEICH_UND_FISCHWIRTSCHAFT' => 102,
+			'SCHEUNEN' => 103,
+			'REITERHOEFE' => 104,
+			'SONSTIGE_LANDWIRTSCHAFTSIMMOBILIEN' => 105
+		);
+		$array['sonstige'] = array(
+			'PARKHAUS' => 106,
+			'TANKSTELLE' => 107,
+			'GARAGEN' => 108,
+			'PARKFLACHE' => 109,
+			'SONSTIGE' => 110
+		);
+		$array['freizeitimmobilie_gewerblich'] = array(
+			'SPORTANLAGEN' => 111,
+			'VERGNUEGUNGSPARKS_UND_CENTER' => 112,
+		);
+		$array['zinshaus_renditeobjekt'] =
+				array(
+					'MEHRFAMILIENHAUS' => 113,
+					'WOHN_UND_GESCHAEFTSHAUS' => 114,
+					'GESCHAEFTSHAUS' => 115,
+					'BUEROGEBAEUDE' => 116,
+					'SB_MAERKTE' => 117,
+					'EINKAUFSCENTREN' => 118,
+					'WOHNANLAGEN' => 119,
+					'VERBRAUCHERMAERKTE' => 120,
+					'INDUSTRIEANLAGEN' => 121);
+		$arrays = $datas->anbieter;
+		for ($z = 0; $z < count($arrays); $z++) {
+			$nom_societe = $arrays[$z]->firma . '';
+			$office_id = $arrays[$z]->anbieternr . '';
+			foreach ($arrays[$z]->{immobilie} as $data) {
+				$user = array();
+				$tour = array();
+				$EQUIPEMENTS = "";
+				#####
+				## ID_TYPE_BIEN
+				####
+				if ((!isset($diffusions[$userCode]['limit']) || empty($diffusions[$userCode]['limit'])) || ($tourCount[$userCode]++) < $diffusions[$userCode]['limit']) {
+					$tour['REF_PORTAIL'] = $userCode . '-' . str_replace(array(' ', '/', '(', ')'), array('', '-', '', ''), (string) $data->verwaltung_techn->openimmo_obid);
+					$action = ((string) $data->verwaltung_techn->aktion->attributes() == "DELETE" ? 'DEL' : 'ADD');
+					$user['USERCODE'] = $tour['USERCODE'] = (string) $data->kontaktperson->email_direkt;
+
+					if ($tour['USERCODE'] == "")
+						$user['USERCODE'] = $tour['USERCODE'] = (string) $data->kontaktperson->email_zentrale;
+					if (!in_array($tour['USERCODE'], $emailDone)) {
+						$emailDone[] = $tour['USERCODE'];
+						$user['EMAIL_UTILISATEUR'] = $user['LOGIN'] = $tour['USERCODE'];
+						$user['NOM_UTILISATEUR'] = $data->kontaktperson->name . '' != '' ? $data->kontaktperson->name . '' : ($data->kontaktperson->vorname . '' != '' ? $data->kontaktperson->vorname . '' : $data->kontaktperson->firma . '');
+
+						$user['PRENOM_UTILISATEUR'] = (string) $data->kontaktperson->vorname;
+						$user['TELEPHONE_UTILISATEUR'] = (string) $data->kontaktperson->tel_durchw;
+						$user['MOBILE_UTILISATEUR'] = (string) $data->kontaktperson->tel_handy;
+						$user['NOM_SOCIETE'] = (string) $data->kontaktperson->firma;
+						$user['SITEWEB_SOCIETE'] = (string) $data->kontaktperson->url;
+						$user['PROFIL_VIDEO'] = "FR";
+						$user['FAX'] = (string) $data->kontaktperson->tel_fax;
+						$user['ADRESSE'] = (string) $data->kontaktperson->strasse . ' ' . (string) $data->kontaktperson->hausnummer;
+						$user['VILLE'] = (string) $data->kontaktperson->ort;
+						$user['CODE_POSTAL'] = (string) $data->kontaktperson->plz;
+
+						if (isset($data->kontaktperson->land)) {
+							$user['ID_PAYS'] = $iso3166b[(string) $data->kontaktperson->land->attributes()];
+							if ($user['ID_PAYS'] == '')
+								$user['ID_PAYS'] = "CH";
+						}
+						else
+							$user['ID_PAYS'] = "CH";
+						$user['TELEPHONE'] = (string) $data->kontaktperson->tel_durchw;
+						$user['EMAIL_SOCIETE'] = (string) $data->kontaktperson->email_zentrale;
+						if (!empty($diffusions[$userCode]['distrib'])) {
+							$user['COMPLEMENTS'][] = array('FIELD' => 'CNY_DISTRIB', 'VALUE' => $diffusions[$userCode]['DISTRIBUTEUR']);
+						}
+						$logo = $arrays[$z]->anhang->daten->pfad . '';
+						$logoFound = false;
+						if (!empty($arrays[$z]->anhang->daten->pfad)) {
+							$attr = $arrays[$z]->anhang->attributes();
+							if ($attr['gruppe'] == 'ANBIETERLOGO') {
+								$logoFound = true;
+								$urllogo = $arrays[$z]->anhang->daten->pfad . '';
+							}
+						}
+						if (!$logoFound && strpos($diffusions[$userCode]['url_logo'], '/'))
+							$urllogo = $diffusions[$userCode]['URL_LOGO'];
+						elseif (!$logoFound)
+							$urllogo = PATH_IMPORT_LOGOS . $diffusions[$userCode]['URL_LOGO'];
+						$user['URL_LOGO'] = $urllogo;
+						$user['MD5_LOGO'] = md5(file_get_contents($urllogo));
+						if (is_array($diffusions['logins'][$userCode])) {
+							$user['DIFFUSIONS'] = $diffusions['logins'][$userCode];
+						}
+						$user['MD5_USER'] = md5(implode('', $user));
+						$return['USERS'][] = $user;
+					}
+
+					$prixHorsFrais = $data->preise->kaufpreis . '';
+					if ($prixHorsFrais == "") {
+						if (isset($data->preise->nettokaltmiete))
+							$prixHorsFrais = $data->preise->nettokaltmiete . '';
+						else
+							$prixHorsFrais = $data->preise->kaltmiete . '';
+						$prix_bien = $prixHorsFrais; //+ $tour['CHARGES'];
+					}
+					else
+						$prix_bien = $prixHorsFrais;
+					
+					$tour['PRIX_BIEN'] = str_replace('.00', '', $prix_bien);
+					
+					if( $tour['PRIX_BIEN'] > 0 && $tours['REF_DEVISE'] != 'EUR' && $tours['REF_DEVISE'] != 'USD'){
+						$prix_converted = currency_converter( $tours['REF_DEVISE'], $tours['REF_DEVISE'], 'EUR');
+					}
+					else $prix_converted = $tour['PRIX_BIEN'];
+					
+					if( $prix_converted >= $filter_price )
+						$tour['ID_PRESTIGE'] = 1;
+					else{
+						$tour['ID_PRESTIGE'] = 0;
+						continue;
+					}						
+
+					if ($action == "DEL") {
+						$return['TOURS_DEL'][] = $tour;
+						continue;
+					}
+					$tour['PRIX_BIEN'] = str_replace('.00', '', $prix_bien);
+					$objectart = $data->objektkategorie->objektart;
+					foreach ($balisesTYPEBien as $k => $v) {
+						if (isset($objectart->{$k})) {
+							$typ = @(string) $objectart->{$k}->attributes();
+							$tour['ID_TYPE_BIEN'] = ($array[$k][$typ] != '' ? $array[$k][$typ] : $idTypeBien[$k]);
+						}
+					}
+					if ($tour['ID_TYPE_BIEN'] == '')
+						$tour['ID_TYPE_BIEN'] = 1;
+					$typeTransaction = $data->objektkategorie->vermarktungsart->attributes();
+					if ((string) $typeTransaction['KAUF'] !== '' && (string) $typeTransaction['KAUF'] !== 'false' && (string) $typeTransaction['KAUF'] !== '0')
+						$tour['ID_TYPE_TRANSACTION'] = 1;
+					else
+						$tour['ID_TYPE_TRANSACTION'] = 2;
+					$tour['CHARGES'] = $data->preise->nebenkosten + $data->preise->heizkosten + $data->preise->mietzuschlaege + $data->preise->pacht + $data->preise->erbpacht + $data->preise->hausgeld;
+					$tour['CODE_POSTAL'] = (string) $data->geo->plz;
+					$tour['VOISINNAGE'] = (string) $data->freitexte->lage;
+					$objekt = $data->freitexte->objektbeschreibung;
+					$tour['NOM_VISITE'] = (string) $data->freitexte->objekttitel;
+					if ($diffusions[$userCode]['id_musique'] != '') {
+						$tour['ID_MUSIQUE_VIDEO'] = $diffusions[$userCode]['id_musique'];
+					}
+					$tour['DESCRIPTION'] = $objekt . ' ' . $data->freitexte->ausstatt_beschr . ' ' . $data->freitexte->sonstige_angaben;
+					$tour['REF_VISITE'] = (string) $data->verwaltung_techn->openimmo_obid;
+					$strlen = strlen($tour['DESCRIPTION']);
+					if ($strlen < 400 && $tour['VOISINNAGE'] != "") {
+						$tour['DESCRIPTION'] .= $tour['VOISINNAGE'];
+					} elseif ($strlen < 10)
+						$tour['DESCRIPTION'] = $tour['NOM_VISITE'];
+					$tour['DESCRIPTION'] = strip_tags($tour['DESCRIPTION']);
+					#####
+					## EQUIPEMENTS
+					####
+					if (isset($data->ausstattung->kueche)) {
+						$type = $data->ausstattung->kueche->attributes();
+						if ($type['EBK'] . '' == 'true') {
+							$tour['EQUIPEMENTS'].="Einbauküche, ";
+							$tour['ID_TYPE_CUISINE'] = 2;
+						} elseif ($type['OFFEN'] . '' == 'true') {
+							$tour['ID_TYPE_CUISINE'] = 1;
+							$tour['EQUIPEMENTS'].="offene Küche, ";
+						}
+						else
+							$tour['ID_TYPE_CUISINE'] = NULL;
+					}
+					else
+						$tour['ID_TYPE_CUISINE'] = NULL;
+					if (isset($data->ausstattung->bad)) {
+						$type = $data->ausstattung->bad->attributes();
+						if ((int) $type['DUSCHE'] == 1)
+							$tour['EQUIPEMENTS'].="Dusche/WC, ";
+						if ((int) $type['WANNE'] == 1)
+							$tour['EQUIPEMENTS'].="Badewanne/Dusche/WC, ";
+						if ((int) $type['FENSTER'] == 1)
+							$tour['EQUIPEMENTS'].="Bad mit Fenster, ";
+					}
+					if (isset($data->ausstattung->boden)) {
+						$type = $data->ausstattung->boden->attributes();
+						if ((int) $type['FLIESEN'] == 1)
+							$tour['EQUIPEMENTS'].="Fliessen-Bodenbelag,";
+						if ((int) $type['STEIN'] == 1)
+							$tour['EQUIPEMENTS'].="Marmorboden, ";
+						if ((int) $type['TEPPICH'] == 1)
+							$tour['EQUIPEMENTS'].="Teppichbelag, ";
+						if ((int) $type['PARKETT'] == 1)
+							$tour['EQUIPEMENTS'].="Parkettboden, ";
+						if ((int) $type['DIELEN'] == 1)
+							$tour['EQUIPEMENTS'].="Holz dielen, ";
+						if ((int) $type['KUNSTSTOFF'] == 1)
+							$tour['EQUIPEMENTS'].="Laminatboden, ";
+						if ((int) $type['ESTRICH'] == 1)
+							$tour['EQUIPEMENTS'].="Estrich, ";
+						if ((int) $type['DOPPELBODEN'] == 1)
+							$tour['EQUIPEMENTS'].="Doppelboden, ";
+					}
+					$type = (bool) $data->ausstattung->kamin;
+					if ($type)
+						$tour['EQUIPEMENTS'].="Offener Kamin, ";
+					$codeChauffage = (int) $data->verwaltung_techn->befeuerungsart;
+					if ($codeChauffage != '') {
+						$type = (string) $data->ausstattung->heizungsart->attributes();
+						if ($type != '') {
+							$type = $data->ausstattung->heizungsart->attributes();
+							if ((int) $type['OFEN'] == 'true') {
+								$tour['EQUIPEMENTS'].="Fliessen-Bodenbelag,";
+								if ($codeChauffage == 1) {
+									$TYPE = "Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 52;
+								} elseif ($codeChauffage == 2) {
+									$TYPE = "Erdwärme-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 12; //
+								} elseif ($codeChauffage == 3) {
+									$TYPE = "Solarheizung-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 13; //
+								} elseif ($codeChauffage == 4) {
+									$TYPE = "Pelletheizung-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 14; //
+								} elseif ($codeChauffage == 5) {
+									$TYPE = "Gas-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 15; //
+								} elseif ($codeChauffage == 6) {
+									$TYPE = "Öl-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 16; //
+								} elseif ($codeChauffage == 7) {
+									$TYPE = "Fernwärme-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 17; //
+								} elseif ($codeChauffage == 8) {
+									$TYPE = "Strom-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 18; //
+								} elseif ($codeChauffage == 9) {
+									$TYPE = "Kohle-Ofenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 19; //
+								}
+							}
+							if ($type['ETAGE'] == 'true') {
+								if ($codeChauffage == 1) {
+									$TYPE = "Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 53;
+								} elseif ($codeChauffage == 2) {
+									$TYPE = "Erdwärme-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 20; //
+								} elseif ($codeChauffage == 3) {
+									$TYPE = "Solarheizung-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 21; //
+								} elseif ($codeChauffage == 4) {
+									$TYPE = "Pelletheizung-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 22; //
+								} elseif ($codeChauffage == 5) {
+									$TYPE = "Gas-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 23; //
+								} elseif ($codeChauffage == 6) {
+									$TYPE = "Öl-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 24;
+								} elseif ($codeChauffage == 7) {
+									$TYPE = "Fernwärme-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 25; //
+								} elseif ($codeChauffage == 8) {
+									$TYPE = "Strom-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 26; //
+								} elseif ($codeChauffage == 9) {
+									$TYPE = "Kohle-Etagenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 27; //
+								}
+							}
+							if ($type['ZENTRAL'] == 'true') {
+								if ($codeChauffage == 1) {
+									$TYPE = "Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 53;
+								} elseif ($codeChauffage == 2) {
+									$TYPE = "Erdwärme-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 28; //
+								} elseif ($codeChauffage == 3) {
+									$TYPE = "Solarheizung-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 29; //
+								} elseif ($codeChauffage == 4) {
+									$TYPE = "Pelletheizung-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 30; //
+								} elseif ($codeChauffage == 5) {
+									$TYPE = "Gas-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 31; //
+								} elseif ($codeChauffage == 6) {
+									$TYPE = "Öl-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 32; //
+								} elseif ($codeChauffage == 7) {
+									$TYPE = "Fernwärme-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 33; //
+								} elseif ($codeChauffage == 8) {
+									$TYPE = "Strom-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 34; //
+								} elseif ($codeChauffage == 9) {
+									$TYPE = "Kohle-Zentralheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 35; //
+								}
+							}
+							if ($type['FERN'] == 'true') {
+								if ($codeChauffage == 1) {
+									$TYPE = "Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 54;
+								} elseif ($codeChauffage == 2) {
+									$TYPE = "Erdwärme-Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 36; //												
+								} elseif ($codeChauffage == 3) {
+									$TYPE = "Solarheizung-Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 37; //
+								} elseif ($codeChauffage == 4) {
+									$TYPE = "Pelletheizung-Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 38; //
+								} elseif ($codeChauffage == 5) {
+									$TYPE = "Gas-Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 39; //
+								} elseif ($codeChauffage == 6) {
+									$TYPE = "Öl-Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 40; //
+								} elseif ($codeChauffage == 7) {
+									$TYPE = "Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 41; //
+								} elseif ($codeChauffage == 8) {
+									$TYPE = "Strom-Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 42; //
+								} elseif ($codeChauffage == 9) {
+									$TYPE = "Kohle-Fernwärme";
+									$tour['ID_TYPE_CHAUFFAGE'] = 43; //Kohle-Fernwärme
+								}
+							}
+							if ($type['FUSSBODEN'] == 'true') {
+								if ($codeChauffage == 1) {
+									$TYPE = "Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 55;
+								} elseif ($codeChauffage == 2) {
+									$TYPE = "Erdwärme-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 44; //
+								} elseif ($codeChauffage == 3) {
+									$TYPE = "Solarheizung-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 45; //
+								} elseif ($codeChauffage == 4) {
+									$TYPE = "Pelletheizung-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 46; //
+								} elseif ($codeChauffage == 5) {
+									$TYPE = "Gas-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 47; //
+								} elseif ($codeChauffage == 6) {
+									$TYPE = "Öl-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 48; //
+								} elseif ($codeChauffage == 7) {
+									$TYPE = "Fernwärme-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 49; //
+								} elseif ($codeChauffage == 8) {
+									$TYPE = "Strom-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 50; //
+								} elseif ($codeChauffage == 9) {
+									$TYPE = "Kohle-Fußbodenheizung";
+									$tour['ID_TYPE_CHAUFFAGE'] = 51; //
+								}
+							}
+						}
+						if ($TYPE != '' && $TYPE != 0)
+							$tour['EQUIPEMENTS'].=$TYPE;
+					}
+					if ((bool) $data->ausstattung->klimatisiert)
+						$tour['EQUIPEMENTS'].="Klimaanlage, ";
+					if (isset($data->ausstattung->fahrstuhl)) {
+						$type = $data->ausstattung->fahrstuhl->attributes();
+						if ($type['PERSONEN'] == 'true')
+							$tour['EQUIPEMENTS'].="Personen fahrstuhl, ";
+						if ($type['LASTEN'] == 'true')
+							$tour['EQUIPEMENTS'].="Lasten fahrstuhl, ";
+						$tour['ID_ASCENSEUR'] = 1;
+					}
+					$disponibilite = $data->verwaltung_objekt->verfuegbar_ab . '';
+					if ($disponibilite == "" || preg_match("#(nach\sVereinbarung|ab\ssofort)#i", $disponibilite))
+						$tour['DATE_DISPONIBILITE'] = date("Y-m-d 00:00:00");
+					else {
+						$tour['DATE_DISPONIBILITE'] = date('Y-m-d H:i:s', strtotime($disponibilite));
+					}
+					$tour['ID_CLIMATISATION'] = $data->ausstattung->klimatisiert == "true" ? 1 : NULL;
+					$tour['ID_PISCINE'] = $data->ausstattung->swimmingpool == "true" ? 1 : NULL;
+					$tour['ID_UNITE_SURFACE_HABITABLE'] = $tour['ID_UNITE_SURFACE_TERRAIN'] = 1;
+					$type = @(string) $data->geo->geokoordinaten->attributes();
+					if ($type != '') {
+						$position = $data->geo->geokoordinaten->attributes();
+						$tour['LATITUDE'] = (string) $position['breitengrad'];
+						$tour['LONGITUDE'] = (string) $position['laengengrad'];
+					}
+					$tour['NOMBRE_PIECE'] = (int) $data->flaechen->anzahl_zimmer > 0 ? (int) $data->flaechen->anzahl_zimmer : NULL;
+					$tour['NOMBRE_CHAMBRE'] = (int) $data->flaechen->anzahl_schlafzimmer > 0 ? (int) $data->flaechen->anzahl_schlafzimmer : NULL;
+					$tour['NOMBRE_TERRASSE'] = (int) $data->flaechen->anzahl_balkon_terrassen > 0 ? (int) $data->flaechen->anzahl_balkon_terrassen : NULL;
+					$tour['NOMBRE_SALLE_BAIN'] = (int) $data->flaechen->anzahl_badezimmer > 0 ? (int) $data->flaechen->anzahl_badezimmer : NULL;
+					$tour['NOMBRE_ETAGES'] = (int) $data->flaechen->etagenzahl ? (int) $data->flaechen->etagenzahl : NULL;
+					$tour['NOMBRE_SALLE_EAU'] = (int) $data->flaechen->anzahl_sep_wc ? (int) $data->flaechen->anzahl_sep_wc : NULL;
+					if ((string) $data->preise->stp_garage != '') {
+						$nbgarages = $data->preise->stp_garage->attributes();
+						$tour['NOMBRE_GARAGE'] = $nbgarages['anzahl'];
+					}
+					$tour['NUMERO_ETAGE'] = (int) $data->geo->anzahl_etagen;
+					#######
+					$FRAIS_CLIENT = $data->preise->aussen_courtage . '';
+					$aussen_courtage = str_replace(',', '.', preg_replace("#[^\d,.]#", '', $FRAIS_CLIENT));
+					$FRAIS_AGENCE = $data->preise->innen_courtage . '';
+					$innen_courtage = str_replace(',', '.', preg_replace("#[^\d,]#", '', $FRAIS_AGENCE));
+					if ((float) $data->preise->mietpreis_pro_qm > 0) {
+						$tour['COMPLEMENTS'][] = array(
+							'FIELD' => 'price_surface', 'VALUE' => (float) $data->preise->mietpreis_pro_qm
+						);
+						$tour['COMPLEMENTS'][] = array(
+							'FIELD' => 'price_surface_unit', 'VALUE' => 1
+						);
+						echo "<br>PRIX M2-->" . $tour['REF_PORTAIL'] . "<<<br>";
+					}
+					$tour['REF_DEVISE'] = 'EUR';
+					if (isset($data->preise->waehrung)) {
+						$devise = $data->preise->waehrung->attributes();
+						$tour['REF_DEVISE'] = $devise['iso_waehrung'] ? '' . $devise['iso_waehrung'] : 'EUR';
+					}
+
+					$tour['ID_CAVE'] = NULL;
+					if (isset($data->ausstattung->unterkellert)) {
+						$cave = $data->ausstattung->unterkellert->attributes();
+						$tour['ID_CAVE'] = $cave['keller'] . '' == 'JA' ? 1 : NULL;
+					}
+					$tour['ID_ASCENSEUR'] = NULL;
+					if (isset($data->ausstattung->fahrstuhl)) {
+						$ascenseur = $data->ausstattung->fahrstuhl->attributes();
+						$tour['ID_ASCENSEUR'] = (int) $ascenseur['PERSONEN'] > 0 ? 1 : NULL;
+					}
+					if (isset($data->zustand_angaben->energiepass)) {
+						foreach ($data->zustand_angaben->energiepass as $energie) {
+							if (isset($energie->energieverbrauchkennwert) && $energie->art . '' == 'VERBRAUCH') {
+								$tour['DPE_VALEUR'] = (int) $energie->energieverbrauchkennwert;
+								$tour['DPE_LETTRE'] = $energie->endenergiebedarf . '';
+							} elseif ($energie->art . '' != 'VERBRAUCH') {
+								import_log($file . '==>' . $tour['REF_PORTAIL'] . ' : CHAMPS INCONNU POUR L ENERGIE : ' . $energie->art . '', $script_name);
+							}
+						}
+					}
+					$animaux = (int) $data->verwaltung_objekt->haustiere;
+					if ($animaux == true)
+						$tour['ID_ANIMAUX'] = 1;
+					elseif ($animaux == false)
+						$tour['ID_ANIMAUX'] = 0;
+					else
+						$tour['ID_ANIMAUX'] = NULL;
+					if (preg_match("#\d#", $FRAIS_CLIENT)) {
+						if (preg_match("#M#", $FRAIS_CLIENT))
+							$tour['FRAIS_AGENCE'] = $tour['PRIX_BIEN'] * $aussen_courtage;
+						else if (preg_match("#%#", $FRAIS_CLIENT))
+							$tour['FRAIS_AGENCE'] = $tour['PRIX_BIEN'] * $aussen_courtage / 100;
+						$tour['FRAIS_AGENCE'] = round($tour['FRAIS_AGENCE'], 2);
+						$tour['COMPLEMENTS'][] = array(
+							'FIELD' => 'fee_client_txt', 'VALUE' => $FRAIS_CLIENT
+						);
+					}
+					if ($FRAIS_AGENCE != 0 && preg_match("#\d#", $FRAIS_AGENCE)) {
+						if (preg_match("#M#", $FRAIS_AGENCE))
+							$FEE_AGENCY_TXT = $tour['PRIX_BIEN'] * $innen_courtage;
+						else if (preg_match("#%#", $FRAIS_AGENCE))
+							$FEE_AGENCY_TXT = $tour['PRIX_BIEN'] * $aussen_courtage / 100;
+						$INNEN_FRAIS = round($FEE_AGENCY_TXT, 2);
+						$tour['COMPLEMENTS'][] = array('FIELD' => 'fee_agency_txt', 'VALUE' => $FRAIS_CLIENT . '(' . $INNEN_FRAIS . ' ' . $tour['REF_DEVISE'] . ')');
+					}
+					########						
+					$tour['VILLE'] = (string) $data->geo->ort;
+					$tour['REF_ETAT'] = edireal_getRefEtats($tour['CODE_POSTAL']);
+					if ($tour['REF_ETAT'] == "FALSE")
+						unset($tour['REF_ETAT']);
+					$tour['SURFACE_DISPONIBLE'] = (float) $data->flaechen->wohnflaeche + $data->flaechen->nutzflaeche;
+					if ($tour['SURFACE_DISPONIBLE'] == "")
+						(float) $tour['SURFACE_DISPONIBLE'] = $data->flaechen->gesamtflaeche;
+					$tour['SURFACE_TERRAIN'] = (float) $data->flaechen->grundstuecksflaeche;
+					$tour['SURFACE_HABITABLE'] = (float) $data->flaechen->wohnflaeche;
+					$tour['CAUTION'] = (float) $data->preise->kaution;
+					if (isset($data->geo->land)) {
+						$tour['ID_PAYS'] = $iso3166b[(string) $data->geo->land->attributes()];
+						if ($tour['ID_PAYS'] == '')
+							$tour['ID_PAYS'] = "CH";
+					}
+					else
+						$tour['ID_PAYS'] = "CH";
+					if ($tour['SURFACE_HABITABLE'] == "")
+						$tour['SURFACE_HABITABLE'] = (float) $data->flaechen->vermietbare_flaeche;
+					if ($tour['SURFACE_HABITABLE'] == "")
+						$tour['SURFACE_HABITABLE'] = (float) $data->flaechen->nutzflaeche;
+					$affichAdresse = (string) $data->verwaltung_objekt->objektadresse_freigeben;
+					if ($tour['SURFACE_DISPONIBLE'] == "")
+						$tour['SURFACE_DISPONIBLE'] = $tour['SURFACE_HABITABLE'];
+
+					if (isset($diffusions[$userCode]['affich_adress']) && $diffusions[$userCode]['affich_adress'] > 0) {
+						if ($affichAdresse != "true") {
+							$tour['ID_ADRESSE_CACHEE'] = 0;
+						} else {
+							$tour['ID_ADRESSE_CACHEE'] = 1;
+						}
+						if ($diffusions[$userCode]['affich_adress'] == 2) {
+							$tour['ID_ADRESSE_CACHEE'] = $tour['ID_ADRESSE_CACHEE'] == 1 ? 0 : 1;
+						}
+					} else {
+						$tour['ID_ADRESSE_CACHEE'] = $tour['ID_ADRESSE_CACHEE'] = 1;
+					}
+					$tour['CACHER_LOCALISATION'] = 0;
+					$tour['ID_LANGUE'] = 'DE';
+					$tour['URL_ANNONCE'] = NULL;
+					$tour['ADRESSE'] = (string) $data->geo->strasse . ' ' . (string) $data->geo->hausnummer;
+					####
+					# IMAGES
+					####
+					if ($need_images) {
+						$nb = 1;
+						if (isset($data->anhaenge->user_defined_simplefield)) {
+							$imgs = $data->anhaenge->user_defined_simplefield;
+							for ($j = 0; $j < count($imgs); $j++) {
+								$dateChange = $imgs[$j];
+								$depuis = time() - strtotime($dateChange);
+								$link = $imgs[$j]->attributes();
+								$link = $link['feldname'];
+								if (!preg_match('#(jpg|png|jpeg|gif)$#i', $link))
+									continue;
+								$image = array();
+								$url = $workPath . basename($link);
+								if (!is_file($url) || $depuis < 172800 | $forceUpdate) {
+									if(!$content = file_get_contents($link)) {
+										echo "[1]ERROR GETTING ".$link;
+										//die();										
+										continue;
+									}
+									file_put_contents($url, $content);
+								}
+								$image['REF_PORTAIL'] = $tour['REF_PORTAIL'];
+								$image['POIDS'] = $nb++;
+								$image['URL_IMAGE'] = $url;
+								$image['KEEP_IMAGE'] = true;
+								$image['MD5_IMAGE'] = md5($dateChange);
+								$return['IMAGES'][] = $image;
+							}
+						}
+						elseif( isset($data->anhaenge->anhaeng) ){
+							$imgs = $data->anhaenge->anhaeng;
+							for ($j = 0; $j < count($imgs); $j++) {
+								if( $imgs[$j]->format.'' == 'jpg' ) {
+									if( $imgs[$j]->daten->pfad.''  != '' ){
+										$link = $imgs[$j]->daten->pfad.'';
+										$image = array();
+										$url = $workPath . basename($link);
+										if ( !is_file($url) || $forceUpdate ) {
+											if(!$content = file_get_contents($link)){
+												import_log("Error getting $link","edireal")												
+												continue;								
+											}
+											file_put_contents( $url, $content );
+										}
+										$image['REF_PORTAIL'] = $tour['REF_PORTAIL'];
+										$image['POIDS'] = $nb++;
+										$image['URL_IMAGE'] = $url;
+										$image['KEEP_IMAGE'] = true;
+										$image['MD5_IMAGE'] = md5($url);
+										$return['IMAGES'][] = $image;
+									}
+								}								
+							}
+						}
+						else
+							import_log('user_defined_simplefield not isset :' . $tour['REF_VISITE'], $script_name);
+							
+						
+					}//fin images
+					$tour['MD5_TOUR'] = md5(implode("", $tour));
+					$return['TOURS'][] = $tour;
+					$nbtotal++;
+					if ($limit != false && $nbtotal >= $limit) {
+						return $return;
+					}
+				} else {
+					echo "BREAK<br>";
+					break;
+				}
+			}
+		}
+	}
+	return $return;
+}
+
+function edireal_getRefEtats($plz) {
+	$cases = array(
+		array("postals" => array(
+				array('02000', '03999'),
+				array('05000', '05999'),
+				array('08000', '09999'),
+				array('01001', '01462'),
+				array('01616', '01616'),
+				array('01654', '01664'),
+				array('01731', '01731'),
+				array('01762', '01762'),
+				array('01774', '01774'),
+				array('01809', '01809'),
+				array('01816', '01816'),
+				array('01819', '01819'),
+				array('01825', '01825'),
+				array('01833', '01833'),
+				array('01847', '01847'),
+				array('01945', '01987'),
+				array('02000', '02999'),
+				array('04003', '04357'),
+				array('04416', '04416'),
+				array('04509', '04509'),
+				array('04617', '04617'),
+				array('04651', '04651'),
+				array('04758', '04758'),
+				array('04808', '04808'),
+				array('04827', '04827'),
+				array('04860', '04860'),
+				array('04931', '04931'),
+				array('06001', '06123'),
+				array('06420', '06420'),
+				array('06449', '06449'),
+				array('06458', '06458'),
+				array('06484', '06484'),
+				array('06493', '06493'),
+				array('06502', '06502'),
+				array('06507', '06507'),
+				array('06557', '06557'),
+				array('06667', '06667'),
+				array('06686', '06686'),
+				array('08001', '08066'),
+				array('08209', '08209'),
+				array('08340', '08340'),
+				array('08468', '08468'),
+				array('09111', '09131'),
+				array('09212', '09212'),
+				array('09232', '09232'),
+				array('09380', '09380'),
+				array('09392', '09392'),
+				array('09394', '09394'),
+				array('09456', '09456'),
+				array('09509', '09509'),
+				array('09623', '09623'),
+			),
+			"LAND" => 'ST'
+		),
+		array("postals" => array(
+				'10115', '10117', '10119', '10178', '10179', '10243', '10245', '10247', '10249', '10318', '10319', '10405', '10407', '10409', '10435', '10437', '10439', '10585', '10587', '10589', '10623', '10625', '10627', '10629', '10823', '10825', '10827', '10829', '10961', '10963', '10965', '10967', '10969', '10997', '10999', '12043', '12045', '12047', '12049', '12051', '12053', '12055', '12057', '12059', '12203', '12205', '12207', '12209', '12247', '12249', '12277', '12279', '12305', '12307', '12309', '12487', '12489', '12555', '12557', '12559', '12679', '12681', '12683', '12685', '12687', '12689', '1979', '13086', '13088', '13089', '13187', '13189', '13347', '13349', '13351', '13353', '13355', '13357', '13359', '13403', '13405', '13407', '13409', '13435', '13437', '13439', '14109', '14163', '14165', '14167', '14169'),
+			"LAND" => 'BE' //Berlin 
+		),
+		array("postals" => array(
+				array('15201', '15236'),
+				'01945', '01968', '01983', '01987', '01990', '04931', '15201', '15230', '15236', '15518', '15732', '15926', '19348', '19348'
+			),
+			"LAND" => 'BB'
+		),
+		array("postals" => array(
+				array('17000', '19999')
+			),
+			"LAND" => 'MV'
+		),
+		array("postals" => array(
+				array('20001', '20999'),
+				array('21450', '21499'),
+				array('21001', '21149'),
+				array('22001', '22757')
+			),
+			"LAND" => 'HH'
+		),
+		array("postals" => array(
+				array('21451', '21465'),
+				array('23000', '25999'),
+			),
+			"LAND" => 'SH' //Schleswig-Holstein
+		),
+		array("postals" => array(
+				array('28078', '28199'),
+			),
+			"LAND" => 'HB' // BREMEN
+		),
+		array("postals" => array(
+				array('21680', '21682'),
+				array('26351', '26389'),
+				array('30001', '30659'),
+				array('31101', '31141'),
+				array('31785', '31789'),
+				array('38154', '38547'),
+				array('49074', '49090'),
+				array('49477', '49479'),
+				'21244', '21729', '21730', '26160', '26603', '26689', '26789', '26802', '26817', '26835', '26844', '26931', '29439', '31008', '31061', '31627', '31737', '37073', '38296', '38678', '38486', '39638', '49124', '49170', '49176', '49186', '49196', '49201', '49214', '49219'
+			),
+			"LAND" => 'NI' //Niedersachsen (Lower_Saxony)
+		),
+		array("postals" => array(
+				'04617', '04626', '06577', '07586', '07613', '07629', '07646', array('07701', '07751'), '37301', '37308', '37318', '37321', '37327', '37339', '37345', '37351', '37355', '37359', '98599', array('99301', '99310'), '99301', '99310', array('99421', '99427'), '99421', '99423', '99427', '99411', array('99801', '99817'), '99801', '99817', '99869', '49219'
+			),
+			"LAND" => 'TH' //Thüringen (Thuringia)
+		),
+		array("postals" => array(
+				//48999
+				array('40000', '48999'),
+				array('49477', '49479'),
+				array('50600', '50999'),
+				array('51060', '51149'),
+				array('52000', '52080'),
+				array('52231', '52249'),
+				array('57001', '57080'),
+				array('58401', '58456'),
+				array('58507', '58515'),
+				array('58000', '58139'),
+				array('53000', '53499'),
+				'32469', '32257', '32584', '32657', '32756', '32758', '32760', '33775', '33415', '40547', '40721', '40722', '40723', '40724', '40769', '40789', '40822', '40878', '40879', '40880', '40881', '40882', '40883', '40884', '40885', '41334', '41460', '41492', '41751', '41844', '42096', '42097', '42103', '42105', '42107', '42119', '42329', '42349', '42369', '42477', '42489', '42499', '42579', '42781', '42799', '42929', '45549', '46519', '46562', '46282', '47918', '48249', '48291', '48351', '48727', '48477', '50226', '50494', '50000', '51399', '51588', '51643', '51644', '51655', '51666', '51677', '51702', '51709', '52134', '52156', '52428', '53111', '53721', '53809', '55548', '58239', '58256', '58285', '58300', '58313', '59174', '59192', '59439', '59494'
+			),
+			"LAND" => 'NW' //Nordrhein-Westfalen (North Rhine-Westphalia)
+		),
+		array("postals" => array(
+				array('53500', '53599'),
+				array('55517', '55545'),
+				array('56000', '56999'),
+				array('54000', '54999'),
+				array('55001', '55131'),
+				'53520', '53809', '54306', '54441', '54470', '54479', '54634', '54529', '55218', '55411', '55548', '55566', '55569', '55595', '55743', '55758', '56291', '56346', '56368', '56370', '56459', '56472', '56626', '56841', '56851', '57612', '65624', '65835', '66849', '66879', '66894'
+			),
+			"LAND" => 'RP' //Rheinland-Pfalz (Rhineland-Palatinate)
+		),
+		array("postals" => array(
+				array('63000', '63899'),
+				array('60000', '60624'),
+				array('63015', '63075'),
+				array('64283', '64297'),
+				array('65183', '65207'),
+				array('61348', '61352'),
+				'35037', '35038', '35039', '35040', '35041', '35042', '35043', '35633', '36396', '61476', '63303', '63450', '63451', '63452', '63453', '63454', '63455', '63456', '63457', '63571', '63575', '63576', '63579', '64404', '64319', '64347', '64560', '65207', '65624', '67346'
+			),
+			"LAND" => 'HE' //Hessen (Hesse)
+		),
+		array("postals" => array(
+				'66150', '66117', '66124', '66666', '66879', '66894', '66976'
+			),
+			"LAND" => 'SL'
+		),
+		array("postals" => array(
+				array('88001', '88048'),
+				array('88381', '88400'),
+				array('88181', '88214'),
+				'69115', '69117', '69118', '69120', '69121', '69123', '69124', '69126', '69151', '69168', '69181', '69190', '69198', '69207', '69214', '69221', '69226', '69231', '69234', '69239', '69242', '69245', '69250', '69251', '69253', '69254', '69256', '69257', '69259', '69412', '69412', '69427', '69429', '69429', '69434', '69434', '69434', '69436', '69437', '69439', '69469', '69483', '69488', '69493', '69502', '69509', '69514', '69517', '69518', '70173', '70174', '70176', '70178', '70180', '70182', '70184', '70186', '70188', '70190', '70191', '70192', '70193', '70195', '70197', '70199', '70327', '70329', '70372', '70374', '70376', '70378', '70378', '70435', '70437', '70439', '70469', '70499', '70563', '70565', '70567', '70569', '70597', '70599', '70619', '70629', '70734', '70736', '70771', '70794', '70806', '70825', '70839', '71032', '71034', '71063', '71065', '71067', '71069', '71083', '71088', '71093', '71101', '71106', '71111', '71111', '71111', '71111', '71111', '71111', '71116', '71120', '71126', '71131', '71134', '71139', '71144', '71144', '71144', '71144', '71149', '71154', '71155', '71157', '71159', '71229', '71254', '71263', '71272', '71272', '71277', '71282', '71287', '71292', '71296', '71297', '71299', '71332', '71334', '71336', '71364', '71364', '71364', '71384', '71394', '71397', '71404', '71409', '71522', '71540', '71540', '71540', '71543', '71543', '71546', '71549', '71549', '71554', '71560', '71560', '71560', '71560', '71563', '71563', '71566', '71570', '71570', '71573', '71576', '71577', '71577', '71579', '71579', '71634', '71636', '71638', '71640', '71642', '71665', '71672', '71672', '71679', '71686', '71691', '71696', '71701', '71706', '71706', '71711', '71711', '71711', '71717', '71720', '71720', '71720', '71723', '71726', '71729', '71729', '71732', '71732', '71732', '71735', '71737', '71739', '72070', '72070', '72072', '72074', '72076', '72108', '72116', '72119', '72124', '72127', '72131', '72135', '72138', '72138', '72141', '72144', '72145', '72147', '72147', '72149', '72160', '72160', '72160', '72172', '72175', '72178', '72181', '72184', '72186', '72186', '72189', '72202', '72213', '72218', '72221', '72224', '72226', '72227', '72229', '72250', '72250', '72270', '72275', '72280', '72285', '72290', '72290', '72291', '72291', '72293', '72294', '72296', '72297', '72297', '72297', '72299', '72299', '72336', '72348', '72351', '72355', '72356', '72358', '72359', '72361', '72362', '72364', '72365', '72367', '72369', '72379', '72379', '72393', '72401', '72406', '72411', '72414', '72415', '72417', '72419', '72419', '72419', '72458', '72458', '72459', '72461', '72469', '72474', '72475', '72477', '72479', '72488', '72501', '72501', '72505', '72510', '72511', '72513', '72514', '72516', '72517', '72519', '72525', '72525', '72531', '72532', '72534', '72535', '72537', '72539', '72555', '72574', '72581', '72582', '72584', '72585', '72587', '72589', '72622', '72631', '72636', '72639', '72644', '72649', '72654', '72655', '72657', '72658', '72660', '72661', '72663', '72664', '72666', '72667', '72669', '72760', '72762', '72764', '72766', '72768', '72770', '72793', '72800', '72805', '72810', '72813', '72813', '72818', '72820', '72827', '72829', '73033', '73035', '73037', '73037', '73037', '73054', '73054', '73061', '73066', '73072', '73072', '73072', '73072', '73079', '73079', '73084', '73087', '73087', '73092', '73095', '73098', '73099', '73101', '73102', '73104', '73105', '73107', '73107', '73107', '73108', '73110', '73111', '73113', '73113', '73114', '73116', '73116', '73116', '73117', '73119', '73207', '73230', '73235', '73235', '73240', '73249', '73249', '73249', '73252', '73257', '73262', '73265', '73266', '73266', '73266', '73266', '73268', '73269', '73271', '73272', '73274', '73275', '73277', '73278', '73312', '73312', '73312', '73312', '73326', '73329', '73333', '73337', '73340', '73342', '73344', '73345', '73345', '73345', '73345', '73347', '73349', '73349', '73349', '73349', '73430', '73431', '73432', '73433', '73434', '73434', '73441', '73441', '73441', '73441', '73447', '73450', '73450', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73453', '73457', '73460', '73463', '73466', '73467', '73469', '73479', '73479', '73485', '73485', '73486', '73488', '73489', '73489', '73489', '73489', '73489', '73489', '73489', '73491', '73492', '73494', '73494', '73494', '73494', '73495', '73497', '73499', '73525', '73527', '73527', '73529', '73529', '73529', '73529', '73540', '73547', '73547', '73550', '73550', '73553', '73553', '73553', '73553', '73553', '73553', '73557', '73560', '73563', '73563', '73565', '73565', '73565', '73566', '73566', '73566', '73566', '73568', '73568', '73568', '73569', '73569', '73569', '73569', '73569', '73571', '73572', '73574', '73574', '73574', '73575', '73575', '73575', '73575', '73575', '73577', '73577', '73577', '73577', '73577', '73577', '73579', '73614', '73614', '73630', '73635', '73635', '73642', '73642', '73642', '73642', '73642', '73650', '73655', '73655', '73655', '73655', '73655', '73655', '73655', '73655', '73660', '73663', '73666', '73667', '73667', '73669', '73728', '73730', '73732', '73733', '73734', '73760', '73765', '73770', '73773', '73776', '73779', '74072', '74074', '74076', '74078', '74080', '74081', '74172', '74177', '74182', '74189', '74193', '74196', '74196', '74199', '74206', '74211', '74214', '74219', '74223', '74223', '74226', '74229', '74232', '74235', '74238', '74239', '74243', '74245', '74246', '74248', '74249', '74249', '74249', '74249', '74251', '74252', '74254', '74255', '74257', '74259', '74321', '74336', '74343', '74348', '74354', '74357', '74357', '74360', '74360', '74363', '74366', '74369', '74372', '74374', '74376', '74379', '74382', '74385', '74388', '74389', '74391', '74392', '74394', '74394', '74395', '74397', '74399', '74405', '74417', '74417', '74417', '74420', '74423', '74424', '74426', '74427', '74429', '74523', '74523', '74523', '74523', '74523', '74523', '74532', '74532', '74532', '74535', '74538', '74541', '74542', '74544', '74545', '74545', '74547', '74549', '74564', '74564', '74564', '74564', '74572', '74575', '74579', '74579', '74579', '74579', '74579', '74579', '74579', '74582', '74585', '74585', '74586', '74589', '74592', '74594', '74594', '74595', '74597', '74597', '74597', '74597', '74597', '74597', '74599', '74613', '74626', '74629', '74632', '74632', '74632', '74635', '74638', '74639', '74639', '74653', '74653', '74670', '74673', '74676', '74677', '74679', '74706', '74722', '74731', '74731', '74736', '74740', '74743', '74744', '74746', '74747', '74749', '74821', '74831', '74834', '74834', '74838', '74842', '74847', '74850', '74855', '74858', '74861', '74862', '74864', '74865', '74867', '74869', '74889', '74906', '74909', '74912', '74915', '74918', '74921', '74924', '74925', '74927', '74928', '74930', '74931', '74933', '74934', '74936', '74937', '74939', '75015', '75031', '75031', '75031', '75038', '75045', '75050', '75053', '75056', '75057', '75059', '75059', '75172', '75173', '75175', '75177', '75177', '75179', '75180', '75181', '75196', '75203', '75210', '75217', '75223', '75228', '75233', '75236', '75239', '75242', '75245', '75248', '75249', '75305', '75323', '75328', '75331', '75334', '75335', '75337', '75337', '75339', '75365', '75378', '75382', '75385', '75385', '75385', '75385', '75387', '75389', '75391', '75392', '75394', '75395', '75397', '75399', '75399', '75399', '75417', '75428', '75433', '75438', '75443', '75446', '75447', '75449', '76131', '76133', '76135', '76137', '76139', '76149', '76185', '76187', '76189', '76199', '76227', '76228', '76229', '76275', '76287', '76297', '76307', '76316', '76327', '76332', '76332', '76337', '76344', '76351', '76356', '76356', '76359', '76359', '76359', '76437', '76448', '76456', '76461', '76467', '76470', '76473', '76474', '76476', '76477', '76479', '76530', '76532', '76534', '76547', '76549', '76571', '76593', '76596', '76597', '76599', '76646', '76661', '76669', '76676', '76684', '76689', '76694', '76694', '76698', '76703', '76706', '76707', '76709', '76726', '76726', '76726', '76744', '76744', '76744', '76751', '76756', '76761', '76764', '76767', '76767', '76768', '76770', '76771', '76773', '76774', '76776', '76777', '76779', '76779', '76829', '76829', '76829', '76829', '76831', '76831', '76831', '76831', '76831', '76831', '76831', '76831', '76833', '76833', '76833', '76833', '76833', '76835', '76835', '76835', '76835', '76835', '76835', '76835', '76835', '76846', '76848', '76848', '76848', '76848', '76848', '76848', '76855', '76855', '76855', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76857', '76863', '76863', '76865', '76865', '76870', '76872', '76872', '76872', '76872', '76872', '76872', '76872', '76877', '76877', '76879', '76879', '76879', '76879', '76879', '76879', '76887', '76887', '76887', '76887', '76887', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76889', '76891', '76891', '76891', '76891', '76891', '76891', '76891', '76891', '76891', '77652', '77654', '77656', '77694', '77704', '77709', '77709', '77716', '77716', '77716', '77723', '77728', '77731', '77736', '77740', '77743', '77746', '77749', '77756', '77761', '77767', '77770', '77773', '77776', '77781', '77784', '77787', '77790', '77791', '77793', '77794', '77796', '77797', '77799', '77815', '77830', '77833', '77836', '77839', '77855', '77866', '77871', '77876', '77880', '77883', '77886', '77887', '77889', '77933', '77948', '77955', '77960', '77963', '77966', '77971', '77972', '77974', '77975', '77977', '77978', '78048', '78050', '78052', '78054', '78056', '78073', '78078', '78083', '78083', '78086', '78087', '78089', '78098', '78112', '78112', '78120', '78126', '78132', '78136', '78141', '78144', '78147', '78148', '78166', '78176', '78183', '78187', '78194', '78199', '78224', '78234', '78239', '78244', '78247', '78250', '78253', '78256', '78259', '78262', '78266', '78267', '78269', '78315', '78333', '78337', '78343', '78345', '78351', '78354', '78355', '78357', '78359', '78462', '78464', '78465', '78465', '78467', '78476', '78479', '78532', '78549', '78554', '78554', '78554', '78559', '78564', '78564', '78567', '78567', '78570', '78573', '78576', '78579', '78580', '78580', '78582', '78583', '78585', '78586', '78588', '78589', '78591', '78592', '78594', '78595', '78597', '78598', '78600', '78601', '78603', '78604', '78606', '78607', '78609', '78628', '78628', '78647', '78652', '78652', '78652', '78655', '78658', '78661', '78662', '78664', '78665', '78667', '78667', '78669', '78713', '78713', '78727', '78730', '78730', '78730', '78733', '78733', '78733', '78736', '78737', '78739', '79098', '79100', '79102', '79104', '79106', '79108', '79110', '79111', '79112', '79114', '79115', '79117', '79183', '79189', '79194', '79194', '79199', '79206', '79211', '79215', '79215', '79219', '79224', '79227', '79232', '79235', '79238', '79241', '79244', '79249', '79252', '79254', '79256', '79258', '79261', '79263', '79268', '79271', '79274', '79276', '79279', '79280', '79282', '79283', '79285', '79286', '79288', '79289', '79291', '79292', '79294', '79295', '79297', '79299', '79312', '79312', '79331', '79336', '79341', '79346', '79348', '79350', '79353', '79356', '79359', '79361', '79362', '79364', '79365', '79367', '79369', '79379', '79395', '79400', '79410', '79415', '79418', '79423', '79424', '79426', '79427', '79429', '79539', '79540', '79541', '79576', '79585', '79588', '79589', '79591', '79592', '79594', '79595', '79597', '79599', '79618', '79639', '79650', '79664', '79669', '79674', '79677', '79677', '79677', '79677', '79677', '79677', '79677', '79682', '79683', '79685', '79686', '79688', '79689', '79691', '79692', '79692', '79692', '79692', '79694', '79695', '79697', '79699', '79713', '79725', '79730', '79733', '79736', '79737', '79739', '79761', '79771', '79774', '79777', '79780', '79787', '79790', '79793', '79798', '79801', '79802', '79804', '79805', '79807', '79809', '79822', '79837', '79837', '79837', '79837', '79843', '79848', '79853', '79856', '79859', '79862', '79865', '79868', '79871', '79872', '79874', '79875', '79875', '79877', '79879', '88074', '88069', '88099', '88131', '88239', '88250', '88263', '88268', '88486', '88669'
+			),
+			"LAND" => 'BW' //Baden-Württemberg
+		),
+		array("postals" =>
+			array(
+				array('80000', '87999'),
+				array('89000', '95999'),
+			),
+			"LAND" => 'BY' //Bayern (BAVARIA)
+		),
+	);
+	foreach ($cases as $cas) {
+
+		foreach ($cas['postals'] as $code) {
+
+			if (is_array($code)) {
+				if ($plz >= $code[0] && $plz <= $code[1]) {
+					return $cas['LAND'];
+				}
+			} elseif ((int) $code == (int) $plz) {
+				return $cas['LAND'];
+			}
+		}
+	}
+
+
+	return "FALSE";
+}
+
+function edireal_curl($url) {
+
+	$curl = curl_init();
+	curl_setopt($curl, CURLOPT_SSLVERSION, 3);
+	curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
+	curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
+	curl_setopt($curl, CURLOPT_HEADER, false);
+	curl_setopt($curl, CURLOPT_VERBOSE, 0);
+	curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+	curl_setopt($curl, CURLOPT_COOKIESESSION, true);
+	curl_setopt($curl, CURLOPT_POST, false);
+	curl_setopt($curl, CURLOPT_COOKIEJAR, 'cookies.txt');
+	curl_setopt($curl, CURLOPT_COOKIEFILE, 'cookies.txt');
+	curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+	curl_setopt($curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows; U; Windows NT 6.0; fr; rv:1.9.2.10) Gecko/20101004 Firefox/3.6.10 GTB7.1");
+	curl_setopt($curl, CURLOPT_URL, $url);
+	$data = curl_exec($curl);
+	return $data;
+}
+
+function edireal_getCode($ville) {
+
+	if (!is_dir(PATH_TMP . 'edireal'))
+		mkdir(PATH_TMP . 'edireal');
+	if (file_exists(PATH_TMP . "edireal/villesDE")) {
+		$array = file_get_contents(PATH_TMP . "edireal/villesDE");
+		$array = unserialize($array);
+	}
+	else
+		$array = array();
+	if (!array_key_exists(strtolower($ville), $array)) {
+		$code = edireal_getNewCode($ville);
+		if ($code != 'FALSE' && $code != 'TROP') {
+			$array[strtolower($ville)] = $code;
+			file_put_contents(PATH_TMP . "edireal/villesDE", serialize($array));
+			return $code;
+		} else {
+			preg_match("#(.*)[-/]#", $ville, $result);
+			$code = edireal_getNewCode($result[1]);
+			if ($code != 'FALSE' && $code != 'TROP') {
+				$array[strtolower($ville)] = $code;
+				file_put_contents(PATH_TMP . "edireal/villesDE", serialize($array));
+				return $code;
+			}
+			return $code;
+		}
+	}
+	else
+		return $array[strtolower($ville)];
+}
+
+function edireal_getNewCode($ville) {
+
+	$content = str_replace("\n", '', edireal_curl('http://en.wikipedia.org/wiki/' . $ville));
+	$codes = array(
+		'North_Rhine-Westphalia' => 'NW',
+		'Baden-Württemberg' => 'BW',
+		'Bavaria' => 'BY',
+		'Berlin' => 'BE',
+		'Brandenburg' => 'BB',
+		'Bremen' => 'HB',
+		'Hamburg' => 'HH',
+		'Hesse' => 'HE',
+		'Mecklenburg-Vorpommern' => 'MV',
+		'Nordrhein-Westfalen' => 'NW',
+		'Rhineland-Palatinate' => 'RP',
+		'Saarland' => 'SL',
+		'Saxony' => 'SN',
+		'Saxony-Anhalt' => 'ST',
+		'Lower_Saxony' => 'NI',
+		'Schleswig-Holstein' => 'SH',
+		'Thuringen' => 'TH',
+	);
+	if (preg_match('#<td><b><a href="/wiki/States_of_Germany" title="States of Germany">State</a></b></td><td><a href="/wiki/(.*)"#Ui', $content, $code))
+		return $codes[$code[1]];
+	else {
+		foreach ($codes as $region => $code) {
+			if (preg_match('#' . $region . '#i', $content)) {
+				return $code;
+			}
+		}
+	}
+
+	return 'FALSE';
+}
+
+?>

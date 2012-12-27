@@ -1,0 +1,191 @@
+<?php
+
+/* code includes */
+require_once('./include/fonctions.php');
+require_once('./include/fonction.db.php');
+require_once('./include/fonction.converter.php');
+require_once('./include/fonction.images.php');
+require_once('./include/fonction.stupeflix.php');
+require_once('./include/fonction.stupeflix.createxml.php');
+require_once('./include/global.php');
+require_once('./include/stupeflix/stupeflix.php');
+require_once('./include/stupeflix/key.php');
+require_once('DB.php');
+require_once('HTTP/Request.php');
+require_once('previsite/GetDsn.php');
+require_once 'phpmailer2/class.phpmailer.php';
+if(SERVEUR_DEV) require_once('./include/fonction.stupeflix.dev.php');
+
+$tour 		= $_REQUEST['id'];
+$type	 	= strtoupper($_REQUEST['type']);
+$ref_video	= $_REQUEST['ref'];
+$profiles 	= $_REQUEST['profiles'];
+$distrib	= strtoupper($_REQUEST['distrib']);
+$seexml		= ($_REQUEST['seexml'] == 'true');
+$mode		= $_REQUEST['mode'];
+$forceprofiles = ($_REQUEST['forceprofiles'] == 'true');
+
+
+$wait_for_tts = false;
+if(preg_match('/^(auto|cron)$/i', $mode) > 0) $wait_for_tts = true;
+//$db_data['name'] = "video";
+
+$tab_error = Array(
+	-1 => 'DELETED TOUR',
+	0 => "OK",
+	1 => "MISSING ID TOUR",
+	2 => "TOUR NOT FOUND",
+	3 => "IMAGES NOT FOUND",
+	4 => "POST FILE ERROR",
+	5 => "WAIT FOR TTS",
+	6 => "TOUR DATABASE NOT FOUND",
+	7 => "VIDEO PROFIL ERROR",
+	8 => "XML CREATION ERROR",
+	9 => "DOUBLON ISSUE",
+	10 => "NOT ENOUGH IMAGE",
+	11 => "VIDEO PROFIL ERROR",
+	12 => "DB MAINTENANCE",
+);
+
+$code_error = 0;
+$video_duration = VIDEO_DURATION_DEFAULT;
+write_stupeflix_log("[GENERATION][".$tour."/".$distrib."]: ".$type."(".$profiles."): ".$ref_video." | ".$mode.($wait_for_tts ? " - Wait TTS" : ""));
+if(is_guid($tour)){
+	$getDsn = new GetDsn();
+	$tourDsn = "";
+	if(is_guid($distrib)){$tourDsn = $getDsn->byDistrib($distrib);}
+	if(is_guid($tour) && $tourDsn == ""){ $tourDsn = $getDsn->byTourID($tour);}
+	$db_data['pool'][$db_data['name']]['DSN'] = $tourDsn;
+	//if($db_data['pool'][$db_data['name']]['DSN'] != "" && preg_match('/\.17/i', $tourDsn) == 0){
+	if($db_data['pool'][$db_data['name']]['DSN'] != ""){
+		if($mode == "cron" && is_guid($tour)){
+			$sql = "SELECT ID_VISITE, REF_VIDEO, TYPE_VIDEO, WAIT_TTS FROM VIDEO WHERE ID_VIDEO='".$tour."' AND TYPE_VIDEO NOT LIKE '%_DOUBLON'";
+			$result = db_query($sql, $db_data['name']);
+			if($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){
+				$tour = $r['ID_VISITE'];
+				$ref_video = $r['REF_VIDEO'];
+				$type = $r['TYPE_VIDEO'];
+				$wait_for_tts = ($r['WAIT_TTS'] == 1);
+				write_stupeflix_log("[GENERATION][CRON][".$tour."/".$distrib."]: ".$type.": ".$ref_video." (wait tts:".($wait_for_tts ? "true" : "false").")");
+			}
+		}
+		$id_video = update_video_infos( $tour, $ref_video, $type, $distrib, $wait_for_tts);
+		if(is_guid($id_video)){
+			$type_reference = preg_replace('/_CORP$/i', '', $type);
+			$function_createxml = FUNCTION_CREATEXML;
+	//		$db_name = "realestate";
+			if(!is_guid($distrib)){ $distrib = get_video_distributeur($tour);}
+
+			$options = array(
+				'ID_VISITE' => $tour,
+				'ID_VIDEO' => $id_video, 
+				'REF_VIDEO' => $ref_video,
+				'TYPE' => $type,
+				'WAIT_TTS' => $wait_for_tts, 
+				'IS_CORPORTATE' => ($type != $type_reference)
+			);
+			if($forceprofiles){
+				$options['IS_DEBUG'] = true;
+				$options['PROFIL'] = $profiles;
+			}
+			$tab_xml = $function_createxml($options);
+			if($tab_xml['error_code'] == 0 ){
+				if($seexml){
+					header('Content-type: text/xml');
+					echo $tab_xml['profiles'][0]['content'];
+					exit;
+				}
+/*				if($tab_xml['bgimg'] != ""){
+					//on upload la première image de la vv pour en faire une miniature
+					$first_img = PATH_TEMP.$tour.".jpg";
+					file_put_contents($first_img, file_get_contents(str_replace('&amp;', '&', $tab_xml['bgimg'])));
+					$client = &new HTTP_Request(get_storage_path("post",$tour,"jpg")."&force=true");
+					$client->setMethod(HTTP_REQUEST_METHOD_POST);
+					$client->addFile("fichier",$first_img);
+					$client->sendRequest();
+				 	@unlink($first_img);
+				}
+*/			 	db_close();
+				$conversions = post_file_stupeflix( $tour, $id_video, $tab_xml['profiles'], URL_VIDEO_NOTIFICATION, URL_VIDEO_UPLOAD);
+				if(!is_array($conversions)){ $code_error = 4;}
+	
+			}else{ $code_error = $tab_xml['error_code'];}
+			if(!is_guid($tab_xml['user']['ID_DISTRIBUTEUR'])){ $tab_xml['user']['ID_DISTRIBUTEUR'] = $distrib;}
+			$db_data['name'] = 'main';
+			insert_conversion($id_video , $tab_xml['ref_video'], $conversions, $tab_xml['tour'], $tab_xml['user']['ID_DISTRIBUTEUR'], $tab_xml['nb_image'], $type, ($tab_xml['error_code'] == 5));
+		}else if($id_video === true){
+			$code_error = 0;
+			$video_duration = 0;
+		}else{ $code_error = ($id_video == "doublon" ? 9 : 2);}
+	//}else{ $code_error = (preg_match('/\.17/i', $tourDsn) > 0 ? 12 : 6);}
+	}else{ $code_error = 6;}
+}else{ $code_error = 1;}
+
+if($code_error == 2 || $code_error == -1 || $code_error == 9){
+
+//	$tab_tour = get_tour_data($tour, true);
+
+	$url_infos_tour = str_replace('#TOUR#', $tour, URL_GET_TOUR_INFOS);
+	$response = @file_get_contents($url_infos_tour);
+	$tab_tour = json_decode($response, true);
+	
+	if(is_guid($tab_tour['TOUR']['ID_VISITE'])) {
+		if($tab_tour['TOUR']['ID_STATUT_VISITE'] < 0){
+			$sql = "UPDATE VIDEO SET ID_STATUT_VIDEO='-1',DATE_MODIFICATION_VIDEO='".date('Y-m-d H:i:s')."' WHERE ID_VISITE='".$tab_tour['TOUR']['ID_VISITE']."' AND TYPE_VIDEO='".fix_text($type)."'";
+			db_query($sql, $db_data['name']);
+			db_close();
+			$sql = "DELETE FROM VIDEO_CRON WHERE ID_VISITE='".$tab_tour['TOUR']['ID_VISITE']."'";
+			db_query($sql, "video");
+		}else if($mode == "cron" && is_guid($tour)){
+			db_close();
+			$sql = "DELETE FROM VIDEO_CRON WHERE ".($code_error != 9 ? "ID_VIDEO" : "ID_VISITE")."='".$tour."'";
+			db_query($sql, "video");
+		}
+	}
+	if($code_error == 9){ 
+		$body = "DOUBLON ISSUE<br />";
+		$body .= ($mode == "cron" ? "video" : "tour" ).": <a href=\"".str_replace(array('#ID#', '#DISTRIB#'), array( $tour, $distrib), URL_VIDEO_DETAIL)."\" >".$tour."</a><br />";
+		sendAlertEmail("DOUBLON - ".$tour ,$body);
+	}
+}
+
+if(($code_error > 1 && $code_error != 5) || $code_error == -1){
+	$url = URL_VIDEO_NOTIFICATION;
+	$client = &new HTTP_Request($url);
+	$client->setMethod(HTTP_REQUEST_METHOD_POST);
+	$params = array(
+		'resource' => '',//$tour,
+		'status' => "error",
+		'description' => $tab_error[$code_error],
+		'code' => $code_error,
+		'tour' => $tour,
+		'video' => $id_video,
+		'generationFailed' => "true",
+	);
+	if($code_error == -1){ $params['isdeleted'] = "true";}
+	if($type != ""){ $params['type'] = $type;}
+	$debug_params = "";
+	foreach($params as $k=>$v){
+		$client->addPostData( $k, $v);
+		$debug_params .= "&".$k."=".urlencode($v);
+	}
+//	echo $url.preg_replace('/^&/i', '?', $debug_params);
+	$client->sendRequest();
+}
+
+/* Prepare VideoRequestResult XML */
+$xml_data ="<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+$xml_data .="<VideoRequestResult Version=\"1.0\">\n";
+$xml_data.="	<VideoResultCode>".$code_error."</VideoResultCode>\n";
+$xml_data.="	<VideoResultText>".$tab_error[$code_error]."</VideoResultText>\n";
+$xml_data.="	<VideoConvertDuration>".$video_duration."</VideoConvertDuration>\n";
+$xml_data.="</VideoRequestResult>";
+
+//header('Content-type: text/xml');
+echo $xml_data;
+
+/* Exit */
+db_close();
+exit;
+
+?>

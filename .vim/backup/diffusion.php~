@@ -1,0 +1,78 @@
+<?php
+require_once('DB.php');
+require_once('HTTP/Request.php');
+require_once('previsite/GetDsn.php');
+require_once('./include/fonction.stupeflix.php');
+require_once('./include/global.php');
+require_once('phpmailer/class.phpmailer.php');
+
+$todo			= $_REQUEST['todo'];
+$id 			= $_REQUEST['id'];
+$tour			= $_REQUEST['tour'];
+$distrib		= $_REQUEST['distrib'];
+$site 			= strtoupper($_REQUEST['site']); 
+$login  		= $_REQUEST['login'];
+$pwd		  	= $_REQUEST['password'];
+$type			= strtoupper($_REQUEST['type']);
+$notification 	= $_REQUEST['notification'];
+$title			= $_REQUEST['title'];
+$force			= $_REQUEST['force'];
+$mode			= $_REQUEST['mode'];
+$debug			= $_REQUEST['debug'];
+$ref			= $_REQUEST['ref'];
+$no_notification= $_REQUEST['no_notification'];
+$no_playlist    = $_REQUEST['no_playlist'];
+$url			= $_REQUEST['url'];
+$json			= $_REQUEST['json'];
+
+// http://dev.video.previsite.net/diffusion.php?todo=diffusion&id=AE6C2CD9-887B-634E-3132-EE3B09CE22E4&site=YOUTUBE&type=FR_DOOR&notification=&login=century21immoeffertz&password=century21immoeffertz2011prev%21&title=A+Vendre+-+Maison+-+Pepinster+%284860%29+&mode=&distrib=DA37F215-AEEB-F80C-7AE6-7699B1DAE01D&tour=816D51F2-CFE5-A182-219B-D56E7B8B9005
+//echo $type;
+
+if($pwd == "" && $login == ""){
+	$login 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['LOGIN'];
+	$pwd 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['PASSWORD'];
+}
+
+if(count($videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['TAGS'])>0){
+	$tags = implode(';', $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['TAGS']);
+}
+
+
+$params = array(
+	'todo' => $todo,
+	'id' => $id,
+	'tour' => $tour,
+	'distrib' => $distrib,
+	'site' => $site,
+	'type' => $type,
+	'notification' => $notification,
+	'login' => $login,
+	'password' => $pwd,
+	'title' => $title,
+	'mode' => $mode,
+	'force' => $force,
+	'tags' => $tags,
+	'debug' => $debug,
+	'no_notification' => $no_notification,
+	'ref' => $ref,
+	'url' => $url,
+	'json' => $json,
+);
+
+$client = &new HTTP_Request(URL_DIFFUSION_VIDEO_NEW);
+$client->setMethod(HTTP_REQUEST_METHOD_POST);
+$url = URL_DIFFUSION_VIDEO_NEW."?";
+foreach($params as $k=>$v){
+	$client->addPostData( $k, $v);
+	$url.= $k."=".urlencode($v)."&";
+}
+$url = preg_replace('/&$/i', '', $url);
+
+$client->sendRequest();
+$result = $client->getResponseBody();
+$xml = @simplexml_load_string($result);
+
+write_stupeflix_log("[DIFFUSION][".strtoupper($todo)."]: ".$id."/".$tour." ".$type." (".$site.":".$login."/".$pwd." mode:".$mode.") result:(".$url.":".$xml->VideoDiffusionResultCode.".".$xml->VideoDiffusionResultText.")");
+echo $result;
+exit;
+?>

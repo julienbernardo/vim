@@ -1,0 +1,31 @@
+<?php
+
+//main function
+function create_stupeflix_xml_AUTO(&$options){	
+	$images = $options['IMAGES'];
+	$tab_infos = $options['INFOS'];
+	
+	$subtitle = "";
+	if($tab_infos['TOUR']['PRIX_BIEN'] != ""){ 
+		$subtitle .= number_format($tab_infos['TOUR']['PRIX_BIEN'], 0, ',', ' ').$tab_infos['TOUR']['SYMBOLEBRUT_DEVISE'];
+	}
+	if(preg_match('/^(\d{4})/i', $tab_infos['TOUR']['DATE_PREMIERE_IMMATRICULATION'], $result) > 0){ 
+		$subtitle .= ($subtitle!= "" ? " | " : "")."année ".$result[1];
+	}
+	if($tab_infos['TOUR']['DISTANCE_PARCOURUE'] != ""){ 
+		$subtitle .= ($subtitle!= "" ? " | " : "").number_format($tab_infos['TOUR']['DISTANCE_PARCOURUE'], 0, ',', ' ')." ".$tab_infos['TOUR']['NOM_UNITE_DISTANCE'];
+	}
+	
+	$more_options = array(
+		'TITLE' => $tab_infos['TOUR']['NOM_VISITE'],
+		'SUBTITLE' => $subtitle,
+		'PHONE' => ($tab_infos['USER']['TELEPHONE_UTILISATEUR'] != "" ? $tab_infos['USER']['TELEPHONE_UTILISATEUR'] : $tab_infos['USER']['TELEPHONE'] ),
+		'DESCRIPTION' => $tab_infos['TOUR']['OPTIONS'],
+	);
+
+	$options = array_merge($options, $more_options);
+	return write_stupeflix_xml_content_auto($options);
+}
+//xml function
+
+?>

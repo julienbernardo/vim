@@ -1,0 +1,256 @@
+<?php
+$config_sms = array();
+//exit;
+
+/***********************/
+/**                  ***/
+/**        FR        ***/
+/**                  ***/
+/***********************/
+$config_sms['FR'] = array();
+$config_sms['FR']['MT'] = array();
+//login
+$config_sms['FR']['MT']['PARTNERNAME'] 		= 'Previste';
+$config_sms['FR']['MT']['PARTNERPASSWORD'] 	= 'X1NE5983';
+$config_sms['FR']['MT']['PROFILE'] 			= '7936';
+$config_sms['FR']['MT']['POST_URL'] 		= 'http://xml7.mblox.com:8180/send';
+//archive
+$config_sms['FR']['MT']['ARCHIVE_DIR'] 		= ARCHIVE_DIR."/mt/";
+$config_sms['FR']['MT']['MAIL_SUBJECT'] 	= 'Previsite SMS MT FR';
+//message
+$config_sms['FR']['MT']['DEFAULT_TITLE'] 	= 'Previsite Mobile';
+$config_sms['FR']['MT']['URL_VIDEO_MOBILE'] = 'PREVISITE: Cliquez sur le lien pour lancer le téléchargement: http://m.previsite.com/#ID# (px conn. DATA/WEB)';
+//RECHARGEMENT
+$config_sms['FR']['MT']['RELOAD_PACKAGE'] = 'Félicitations! Vous venez d\'acheter une recharge de 50 crédits SMS';
+$config_sms['FR']['MT']['RELOAD_UNLIMIT'] = 'Félicitations! Vous pouvez maintenant envoyer des sms illimites pendant 1 mois';
+
+$config_sms['FR']['MO'] = array();
+//login
+$config_sms['FR']['MO']['PARTNERNAME'] 		= 'PrevisteFR';
+$config_sms['FR']['MO']['PARTNERPASSWORD'] 	= 'p36n5q96';
+$config_sms['FR']['MO']['PROFILE'] 			= '8060';
+$config_sms['FR']['MO']['POST_URL'] 		= 'http://xml7.mblox.com:8180/send';
+//archive
+$config_sms['FR']['MO']['ARCHIVE_DIR'] 		= ARCHIVE_DIR."mo/";
+$config_sms['FR']['MO']['MAIL_SUBJECT'] 	= 'Previsite SMS - MO(FR)';
+//messages
+$config_sms['FR']['MO']['VIDEO_NOT_FOUND'] 	= 'PREVISITE mot clé inconnu. Merci de saisir de manière exacte le mot clé. Support: hotline@previsite.com. SMS non surtaxé';
+$config_sms['FR']['MO']['DEFAULT_TITLE'] 	= 'Previsite Mobile #DATA#';
+$config_sms['FR']['MO']['URL_VIDEO_MOBILE'] = 'PREVISITE: Cliquez sur le lien pour lancer le téléchargement: http://m.previsite.com/#ID# (0,35euro+px d\'un SMS+px conn. DATA/WEB)';
+$config_sms['FR']['MO']['MSG_KEYWORD_STOP'] = 'PREVISITE: vous ne recevrez plus de SMS de la part du 61330. SMS non surtaxé';
+$config_sms['FR']['MO']['MSG_KEYWORD_CONTACT'] = 'PREVISITE édité par mBlox RCS448324285 27 avenue de l\'Opéra 75001 Paris. Support: hotline@previsite.com. SMS non surtaxé';
+$config_sms['FR']['MO']['MSG_KEYWORD_AIDE'] = 'PREVISITE: vous allez recevoir l\'url de la visite par sms, cliquez dessus pour la télécharger. Support: hotline@previsite.com. SMS non surtaxé';
+$config_sms['FR']['MO']['MSG_KEYWORD_INCOMPATIBLE'] = 'PREVISITE : Désolé votre terminal est incompatible avec notre service. Support: hotline@previsite.com. sms non surtaxé.';
+$config_sms['FR']['MO']['FREE_RESPONSE_AIDE'] 	= 'TYPE!AIDE ';
+$config_sms['FR']['MO']['FREE_RESPONSE_CONTACT']= 'TYPE!CONTACT ';
+$config_sms['FR']['MO']['FREE_RESPONSE_QUIT'] 	= 'TYPE!QUIT ';
+$config_sms['FR']['MO']['FREE_RESPONSE_STOP'] 	= 'TYPE!STOP ';
+$config_sms['FR']['MO']['FREE_RESPONSE_SAISIE'] = 'TYPE!SAISIE ';
+$config_sms['FR']['MO']['FREE_RESPONSE_INDISPO']= 'TYPE!INDISPO ';
+$config_sms['FR']['MO']['FREE_RESPONSE_AUTRE'] 	= 'TYPE!AUTRE ';
+//keywords
+$config_sms['FR']['MO']['KEYWORDS'] = array(
+	"WOW" 		=> array('data' => '1B73E55A','id' => "1B73E55A-2C88-A389-D509-A30032A411CA",	"user"=>"62AEE050-1DFF-5F1F-76C9-42103B8D8ACA"),
+	"ADE340" 	=> array('data' => 'F9E3CAC6','id' => "F9E3CAC6-92D5-7C29-0E4E-E9309111CEA7",	"user"=>"C1441F4A-0638-FD49-AF68-5DC0AE35F9AA"),
+	"MEUNIER" 	=> array('data' => 'MEUNIER', 'id' => "MEUNIER"),
+	"BW"	 	=> array('data' => 'BW',	  'id' => "BW"),
+	"HAMBURY"	=> array('data' => 'HAMBURY', 'id' => "HAMBURY"),
+	"SABLESDOR"	=> array('data' => 'SABLESDOR', 'id' => "SABLESDOR"),
+	"MAJESTIC"	=> array('data' => 'MAJESTIC','id' => "MAJESTIC", "text" => "HOTEL MAJESTIC BARRIERE\nCliquez sur ce lien pour découvrir la nouvelle vidéo http://m.previsite.com/MAJESTIC (0,35euro+px d'un SMS+px conn. DATA/WEB)"),
+	//pour les jeux TV
+	"1" => array('data' => '1B73E55A','id' => "1B73E55A-2C88-A389-D509-A30032A411CA",	"user"=>"62AEE050-1DFF-5F1F-76C9-42103B8D8ACA"),
+	"2" => array('data' => '1B73E55A','id' => "1B73E55A-2C88-A389-D509-A30032A411CA",	"user"=>"62AEE050-1DFF-5F1F-76C9-42103B8D8ACA"),
+	"3" => array('data' => '1B73E55A','id' => "1B73E55A-2C88-A389-D509-A30032A411CA",	"user"=>"62AEE050-1DFF-5F1F-76C9-42103B8D8ACA")
+);
+$config_sms['FR']['MO']['PREFIX_PARTNER']['A'] = "76B26336-D5DC-6725-ECF2-6C8FAEB375B1";
+$config_sms['FR']['MO']['PREFIX_PARTNER']['G'] = "31E6BE0D-B651-4922-9AEE-27038D21C4DC";
+$config_sms['FR']['MO']['PREFIX_PARTNER']['K'] = array("TEXT" => "KAUFMAN &amp; BROAD\nCliquez sur ce lien pour découvrir notre vidéo: http://m.previsite.com/#ID# (0,35euro+px d'un SMS+px conn. DATA/WEB)");
+
+//Operator
+$config_sms['FR']['OPERATOR'] 	 	= array(1=>"20820", 2=>"20810", 3=>"20801", "20820" => "BOUYGUES", "20810" => "SFR", "20801" => "ORANGE");
+$config_sms['FR']['SHORTCODE'] 		= "61330";
+
+/***********************/
+/**                  ***/
+/**        US        ***/
+/**                  ***/
+/***********************/
+$config_sms['US'] = array();
+$config_sms['US']['MT'] = array();
+$config_sms['US']['MT']['PARTNERNAME'] 		= 'PrevisiteMT';
+$config_sms['US']['MT']['PARTNERPASSWORD'] 	= '5WEdrahe';
+$config_sms['US']['MT']['PROFILE'] 			= '32241';
+$config_sms['US']['MT']['POST_URL'] 		= "http://xml3.us.mblox.com:8180/send";
+$config_sms['US']['MT']['ARCHIVE_DIR'] 	= ARCHIVE_DIR."mt_us/";
+$config_sms['US']['MT']['DEFAULT_TITLE'] 	= 'Previsite Mobile';
+$config_sms['US']['MT']['URL_VIDEO_MOBILE_CONFIRMATION'] = 'PREVISITE: Virtual Tour reply YES to accept. U may need (unlimited) data plan';
+$config_sms['US']['MT']['MAIL_SUBJECT'] 	= 'Previsite SMS MT US';
+//RECHARGEMENT
+$config_sms['US']['MT']['RELOAD_PACKAGE'] 	= 'Congratulations! You have just buy a 50 SMS credits reload';
+$config_sms['US']['MT']['RELOAD_UNLIMIT'] 	= 'Congratulations! You can now send sms with no limit for a month';
+$config_sms['US']['MT']['URL_VIDEO_MOBILE'] = 'PREVISITE: Click to view virtual tour/T&amp;Cs: http://m.previsite.com/#ID#';
+$config_sms['US']['MT']['END_MESSAGE'] 		= ' Txt STOP 2end. Msg&amp;Data Rates May Apply.';  // ' Txt STOP 2end. OthrRtsApply.');   
+$config_sms['US']['MT']['END_MESSAGE_VIRGIN'] = ' Txt STOP 2end or HELP 4info. Msg&amp;Data Rates May Apply.';//' Txt STOP 2end or HELP 4info. OthrRtsApply.');      
+$config_sms['US']['MT']['END_MESSAGE_VERIZON'] = ' Txt STOP 2end or HELP 4info. Msg&amp;Data Rates May Apply.';//' Txt STOP 2end or HELP 4info. StrdMsgChrgsApply.');
+$config_sms['US']['MT']['END_MESSAGE_ATT_FIRST_MSG'] = ' Txt HELP4help. Msg&amp;Data Rates May Apply.';
+$config_sms['US']['MT']['END_PRICING_MESSAGE'] = ' You have been billed $#TARIF# amount.';
+
+$config_sms['US']['MO'] = array();
+$config_sms['US']['MO']['PARTNERNAME'] 		= 'PrevisiteUS';
+$config_sms['US']['MO']['PARTNERPASSWORD'] 	= 'brASwu8r';
+$config_sms['US']['MO']['PROFILE'] 			= '31331';
+$config_sms['US']['MO']['POST_URL'] 		= "http://xml3.us.mblox.com:8180/send";
+//MO
+$config_sms['US']['MO']['ARCHIVE_DIR'] 	= ARCHIVE_DIR."mo_us/";
+$config_sms['US']['MO']['LAST_VIDEO'] 		= 'archives/last_video.txt';
+$config_sms['US']['MO']['VIDEO_NOT_FOUND'] 	= 'PREVISITE unknown keyword. Please take a correct keyword. Support: help@previsite.com.';
+$config_sms['US']['MO']['DEFAULT_TITLE'] 	= 'Previsite Mobile #DATA#';
+$config_sms['US']['MO']['URL_VIDEO_MOBILE_CONFIRMATION'] = 'Previsite: You have requested a one-time alert at $#TARIF# charged to your wireless account. Reply Y to accept.';
+$config_sms['US']['MO']['URL_VIDEO_MOBILE_CONFIRMATION_ATT'] =	'Video ';
+
+$config_sms['US']['MO']['MSG_KEYWORD_STOP'] 	= 'PREVISITE: Virtual Tours. No further messages will be received. http://www.previsite.com Text again anytime!';
+$config_sms['US']['MO']['MSG_KEYWORD_HELP'] 	= 'Previsite Virtual Tours: Text STOP to end. http://www.previsite.com Alerts priced $0.15-$3.00. Msg&amp;Data Rates May Apply.';
+$config_sms['US']['MO']['MAIL_SUBJECT'] 		= 'Previsite SMS - MO(US)';
+$config_sms['US']['MO']['URL_VIDEO_MOBILE']	 	= 'PREVISITE: Click to view virtual tour/T&amp;Cs: http://m.previsite.com/#ID#';
+$config_sms['US']['MO']['END_MESSAGE'] 			= ' Txt STOP 2end. Msg&amp;Data Rates May Apply.';  // ' Txt STOP 2end. OthrRtsApply.');   
+$config_sms['US']['MO']['END_MESSAGE_VIRGIN'] 	= ' Txt STOP 2end or HELP 4info. Msg&amp;Data Rates May Apply.';//' Txt STOP 2end or HELP 4info. OthrRtsApply.');      
+$config_sms['US']['MO']['END_MESSAGE_VERIZON'] 	= ' Txt STOP 2end or HELP 4info. Msg&amp;Data Rates May Apply.';//' Txt STOP 2end or HELP 4info. StrdMsgChrgsApply.');
+$config_sms['US']['MO']['END_MESSAGE_ATT_FIRST_MSG'] = ' Txt HELP4help or STOP2end. Msg&amp;Data Rates May Apply. http://m.previsite.com/T&amp;C';
+$config_sms['US']['MO']['END_PRICING_MESSAGE'] 	= ' You have been billed $#TARIF# amount.';
+
+$config_sms['US']['MO']['KEYWORDS'] = array(
+	"WOW" 		=> array("id" => "FDD6FB06-998A-D3E8-519B-53E43932A483", "user"=>"47D99FC4-00AA-8923-3B69-7B0AB2AAC7F1"),//"598B7992-5E5D-5F2A-F5E8-51B8C1015490",
+	"123456"	=> array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490", "user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"1234567"  	=> array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490", "user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"12345678" 	=> array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490", "user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	//correction mailing
+	"FDD6FB03" => array("id" => "FDD6FB06-998A-D3E8-519B-53E43932A483", "user"=>"47D99FC4-00AA-8923-3B69-7B0AB2AAC7F1"),
+	//tarrif spé
+	"1234560" => array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490","user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"1234561" => array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490","user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"1234562" => array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490","user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"1234563" => array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490","user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"1234564" => array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490","user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"1234565" => array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490","user"=>"BF708761-C697-EE25-7F68-B611673CE3D3"),
+	"1234566" => array("id" => "598B7992-5E5D-5F2A-F5E8-51B8C1015490","user"=>"BF708761-C697-EE25-7F68-B611673CE3D3")
+);
+
+$config_sms['US']['MO']['HTTP_RESTRICT'] = array();
+$config_sms['US']['MO']['TARIF_SPE'] = array("1234560" => "15", "1234561" => "35", "1234562" => "50", "1234563" => "75", "1234564" => "100", "1234565" => "150", "1234566" => "200", "1234567" => "300");
+$config_sms['US']['MO']['TARIFF_SERVICEID'] = array(
+	//US Cellular
+	"31012" => array("15" => "11945", "35" => "11946", "50" => "11947", "75" => "11948", "100" => "11949", "150" => "11950", "200" => "11951", "300" => "11952"),
+	//Verizon
+	"31003" => array("15" => "12022", "35" => "12023","50" => "12024", "75" => "12025", "100" => "12026", "150" => "12027", "200" => "12028", "300" => "12029"),
+	//AT&T
+	"31002" => array("100"	=> "12063", "150" => "12060", "200" => "12062", "300" => "12061")
+);
+
+$config_sms['US']['NOTIFICATION'] = array();
+$config_sms['US']['NOTIFICATION']['SMS'] = "PREVISITE: Your virtual tour #REF# has been sent to the #PHONE#";
+$config_sms['US']['NOTIFICATION']['EMAIL_SUBJECT'] = 'SMS - Previsite Lead capture Notification - MLS ##MLS#';
+$config_sms['US']['NOTIFICATION']['EMAIL_NAME'] = 'Previsite Lead Capture';
+$config_sms['US']['NOTIFICATION']['EMAIL_FROM'] = 'noreply@previsite.com';
+$config_sms['US']['NOTIFICATION']['EMAIL_TEXT'] = '
+<html>
+<body style="font-family:Arial;font-size:14px">
+<br/>
+DO NOT RESPOND TO THIS MESSAGE
+<br/><br/>
+You have received an inquiry from:<br/>
+<b>#PHONE#</b>
+<br/><br/>
+Information<br />
+-----------------------------------------------------------------------<br/>
+Date : #DATE#		Time: #TIME#<br/>
+Virtual Tour Name: <a href="http://tour.previsite.com/#ID#">#TOUR#</a><br>
+MLS ##MLS#<br/>
+<b>Recipient Phone Number: #PHONE#</b><br/>
+-----------------------------------------------------------------------<br/>
+<br/>
+This recipient has received your listing on his/her mobile Phone. You can now contact him/her at anytime.<br/>
+<br/>
+Have a great day,<br/>
+<br/>
+Previsite <br/>
+The Ultimate Marketing Solution<br/>
+<br/><i>
+To modify your account settings or reload your SMS credit please login to your Previsite account on <a href="http://www.previsite.net">www.previsite.net</a> and go to My Account Page.</i>
+</body>
+</html>';
+
+$config_sms['US']['SHORTCODE'] = "43758";
+$config_sms['US']['COMMANDS'] = array(
+	"START"	=> array('cmd'=>'START','desc'=>'Virtual tour'),
+	"STOP" 	=> array('cmd'=>'STOP',	'desc'=>'')
+);
+
+$config_sms['US']['SPECIFIC_NEEDS'] = array(
+	'contentType' => array("31005","31010"/*,"31002"*/),
+	'prodDesc' 	=> array("31009","31012"),
+	'serviceID' => array("31012"),
+	'activationForbidden' => array("31002"),
+	'idSessionPost' => array("31012","31002")
+);
+
+
+//Operator
+$config_sms['US']['NAME_OPERATOR'] = array("31009" => "Alltel", "31002" => "AT\&T", "31008" => "Boost", "31011" => "Boost", "31006" => "Cellular One", "31007" => "Nextel", "31005" => "Sprint", "31004" => "T-Mobile", "31012" => "US Cellular*", "31003" => "Verizon Wireless", "31010" => "Virgin Mobile USA");
+$config_sms['US']['CREDITLIMIT'] = array();
+$config_sms['US']['CREDITLIMIT']['LIMIT'] 			= 5;
+$config_sms['US']['CREDITLIMIT']['BY_SMS'] 			= $config_sms['US']['CREDITLIMIT']['LIMIT'].' SMS credits';
+$config_sms['US']['CREDITLIMIT']['BY_DAY'] 			= $config_sms['US']['CREDITLIMIT']['LIMIT'].' days';
+$config_sms['US']['CREDITLIMIT']['EMAIL_FROM'] 		= 'noreply@previsite.com';
+$config_sms['US']['CREDITLIMIT']['EMAIL_SUBJECT'] 	= 'SMS - Previsite Lead capture Reload Credits';
+$config_sms['US']['CREDITLIMIT']['EMAIL_NAME'] 		= 'Previsite Support';
+$config_sms['US']['CREDITLIMIT']['EMAIL_TEXT'] = '
+<html>
+<body style="font-family:Arial;font-size:14px"><br />
+DO NOT RESPOND TO THIS MESSAGE<br />
+<br />
+WARNING !<br />
+<br />
+You have Only <b>#LIMIT#</b> left on your account.<br />
+<br />
+Go to "My Account" Page to reload your SMS credit and continue to benefit from the "Send To Mobile" service and  "Lead Capture" service.<br />
+<br />
+Have a great day,<br />
+<br />
+Previsite<br />
+The Ultimate Marketing Solution<br />
+<br />
+To modify your account settings or reload your SMS credit please login to your Previsite account on <a href="http://www.previsite.net">www.previsite.net</a> and go to "My Account" Page.
+</body>
+</html>';
+
+
+/***********************/
+/**                  ***/
+/**       OTHER      ***/
+/**                  ***/
+/***********************/
+$config_sms['OTHER'] = array();
+$config_sms['OTHER']['SHORTCODE'] 			= "61330";
+$config_sms['OTHER']['MT']['PARTNERNAME'] 	= 'Previste';
+$config_sms['OTHER']['MT']['PARTNERPASSWORD'] = 'X1NE5983';
+$config_sms['OTHER']['MT']['PROFILE'] 		= '7936';
+$config_sms['OTHER']['MT']['POST_URL'] 		= "http://xml7.mblox.com:8180/send";
+$config_sms['OTHER']['MT']['ARCHIVE_DIR'] 	= ARCHIVE_DIR."/mt/";
+$config_sms['OTHER']['MT']['MAIL_SUBJECT'] 	= 'Previsite SMS MT OTHER';
+$config_sms['OTHER']['MT']['MESSAGE'] 		= array(
+	'FR' =>	array(
+		'DEFAULT_TITLE'		=> 'Previsite Mobile',
+		'URL_VIDEO_MOBILE'	=> 'PREVISITE: Cliquez sur le lien pour lancer le téléchargement: http://m.previsite.com/#ID# (px conn. DATA/WEB)',
+		'RELOAD_PACKAGE'	=> 'Félicitations! Vous venez d\'acheter une recharge de 50 crédits SMS',
+		'RELOAD_UNLIMIT'	=> 'Félicitations! Vous pouvez maintenant envoyer des sms illimites pendant 1 mois'
+	),
+	'EN' =>	array(
+		'DEFAULT_TITLE'		=> 'Previsite Mobile',
+		'URL_VIDEO_MOBILE'	=> 'PREVISITE: Click to view virtual tour/T&amp;Cs: http://m.previsite.com/#ID#',
+		'RELOAD_PACKAGE'	=> 'Congratulations! You have just buy a 50 SMS credits reload',
+		'RELOAD_UNLIMIT'	=> 'Congratulations! You can now send sms with no limit for a month'
+	)
+);
+$config_sms['OTHER']['MT']['COUNTRY_EXCEPTION'] = array();
+$config_sms['OTHER']['MT']['COUNTRY_EXCEPTION']['ZA'] = "http://www.smss.co.za/API/send_sms.php?user=floorplan&pass=arnaud&sender=34050&GSM=#NUMBER#&SMSText=#TEXT#";
+?>

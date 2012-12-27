@@ -1,0 +1,70 @@
+<?php
+
+require_once('../../include/global.php');
+require_once('../../include/fonctions.php');
+require_once('../../include/fonction.db.php');
+require_once('DB.php');
+require_once('include/header.php');
+require_once('include/js_script.php');
+require_once('include/style_css.php');
+require_once('include/security.php');
+require_once('include/dico.php');
+echo EDIT_TOUR_INCLUDE;
+require_once(EDIT_TOUR_INCLUDE);
+require_once('pages/html_start.php');
+
+if(NEW_INTEGRATION) {
+
+    require_once 'template_start.php';
+    require_once EDIT_TOUR_PAGE;
+    require_once 'template_end.php';
+
+} else {
+
+?>
+<a href="#" onclick="closeCurrentDiv();"><div id="div_full_black" class="div_full_black" style="display: none;"></div></a>
+<div id="help_window"></div>
+<?php
+require_once 'pages/mail_form.php';
+?>
+<table border="0" cellspacing="0" align="center" class="<?=$global['class_content']?>" style="<?=$global['table_height'].$global['width_bundle']?>">
+<?php
+    require_once('pages/'.$global['banner_page']);
+?>
+    <tr>
+        <td class="<?=$global['class_steps']?>" valign="middle" align="center">
+<?php
+    require_once('pages/steps.php');
+?>
+        </td>
+    </tr>
+
+<?php
+if(MODE_BUNDLE && !empty($_SESSION['OPTIONS']['SHOWHEADERCUSTOM']) && is_file($_SESSION['OPTIONS']['SHOWHEADERCUSTOM']) ) {
+    // Banners perso.
+    require_once($_SESSION['OPTIONS']['SHOWHEADERCUSTOM']);
+}
+?>
+
+    <tr<?=$global['cell_valign']?>>
+        <td style="<?=$global['cell_height']?>" class="cell_content">
+            <table class="content_header" id="table_header" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td style="width: 50%;"><h1><?=str_replace("#NB#",1,$dico['edit_tour']['title_left']);?></h1></td>
+                </tr>
+            </table>
+<?php
+
+    require_once EDIT_TOUR_PAGE;
+
+?>
+        </td>
+    </tr>
+<?php
+    require_once('pages/'.$global['footer_page']);
+?>
+</table>
+<?php
+require_once('pages/html_end.php');
+}
+

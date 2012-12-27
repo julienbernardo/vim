@@ -1,0 +1,1122 @@
+<?php
+
+function get_image_position($infos){
+	$return = "";
+//	$image_width = IMAGE_YOUTUBE_WIDTH;
+//	$image_height = IMAGE_YOUTUBE_HEIGHT;
+	//test 480p
+//	$image_width = 856;
+//	$image_height = 480;
+	//test iphone 16-9
+//	$image_width = 480;
+//	$image_height = 270;
+	$test = array( 'y', 'x', 'width_max', 'width_min', 'height_max', 'height_min', 'width', 'height', 'image_width', 'image_height');
+	$wrong_parameter = false;
+	if(count($test) > 0 ){
+		foreach($test as $v){ 
+			if(!isset($infos[$v]) || $infos[$v] === ""){ 
+				$wrong_parameter = true;
+				break;
+			}
+		}
+	}else{ $wrong_parameter = true;}
+	if(!$wrong_parameter){
+		$pos_y = $infos['y'];
+		$pos_x = $infos['x'];
+		$width_max = $infos['width_max'];
+		$width_min = $infos['width_min'];
+		$height_max = $infos['height_max'];
+		$height_min = $infos['height_min'];
+		$width = $infos['width'];
+		$height = $infos['height'];
+		$image_width = $infos['image_width'];
+		$image_height = $infos['image_height'];
+		$coef = get_redim_coef($width,$height, $width_min*$image_width, $height_min*$image_height, $width_max*$image_width, $height_max*$image_height);
+		
+		$width = (($coef*$width)/$image_width);
+		$height = (($coef*$height)/$image_height);
+		
+		$pos_x += ($width_max-$width)/2;
+		$pos_y += ($height_max-$height)/2;
+		$return = array('width' => $width, 'height' => $height, 'x' => $pos_x, 'y' => $pos_y);
+	}
+	return $return;
+}
+
+function get_redim_coef($width, $height, $width_min, $height_min, $width_max, $height_max){
+	$coef = 1;
+//	echo $width_min."/".$height_min." < ".$width."/".$height." < ".$width_max."/".$height_max."<br />";
+	if($width > $width_max || $height > $height_max){
+		if($width_max/$width < $height_max/$height){
+			$coef = $width_max/$width;
+		}else{
+			$coef = $height_max/$height;
+		}
+	}else if($width < $width_min || $height < $height_min){
+		if($width_min/$width > $height_min/$height){
+			$coef = $width_min/$width;
+		}else{
+			$coef = $height_min/$height;
+		}
+	}
+//	echo "=".$coef."(".($coef*$width)."/".($coef*$height).")<br />";
+//	exit;
+	return $coef;
+}
+
+function get_text_length($size,$angle,$fontfile,$text){
+	$box = imagettfbbox( $size, $angle, $fontfile, $text);
+	//return array('width' => abs($box[2] - $box[0])/2,'height' => abs($box[5] - $box[3])/2);
+	return array('width' => abs($box[2] - $box[0]),'height' => abs($box[5] - $box[3]));
+}
+
+function write_text_image($img, $font_size, $height, $width, $position, $color, $font_file, $text){
+	imagettftext($img, $font_size, $height, $width, $position, $color, $font_file, eurofix($text));
+}
+
+
+/**
+* 		Create map
+*/
+//return latidude#longitude
+function getGPS($id_video,$zip = "",$city= "",$address="",$country = "US"){
+	$url_gps = URL_FETCH_GPS;
+	if($zip != ""){
+		$url_gps = str_replace('#COUNTRY#',	urlencode($country), $url_gps);
+		$url_gps = str_replace('#ZIP#',	urlencode($zip), $url_gps);
+		$url_gps = str_replace('#CITY#', urlencode($city), $url_gps);
+		$url_gps = str_replace('#ADDRESS#', urlencode($address), $url_gps);
+		$gps = file_get_contents($url_gps);
+	}
+	return $gps;
+}
+
+function createMapImage($id_video,$lat = "",$long = "", $width = IMAGE_WIDTH, $height = IMAGE_HEIGHT, $url_map = MAP_URL_IMG){
+	global $videos_options;
+	//taille de l'image finale
+	if($lat != "" && $long != ""){
+		if($width > 640 || $height > 640){
+			$coef = get_redim_coef($width, $height, 0, 0, 640, 640);
+			$width = round($width*$coef);
+			$height = round($height*$coef);
+		}
+		$key = $videos_options['GOOGLE_API_KEYS'][rand(0,count($videos_options['GOOGLE_API_KEYS'])-1)]['KEY'];
+		$replace = array(
+			'search' => array('#LATITUDE#', '#LONGITUDE#','#WIDTH#','#HEIGHT#','#KEY#'),
+			'replace'=> array(urlencode($lat), urlencode($long), urlencode($width), urlencode($height), urlencode($key))
+		);
+		$url_map = str_replace( $replace['search'], $replace['replace'], $url_map);
+		
+		return $url_map;
+	}
+	return "";
+}
+
+
+/**
+*
+*		For US tour
+*
+**/
+function create_startLogo_us($id_video,$AgentLogo = "",$BgImage = "",$Price ="",$NbBedroom = "",$NbBathroom = "",$Address = "",$City = "",$Zip = "",$AgentName = "",$AgentPhone = "",$AgentMail = "",$path_file = "",$image_width	= IMAGE_WIDTH, $image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$id_video."_start.png";}
+	//taille de la photo (ou logo) de l'agent
+	$agent_img_width_min = 90;
+	$agent_img_width_max = 630;
+//	$agent_img_width_max = 315;
+	$agent_img_height_min = 90;
+	$agent_img_height_max = 120;
+	//equal housing logo
+	$equalhousing_height 	= 74;
+	$equalhousing_width 	= 96;
+	$equalhousing_margintop = 10;
+	$equalhousing_logo = URL_VIDEO_LOGO_EQUALHOUSING;
+	//position de l'image
+	$position_image = 120;
+	if($image_height > 390){
+		$image_margin_footer = 60;
+	}else{	
+		$image_margin_footer = 35;
+	}
+
+	//font
+	$font_size = 20; //taille font
+	$font_space = 6;//espace entre 2 lignes
+	$result = "";
+	$img = imagecreatetruecolor($image_width,$image_height);
+	if(file_exists($path_file)){ @unlink($path_file);}
+	
+	$tmp_img = PATH_VIDEO_LOGO.$id_video.".tmp.jpg";
+	//on rajoute l'image de fond
+	$BgImage = $BgImage."&width=".$image_width."&height=".$image_height;
+	write_stupeflix_log("[CONVERSION][".$id_video."] Download Image font: ".$BgImage);
+	file_put_contents($tmp_img,file_get_contents($BgImage));
+	//list($width,$height) = getimagesize($tmp_img);
+	$width = $image_width;
+	$height = $image_height;
+	$fond = @imagecreatefromjpeg($tmp_img);
+	@imagecopyresampled($img, $fond, 0, 0, 0, 0, $image_width,$image_height,$width,$height);
+	imagedestroy($fond);
+	@unlink($tmp_img);
+	//on crée la partie supérieur
+	imagefilledrectangle($img, 0, 0, $image_width, $image_height, imagecolorallocatealpha($img, 0, 0, 0, 30));
+	//equalhousing
+	$img_src = @imagecreatefromgif($equalhousing_logo);
+	@imagecopyresampled($img, $img_src, 10,$image_height-$equalhousing_height-10, 0, 0, $equalhousing_width,$equalhousing_height, $equalhousing_width,$equalhousing_height);
+	if($AgentLogo != ""){	
+		//on place le logo
+		write_stupeflix_log("[CONVERSION][".$id_video."] Download Logo: ".$AgentLogo);
+		file_put_contents($tmp_img,file_get_contents($AgentLogo));
+		if(preg_match('/.png$/i',$AgentLogo) > 0){
+			$img_src = @imagecreatefrompng($tmp_img);
+		}else{
+			$img_src = @imagecreatefromjpeg($tmp_img);
+		}
+		list($width, $height) = getimagesize($tmp_img);
+		//$size = getimagesize($tmp_img);
+		//on trouve la bonne taille pour l'image
+		$coef = get_redim_coef($width,$height, $agent_img_width_min, $agent_img_height_min, $agent_img_width_max, $agent_img_height_max);
+		$old_width = $width;
+		$old_height = $height;
+		$width 	= $coef*$width;
+		$height = $coef*$height;		
+		$position_image = (($image_height-$height)/2);	
+		write_stupeflix_log("[CONVERSION][".$id_video."][DEBUG] (".$width." / ".$height.")");
+		imagefilledrectangle($img, (($image_width-$width)/2)-2, $position_image-2, $width+(($image_width-$width)/2)+1, $height+(($image_height-$height)/2)+1, imagecolorallocate($img, 255, 255, 255));
+		@imagecopyresampled($img, $img_src, (($image_width-$width)/2),$position_image, 0, 0, $width,$height,$old_width,$old_height);
+	
+	}else{
+		$height = 120;
+		write_stupeflix_log("[CONVERSION][".$id_video."] No Logo");
+	}
+	//on charge les fonts
+//		imagealphablending($img,true);
+//		// Le texte à dessiner
+//		$text = 'Test...';
+//		// Remplacez le chemin par votre propre chemin de police
+//			putenv('GDFONTPATH=' . realpath('.'));
+	$lines = array();
+	// on prépare les différentes lignes de texte
+	$text = "";
+	if($NbBedroom != "" || $NbBathroom != ""){
+		if($NbBedroom != ""){ $text .= $NbBedroom."#BR";}
+		if($NbBathroom != ""){ $text .= ($NbBedroom != "" ? ", " : "").$NbBathroom."#BA";}				
+	}
+	if($Price != "" && $Price > 0){ $text .= ($text != "" ? " - " : "").number_format($Price)." sqft";}
+	if($text != ""){ $lines[] = $text;}
+	if($Address != ""){ 
+		$size = get_text_length($font_size,0, $font_file,$Address);
+		if($size['width'] > $image_width){
+			$len = 45;
+			do{
+				$text  = substr($Address,0,$len)."...";
+				$size = get_text_length($font_size,0, $font_file,$text);
+				$len -= 5;
+			}while($size['width'] > $image_width);
+			$lines[] = $text;
+		}else{
+			$lines[] = $Address;
+		}
+	}
+	$text = "";
+	if($City != ""){ $text .= $City;}
+	if($Zip != ""){ $text .= ($text != "" ? ", " : "").$Zip;}
+	if($text != ""){ 
+		$size = get_text_length($font_size,0, $font_file,$text);
+		if($size['width'] > $image_width){
+			$len = 45;
+			do{
+				$text  = substr($text,0,$len)."...";
+				$size = get_text_length($font_size,0, $font_file,$text);
+				$len -= 5;
+			}while($size['width'] > $image_width);
+			$lines[]  = $text;
+		}else{
+			$lines[] = $text;
+		}
+	}
+	if(count($lines) > 0) {
+		$size = get_text_length($font_size,0, $font_file,$lines[0]);
+		$position = ($position_image-($size['height']*count($lines)))/2+10;
+		foreach($lines as $text){
+			$size = get_text_length($font_size,0, $font_file,$text);
+			write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255),  $font_file, utf8_decode($text));
+			$position += $size['height']+$font_space;
+		}
+	}
+	$lines = array();
+	if($AgentName != ""){ $lines[] = $AgentName;}
+	if($AgentPhone != ""){ $lines[] = "Phone: ".$AgentPhone;}
+	if($AgentMail != ""){ $lines[] = "Email: ".$AgentMail;}
+	if(count($lines) > 0) {
+		$size = get_text_length($font_size,0, $font_file,$lines[0]);
+		$position = ($position_image+$height+$size['height'])+$image_margin_footer;
+//		echo $position_image."+".$height."+".$size['height']."+".$image_margin_footer;exit;
+		foreach($lines as $text){
+			$size = get_text_length($font_size,0, $font_file,$text);
+			write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255),  $font_file, utf8_decode($text));
+			$position += $size['height']+$font_space;
+		}
+	}
+	@unlink($tmp_img);
+	imagepng($img,$path_file);
+	write_stupeflix_log("[CONVERSION][".$id_video."] Logo Finish: ".$path_file);
+	imagedestroy($img);
+//	if($get_path){ $result = PATH_VIDEO_LOGO.$id_video.".png";}
+//	else{ 
+//		$url = URL_VIDEO_TMP_LOGO;
+//		$url = str_replace('#TYPE#','US',$url);
+//		$url = str_replace('#TOUR#',$id_video,$url);
+//		$url = str_replace('#POS#','',$url);
+//	
+//		$result = $url;
+//		//$result = URL_VIDEO_LOGO.$id_video."_end.png";
+//	}
+	return $path_file;
+}
+
+function create_endLogo_us($id_video,$AgentLogo = "",$BgImage = "",$Price ="",$NbBedroom = "",$NbBathroom = "",$Address = "",$City = "",$Zip = "",$AgentName = "",$AgentPhone = "",$AgentMail = "",$path_file = "",$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+//	return create_startLogo_us($id_video,$AgentLogo,$BgImage,$Price,$NbBedroom,$NbBathroom,$Address,$City,$Zip,$AgentName,$AgentPhone,$AgentMail,$path_file,$image_width,$image_height);
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$id_video."_end.png";}
+	//taille de la photo (ou logo) de l'agent
+	$agent_img_width_min = 90;
+	$agent_img_width_max = 630;
+//	$agent_img_width_max = 315;
+	$agent_img_height_min = 90;
+	$agent_img_height_max = 120;
+	//equal housing logo
+	$equalhousing_height 	= 74;
+	$equalhousing_width 	= 96;
+	$equalhousing_margintop = 10;
+	$equalhousing_logo = URL_VIDEO_LOGO_EQUALHOUSING;
+	//position de l'image
+	$position_image = 120;
+	if($image_height > 390){
+		$image_margin_footer = 60;
+	}else{	
+		$image_margin_footer = 35;
+	}
+
+	//font
+	$font_size = 20; //taille font
+	$font_space = 6;//espace entre 2 lignes
+	$result = "";
+	$img = imagecreatetruecolor($image_width,$image_height);
+	if(file_exists($path_file)){ @unlink($path_file);}
+	
+	$tmp_img = PATH_VIDEO_LOGO.$id_video.".tmp.jpg";
+	//on rajoute l'image de fond
+	$BgImage = $BgImage."&width=".$image_width."&height=".$image_height;
+	write_stupeflix_log("[CONVERSION][".$id_video."] Download Image font: ".$BgImage);
+	file_put_contents($tmp_img,file_get_contents($BgImage));
+	//list($width,$height) = getimagesize($tmp_img);
+	$width = $image_width;
+	$height = $image_height;
+	$fond = @imagecreatefromjpeg($tmp_img);
+	@imagecopyresampled($img, $fond, 0, 0, 0, 0, $image_width,$image_height,$width,$height);
+	imagedestroy($fond);
+	@unlink($tmp_img);
+	//on crée la partie supérieur
+	imagefilledrectangle($img, 0, 0, $image_width, $image_height, imagecolorallocatealpha($img, 0, 0, 0, 30));
+	//equalhousing
+	$img_src = @imagecreatefromgif($equalhousing_logo);
+	@imagecopyresampled($img, $img_src, 10,$image_height-$equalhousing_height-10, 0, 0, $equalhousing_width,$equalhousing_height, $equalhousing_width,$equalhousing_height);
+	if($AgentLogo != ""){	
+		//on place le logo
+		write_stupeflix_log("[CONVERSION][".$id_video."] Download Logo: ".$AgentLogo);
+		file_put_contents($tmp_img,file_get_contents($AgentLogo));
+		if(preg_match('/.png$/i',$AgentLogo) > 0){
+			$img_src = @imagecreatefrompng($tmp_img);
+		}else{
+			$img_src = @imagecreatefromjpeg($tmp_img);
+		}
+		list($width, $height) = getimagesize($tmp_img);
+		//on trouve la bonne taille pour l'image
+		$coef = get_redim_coef($width,$height, $agent_img_width_min, $agent_img_height_min, $agent_img_width_max, $agent_img_height_max);
+		$old_width = $width;
+		$old_height = $height;
+		$width 	= $coef*$width;
+		$height = $coef*$height;
+//		echo $width."/".$height." - ".$old_width."/".$old_height;exit;
+		$position_image = (($image_height-$height)/2);	
+		write_stupeflix_log("[CONVERSION][".$id_video."][DEBUG] (".$width." / ".$height.")");
+		imagefilledrectangle($img, (($image_width-$width)/2)-2, $position_image-2, $width+(($image_width-$width)/2)+1, $height+(($image_height-$height)/2)+1, imagecolorallocate($img, 255, 255, 255));		
+		@imagecopyresampled($img, $img_src, (($image_width-$width)/2),$position_image, 0, 0, $width,$height,$old_width,$old_height);
+	}else{
+		$height = 120;
+		write_stupeflix_log("[CONVERSION][".$id_video."] No Logo");
+	}
+	//on charge les fonts
+	$lines = array();
+	// on prépare les différentes lignes de texte
+	$text = "";
+	if($NbBedroom != "" || $NbBathroom != ""){
+		if($NbBedroom != ""){ $text .= $NbBedroom."#BR";}
+		if($NbBathroom != ""){ $text .= ($NbBedroom != "" ? ", " : "").$NbBathroom."#BA";}				
+	}
+	if($Price != "" && $Price > 0){ $text .= ($text != "" ? " - " : "").number_format($Price)." sqft";}
+	if($text != ""){ $lines[] = $text;}
+	if($Address != ""){ 
+		$size = get_text_length($font_size,0, $font_file,$Address);
+		if($size['width'] > $image_width){
+			$len = 45;
+			do{
+				$text  = substr($Address,0,$len)."...";
+				$size = get_text_length($font_size,0, $font_file,$text);
+				$len -= 5;
+			}while($size['width'] > $image_width);
+			$lines[] = $text;
+		}else{
+			$lines[] = $Address;
+		}
+	}
+	$text = "";
+	if($City != ""){ $text .= $City;}
+	if($Zip != ""){ $text .= ($text != "" ? ", " : "").$Zip;}
+	if($text != ""){ 
+		$size = get_text_length($font_size,0, $font_file,$text);
+		if($size['width'] > $image_width){
+			$len = 45;
+			do{
+				$text  = substr($text,0,$len)."...";
+				$size = get_text_length($font_size,0, $font_file,$text);
+				$len -= 5;
+			}while($size['width'] > $image_width);
+			$lines[]  = $text;
+		}else{
+			$lines[] = $text;
+		}
+	}
+	if(count($lines) > 0) {
+		$size = get_text_length($font_size,0, $font_file,$lines[0]);
+		$position = ($position_image-($size['height']*count($lines)))/2+10;			
+		foreach($lines as $text){
+			$size = get_text_length($font_size,0, $font_file,$text);
+			write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255),  $font_file, utf8_decode($text));
+			$position += $size['height']+$font_space;
+		}
+	}
+	$lines = array();
+	if($AgentName != ""){ $lines[] = $AgentName;}
+	if($AgentPhone != ""){ $lines[] = "Phone: ".$AgentPhone;}
+	if($AgentMail != ""){ $lines[] = "Email: ".$AgentMail;}
+	
+	if(count($lines) > 0) {
+		$size = get_text_length($font_size,0, $font_file,$lines[0]);
+		$position = ($position_image+$height+$size['height'])+$image_margin_footer;
+		foreach($lines as $text){
+			$size = get_text_length($font_size,0, $font_file,$text);
+			write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255),  $font_file, utf8_decode($text));
+			$position += $size['height']+$font_space;
+		}
+	}
+	@unlink($tmp_img);
+	imagepng($img,$path_file);
+	write_stupeflix_log("[CONVERSION][".$id_video."] Logo Finish: ".$path_file);
+	imagedestroy($img);
+	return $path_file;
+}
+
+
+/**
+*	Creation logo US
+*
+***/
+function create_startLogo_usyoutube($id_video,$AgentLogo = "",$BgImage = "",$Price ="",$NbBedroom = "",$NbBathroom = "",$Address = "",$City = "",$Zip = "",$AgentName = "",$AgentPhone = "",$AgentMail = "",$path_file = "",$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+	return create_endLogo_usyoutube($id_video,$AgentLogo,$BgImage,$Price,$NbBedroom,$NbBathroom,$Address,$City,$Zip,$AgentName,$AgentPhone,$AgentMail,$path_file,$image_width,$image_height, $font_file);
+}
+
+function create_endLogo_usyoutube( $id_video, $AgentLogo = "", $BgImage = "", $Price ="", $NbBedroom = "", $NbBathroom = "", $Address = "", $City = "", $Zip = "", $AgentName = "", $AgentPhone = "", $AgentMail = "", $path_file = "", $image_width = IMAGE_WIDTH, $image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$id_video."_end.png";}
+	//taille de la photo (ou logo) de l'agent
+	$agent_img_width_min = 90;
+	$agent_img_width_max = 630;
+//	$agent_img_width_max = 315;
+	$agent_img_height_min = 90;
+	$agent_img_height_max = 120;
+	$agent_img_border = 2;
+	//equal housing logo
+	$equalhousing_height 	= 74;
+	$equalhousing_width 	= 96;
+	$equalhousing_marginright 	= 2;
+	$equalhousing_marginbottom 	= 3;
+	$equalhousing_logo = URL_VIDEO_LOGO_EQUALHOUSING;
+	//position de l'image
+	$text_header_height		= 105;
+	$text_header_marginbottom= 20;
+//	$text_header_position	= 20;
+	$text_header_font_size 	= 20;
+	$text_header_marginleft	= 10;
+	$text_footer_marginleft	= 10;
+	$text_footer_margintop	= 10;
+	$text_footer_font_size 	= 16;
+	$text_footer_height 	= 200;
+//	$text_footer_position	= $text_header_position+$text_header_height+$text_header_marginbottom;
+	$text_footer_position	= $text_header_height+$text_header_marginbottom;
+	$text_header_position 	= ($image_height - ($text_footer_position+$text_footer_height))/2;
+	$text_footer_position	+= $text_header_position; 
+	//font
+	$font_size = 20; //taille font
+	$font_space = 6;//espace entre 2 lignes
+	$result = "";
+	$img = imagecreatetruecolor($image_width,$image_height);
+	if(file_exists($path_file)){ @unlink($path_file);}
+	
+	$tmp_img = PATH_VIDEO_LOGO.$id_video.".tmp.jpg";
+	//on rajoute l'image de fond
+	$BgImage = $BgImage."&width=".$image_width."&height=".$image_height;
+	write_stupeflix_log("[CONVERSION][".$id_video."] Download Image font: ".$BgImage);
+	file_put_contents($tmp_img,file_get_contents($BgImage));
+	//list($width,$height) = getimagesize($tmp_img);
+	$width = $image_width;
+	$height = $image_height;
+	$fond = @imagecreatefromjpeg($tmp_img);
+	@imagecopyresampled($img, $fond, 0, 0, 0, 0, $image_width,$image_height,$width,$height);
+	imagedestroy($fond);
+	@unlink($tmp_img);
+
+	//on crée la partie supérieure
+	//on charge les fonts
+	$lines = array();
+	// on prépare les différentes lignes de texte
+	$text = "";
+	if($NbBedroom != "" || $NbBathroom != ""){
+		if($NbBedroom != ""){ $text .= $NbBedroom."#BR";}
+		if($NbBathroom != ""){ $text .= ($NbBedroom != "" ? ", " : "").$NbBathroom."#BA";}				
+	}
+	if($Price != "" && $Price > 0){ $text .= ($text != "" ? " - " : "").number_format($Price)." sqft";}
+	if($text != ""){ $lines[] = $text;}
+	if($Address != ""){ 
+		$size = get_text_length($text_header_font_size,0, $font_file,$Address);
+		if($size['width'] > $image_width){
+			$len = 45;
+			do{
+				$text  = substr($Address,0,$len)."...";
+				$size = get_text_length($text_header_font_size,0, $font_file,$text);
+				$len -= 5;
+			}while($size['width'] > $image_width);
+			$lines[] = $text;
+		}else{
+			$lines[] = $Address;
+		}
+	}
+	$text = "";
+	if($City != ""){ $text .= $City;}
+	if($Zip != ""){ $text .= ($text != "" ? ", " : "").$Zip;}
+	if($text != ""){ 
+		$size = get_text_length($text_header_font_size,0, $font_file,$text);
+		if($size['width'] > $image_width){
+			$len = 45;
+			do{
+				$text  = substr($text,0,$len)."...";
+				$size = get_text_length($text_header_font_size,0, $font_file,$text);
+				$len -= 5;
+			}while($size['width'] > $image_width);
+			$lines[]  = $text;
+		}else{
+			$lines[] = $text;
+		}
+	}
+	if(count($lines) > 0) {
+		$size = get_text_length($text_header_font_size,0, $font_file,$lines[0]);
+		imagefilledrectangle($img, 0, $text_header_position, $image_width, $text_header_position+$text_header_height, imagecolorallocatealpha($img, 0, 0, 0, 30));
+		$position = $text_header_position+$size['height'];
+		foreach($lines as $k=>$text){
+			$font_file =  $font_file;
+			if($k == 0){ $font_file =  $font_file_bold;}
+			$size = get_text_length($text_header_font_size,0,$font_file,$text);
+			write_text_image($img, $text_header_font_size, 0, $text_header_marginleft, $position, imagecolorallocate($img, 255, 255, 255), $font_file, utf8_decode($text));
+			$position += $size['height']+$font_space;
+		}
+	}
+	
+	//partie inférieur
+	imagefilledrectangle($img, 0, $text_footer_position, $image_width, $text_footer_position+$text_footer_height, imagecolorallocatealpha($img, 0, 0, 0, 30));
+	//logo
+	if($AgentLogo != ""){	
+		//on place le logo
+		write_stupeflix_log("[CONVERSION][".$id_video."] Download Logo: ".$AgentLogo);
+		file_put_contents($tmp_img,file_get_contents($AgentLogo));
+		if(preg_match('/.png$/i',$AgentLogo) > 0){
+			$img_src = @imagecreatefrompng($tmp_img);
+		}else{
+			$img_src = @imagecreatefromjpeg($tmp_img);
+		}
+		list($width, $height) = getimagesize($tmp_img);
+		//on trouve la bonne taille pour l'image
+		$coef = get_redim_coef($width,$height, $agent_img_width_min, $agent_img_height_min, $agent_img_width_max, $agent_img_height_max);
+		$old_width = $width;
+		$old_height = $height;
+		$width 	= $coef*$width;
+		$height = $coef*$height;
+//		echo $width."/".$height." - ".$old_width."/".$old_height;exit;
+		$position_image = $text_footer_marginleft;
+		write_stupeflix_log("[CONVERSION][".$id_video."][DEBUG] (".$width." / ".$height.")");
+		imagefilledrectangle($img, $position_image-$agent_img_border, $text_footer_position+$text_footer_margintop-$agent_img_border, $position_image+$width+$agent_img_border, $text_footer_position+$text_footer_margintop+$height+$agent_img_border, imagecolorallocate($img, 255, 255, 255));		
+		@imagecopyresampled($img, $img_src, $position_image,$text_footer_position+$text_footer_marginleft, 0, 0, $width,$height,$old_width,$old_height);
+		$position_image += $width;
+	}else{
+		write_stupeflix_log("[CONVERSION][".$id_video."] No Logo");
+	}
+	$image_footer_margin_left = 10;
+	//texte
+	$lines = array();
+	if($AgentName 	!= ""){ $lines[] = $AgentName;}
+	if($AgentPhone	!= ""){ $lines[] = $AgentPhone;}
+	if($AgentMail	!= ""){ $lines[] = $AgentMail;}
+	
+	if(count($lines) > 0) {
+		$size = get_text_length($text_footer_font_size,0, $font_file,$lines[0]);
+		$position = ($text_footer_position+$size['height'])+$text_footer_margintop;
+		//separateur
+		imagefilledrectangle($img, $position_image+$text_footer_marginleft, $position-$size['height'], $position_image+$text_footer_marginleft, $position+$size['height']*count($lines), imagecolorallocate($img, 255, 255, 255));	
+		$position_image += $text_footer_marginleft;
+		foreach($lines as $text){
+			$size = get_text_length($text_footer_font_size,0, $font_file,$text);
+			write_text_image($img, $text_footer_font_size, 0, $position_image+$text_footer_marginleft, $position, imagecolorallocate($img, 255, 255, 255),  $font_file, utf8_decode($text));
+			$position += $size['height']+$font_space;
+		}
+	}
+	//equalhousing
+	$img_src = @imagecreatefromgif($equalhousing_logo);
+	@imagecopyresampled($img, $img_src, $image_width-$equalhousing_width-$equalhousing_marginright,$text_footer_position+$text_footer_height-$equalhousing_height-$equalhousing_marginbottom, 0, 0, $equalhousing_width,$equalhousing_height, $equalhousing_width,$equalhousing_height);
+	
+
+	@unlink($tmp_img);
+	imagepng($img,$path_file);
+	write_stupeflix_log("[CONVERSION][".$id_video."] Logo Finish: ".$path_file);
+	imagedestroy($img);
+	return $path_file;
+}
+
+/**
+*		creation logo Videotour
+*
+***/
+function create_startLogo_videotour($id_video,$BgImage = "",$Price ="",$NbRoom = "",$NbBathroom = "",$sqt = "",$Address = "",$City = "",$Zip = "",$contact = "",$title = "",$unit="Square Feet",$path_file = "",$preview = false,$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+//function create_startLogo_videotour($id_video,$BgImage = "",$Price ="",$NbRoom = "",$NbBathroom = "",$sqt = "",$get_path = false){
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$id_video."_start.png";}
+	if(file_exists($path_file)){ @unlink($path_file);}
+	$font_file =  $font_file;
+	//$font_file = '/var/www/video.previsite.net/font/AdobeGaramondPro.otf';
+	//define(' $font_file','/var/www/video.previsite.net/font/AdobeGaramondPro.otf');
+	$opacity = 30;
+	//font
+	$font_size = 35; //taille font
+	$font_space = 20;//espace entre 2 lignes
+	if($image_height > 390){
+		$position_start = 100;
+		$position_middle = 190;
+		$position_end = 390;
+	}else{
+		$position_start = 60;
+		$position_middle = 120;
+		$position_end = 290;
+	}
+	$result = "";
+	$img = imagecreatetruecolor($image_width,$image_height);
+	$tmp_img = PATH_VIDEO_LOGO.$id_video.".tmp.jpg";
+	//on rajoute l'image de fond
+	file_put_contents($tmp_img,file_get_contents($BgImage));
+	list($width,$height) = getimagesize($tmp_img);
+	if($width/$height != $image_width/$image_height){
+		if($width > $height){
+			$new_width = $image_width/$image_height * $height;
+			$x = ($width-$new_width)/2;
+			$width = $new_width;
+		}else{
+			$new_height = $image_height/$image_width * $width;
+			$y = ($height-$new_height)/2;
+			$height = $new_height;
+		}
+	}
+	$fond = @imagecreatefromjpeg($tmp_img);
+	@imagecopyresampled($img, $fond, 0, 0, $x, $y, $image_width,$image_height,$width,$height);
+	imagedestroy($fond);
+	@unlink($tmp_img);
+	//on crée la partie supérieur
+	$imgcolor = imagecolorallocatealpha($img, 0, 0, 0, $opacity);
+	imagefilledrectangle($img, 0, 0, $image_width, $image_height, $imgcolor);
+	
+	if(!$preview){
+		$lines = array();
+		if($title != ""){ $lines[0] = $title;}
+		if($Price != ""){ $lines[1] = $Price;}
+			
+		$text = "";
+		if($NbBedroom != "" || $NbBathroom != ""){
+			if($NbRoom != ""){ $text .= $NbRoom." rooms";}
+			if($NbBathroom != ""){ $text .= ($NbRoom != "" ? ", " : "").$NbBathroom." baths";}				
+		}
+		if($text != ""){ $lines[2] = $text;}
+		
+		if($sqt != ""){ $lines[3] = number_format($sqt)." ".$unit;}
+		
+		if($Address != ""){ $lines[4] = $Address;}
+		
+		$text = "";
+		if($City != ""){ $text .= $City;}
+		if($Zip != ""){ $text .= ($text != "" ? ", " : "").$Zip;}
+		if($text != ""){ $lines[5] = $text;}
+		
+		if(count($lines) > 0) {
+			$size = get_text_length($font_size,0,$font_file,$lines[0]);
+			$position = $position_start;
+			foreach($lines as $k=>$text){
+				if($k > 0 && $position < $position_middle){ $position = $position_middle;}
+				if($k > 3 && $position < $position_end){ $position = $position_end;}
+				$size = get_text_length($font_size,0,$font_file,$text);
+				$len = 45;
+				while($size['width'] > $image_width){
+					$text = substr($text,0,$len)."...";
+					$size = get_text_length($font_size,0,$font_file,$text);
+					$len -= 5;
+				}
+	//			write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255), $font_file, utf8_decode($text));
+				write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255), $font_file, $text);
+				if($k==0){ imageline( $img, ($image_width-$size['width'])/2  ,$position+5  , ($image_width+$size['width'])/2 , $position+5  , imagecolorallocate($img, 255, 255, 255)  );}
+				$position += $size['height']+$font_space;
+				if($k==0){ $font_size -= 10;$font_space -= 10;}
+			}
+		}
+	}
+	
+	imagepng($img,$path_file);
+	imagedestroy($img);
+	//if($get_path){ $result = PATH_VIDEO_LOGO.$id_video."_start.png";}
+	//else{ 
+	//	$url = URL_VIDEO_TMP_LOGO;
+	//	$url = str_replace('#TYPE#','VIDEOTOUR',$url);
+	//	$url = str_replace('#TOUR#',$id_video,$url);
+	//	$url = str_replace('#POS#','start',$url);
+	//
+	//	$result = $url;
+	//	//$result = URL_VIDEO_LOGO.$id_video."_end.png";
+	//}
+	return $path_file;
+}
+
+
+function create_endLogo_videotour($id_video,$BgImage = "",$Price ="",$NbRoom = "",$NbBathroom = "",$sqt = "",$Address = "",$City = "",$Zip = "",$contact = "",$titre = "",$unit="Square Feet",$path_file = false,$preview = false,$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+//function create_endLogo_videotour($id_video,$BgImage = "",$Address = "",$City = "",$Zip = "",$contact = "",$get_path = false){
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$id_video."_end.png";}
+	if(file_exists($path_file)){ @unlink($path_file);}
+	$font_file =  $font_file;
+	//$font_file = '/var/www/video.previsite.net/font/AdobeGaramondPro.otf';
+	$opacity = 30;
+	//font
+	$font_size = 40; //taille font
+	$font_space = 20;//espace entre 2 lignes
+	if($image_height > 390){
+		$position_start = 120;
+		$position_middle = 220;
+		$position_end = 380;
+	}else{
+		$position_start = 60;
+		$position_middle = 160;
+		$position_end = 300;
+	}
+	$result = "";
+	$img = imagecreatetruecolor($image_width,$image_height);
+	$tmp_img = PATH_VIDEO_LOGO.$id_video.".tmp.jpg";
+	//on rajoute l'image de fond
+	file_put_contents($tmp_img,file_get_contents($BgImage));
+	list($width,$height) = getimagesize($tmp_img);
+	if($width/$height != $image_width/$image_height){
+		if($width > $height){
+			$new_width = $image_width/$image_height * $height;
+			$x = ($width-$new_width)/2;
+			$width = $new_width;
+		}else{
+			$new_height = $image_height/$image_width * $width;
+			$y = ($height-$new_height)/2;
+			$height = $new_height;
+		}
+	}
+	$fond = @imagecreatefromjpeg($tmp_img);
+	@imagecopyresampled($img, $fond, 0, 0, $x, $y, $image_width,$image_height,$width,$height);
+	imagedestroy($fond);
+	@unlink($tmp_img);
+	//on crée la partie supérieur
+	$imgcolor = imagecolorallocatealpha($img, 0, 0, 0, $opacity);
+	imagefilledrectangle($img, 0, 0, $image_width, $image_height, $imgcolor);
+	
+	if(!$preview){		
+		$lines = array();
+		if($titre != ""){ $lines[0] = $titre;}
+		if($Address != ""){ $lines[1] = $Address;}
+		$text = "";
+		if($City != ""){ $text .= $City;}
+		if($Zip != ""){ $text .= ($text != "" ? ", " : "").$Zip;}
+		if($text != ""){ $lines[2] = $text;}
+	
+	//	if($Price != ""){ $lines[3] = $Price;}
+			
+	//	$text = "";
+	//	if($NbBedroom != "" || $NbBathroom != ""){
+	//		if($NbRoom != ""){ $text .= $NbRoom." rooms";}
+	//		if($NbBathroom != ""){ $text .= ($NbRoom != "" ? ", " : "").$NbBathroom." baths";}				
+	//	}
+	//	if($text != ""){ $lines[4] = $text;}
+	//	if($sqt != ""){ $lines[5] = number_format($sqt)." ".$unit;}
+		if($contact != ""){ $lines[6] = $contact;}
+		if(count($lines) > 0) {
+			$size = get_text_length($font_size,0,$font_file,$lines[0]);
+			$position = $position_start;
+			foreach($lines as $k=>$text){
+				if($k == 6){ $position = $position_end;}
+				if($k > 0 && $position < $position_middle){ $position = $position_middle;}
+				$size = get_text_length($font_size,0,$font_file,$text);
+				$len = 45;
+				while($size['width'] > $image_width){
+					$text = substr($text,0,$len)."...";
+					$size = get_text_length($font_size,0,$font_file,$text);
+					$len -= 5;
+				}
+	//			write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255), $font_file, utf8_decode($text));
+				write_text_image($img, $font_size, 0, ($image_width-$size['width'])/2, $position, imagecolorallocate($img, 255, 255, 255), $font_file, $text);
+				if($k==0){ imageline( $img, ($image_width-$size['width'])/2  ,$position+5  , ($image_width+$size['width'])/2 , $position+5  , imagecolorallocate($img, 255, 255, 255)  );}
+				$position += $size['height']+$font_space;
+				if($k==0){ $font_size -= 15;$font_space -= 10;}
+			}
+		}
+	}
+	imagepng($img,$path_file);
+	imagedestroy($img);
+	//if($get_path){ $result = PATH_VIDEO_LOGO.$id_video."_end.png";}
+	//else{ 
+	//	$url = URL_VIDEO_TMP_LOGO;
+	//	$url = str_replace('#TYPE#','VIDEOTOUR',$url);
+	//	$url = str_replace('#TOUR#',$id_video,$url);
+	//	$url = str_replace('#POS#','end',$url);
+	//
+	//	$result = $url;
+	//	//$result = URL_VIDEO_LOGO.$id_video."_end.png";
+	//}
+	
+	return $path_file;
+}
+/**
+*		creation logo VideotourDemo
+*
+***/
+function create_startLogo_videotourdemo($id_video,$BgImage = "",$Price ="",$NbRoom = "",$NbBathroom = "",$sqt = "",$Address = "",$City = "",$Zip = "",$contact = "",$title = "",$unit="Square Feet",$path_file = "",$preview = false,$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT){
+	return create_startLogo_videotour($id_video,$BgImage,$Price,$NbRoom,$NbBathroom,$sqt,$Address,$City,$Zip,$contact,$title,$unit,$path_file,$preview,$image_width,$image_height, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD);
+}
+
+
+function create_endLogo_videotourdemo($id_video,$BgImage = "",$Price ="",$NbRoom = "",$NbBathroom = "",$sqt = "",$Address = "",$City = "",$Zip = "",$contact = "",$titre = "",$unit="Square Feet",$path_file = "",$preview = false,$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT){
+	return create_endLogo_videotour($id_video,$BgImage,$Price,$NbRoom,$NbBathroom,$sqt,$Address,$City,$Zip,$contact,$titre,$unit,$path_file,$preview,$image_width,$image_height, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD);
+}
+
+/**
+*		creation logo agence plus start / end
+*
+***/
+function create_startLogo_agenceplus($tour,$logo,$path_file= "",$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$tour."_start.png";}
+	if(file_exists($path_file)){ @unlink($path_file);}
+	//taille de la photo (ou logo) de l'agent
+	$agent_img_width_min = 100;
+	$agent_img_width_max = 630;
+	$agent_img_height_min = 100;
+	$agent_img_height_max = 470;
+	//position de l'image
+	
+	$img = imagecreatetruecolor($image_width,$image_height);
+//	$fond = imagecreate($image_width,$image_height);
+	imagefill($img, 0, 0, imagecolorallocatealpha($img, 255, 255, 255, 0));
+	@imagecopyresampled($img, $fond, 0, 0, 0, 0, $image_width,$image_height,$width,$height);
+	//on rajoute l'image de fond
+	$tmp_img = PATH_VIDEO_LOGO.$tour.".tmp.jpg";
+	//on place le logo                                    
+	file_put_contents($tmp_img,file_get_contents($logo));
+	if(preg_match('/.png$/i',$logo) > 0){
+		$img_src = @imagecreatefrompng($tmp_img);
+	}else{
+		$img_src = @imagecreatefromjpeg($tmp_img);
+	}
+	list($width, $height) = getimagesize($tmp_img);
+	//$size = getimagesize($tmp_img);
+	//on trouve la bonne taille pour l'image
+	$coef = get_redim_coef($width,$height, $agent_img_width_min, $agent_img_height_min, $agent_img_width_max, $agent_img_height_max);
+	
+	$old_width = $width;
+	$old_height = $height;
+	$width 	= $coef*$width;
+	$height = $coef*$height;			
+	//imagefilledrectangle($img, (($image_width-$width)/2)-2, $position_image-2, $width+(($image_width-$width)/2)+1, $height+$position_image+1, imagecolorallocate($img, 255, 255, 255));
+	@imagecopyresampled($img, $img_src, (($image_width-$width)/2),(($image_height-$height)/2), 0, 0, $width,$height,$old_width,$old_height);
+//	imagefilledrectangle($img, (($image_width-$width)/2)-2, (($image_height-$height)/2)-2, $width+(($image_width-$width)/2)+1, $height+(($image_height-$height)/2)+1, imagecolorallocate($img, 255, 255, 255));
+//	@imagecopyresampled($img, $img_src, (($image_width-$width)/2),(($image_height-$height)/2), 0, 0, $width,$height,$old_width,$old_height);
+
+	@unlink($tmp_img);
+	imagepng($img,$path_file);
+	imagedestroy($img);
+	//if($get_path) { return PATH_VIDEO_LOGO.$tour."_start.png";}
+	////return URL_VIDEO_LOGO.$tour."_start.png";
+  //
+	//$url = URL_VIDEO_TMP_LOGO;
+	//$url = str_replace('#TYPE#','AGENCEPLUS',$url);
+	//$url = str_replace('#TOUR#',$tour,$url);
+	//$url = str_replace('#POS#','start',$url);
+	return $path_file;
+
+}	
+
+function create_endLogo_agenceplus($tour,$logo_end,$name,$phone,$ref,$bgimg, $path_file = "",$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+	if($path_file != ""){ $path_file = PATH_VIDEO_LOGO.$tour."_end.png";}
+	if(file_exists($path_file)){ @unlink($path_file);}
+	//taille de l'image finale
+	//taille de la photo (ou logo) de l'agent
+	$agent_img_width_min = 90;
+	$agent_img_width_max = 630;
+	$agent_img_height_min = 90;
+	$agent_img_height_max = 120;
+	//position de l'image
+	$position_image = 60;
+	//font
+	if($image_height > 420){
+		$lines = array(
+							array('font_size'=> 32, 'position'=> 250, 'text'=>""),
+							array('font_size'=> 25, 'position'=> 330, 'text'=>""),
+							array('font_size'=> 25, 'position'=> 420, 'text'=>"")
+						);
+	}else{
+		$lines = array(
+							array('font_size'=> 32, 'position'=> 250, 'text'=>""),
+							array('font_size'=> 25, 'position'=> 295, 'text'=>""),
+							array('font_size'=> 25, 'position'=> 340, 'text'=>"")
+						);		
+	}
+	$img = imagecreatetruecolor($image_width,$image_height);
+	$tmp_img = PATH_VIDEO_LOGO.$tour.".tmp.jpg";
+	//on rajoute l'image de fond
+	$bgimg = $bgimg."&width=".$image_width."&height=".$image_height;
+	file_put_contents($tmp_img,file_get_contents($bgimg));
+	$width = $image_width;
+	$height = $image_height;
+	$fond = @imagecreatefromjpeg($tmp_img);
+	@imagecopyresampled($img, $fond, 0, 0, 0, 0, $image_width,$image_height,$width,$height);
+	imagedestroy($fond);
+	@unlink($tmp_img);
+	//on crée la partie supérieur
+	imagefilledrectangle($img, 0, 0, $image_width, $image_height, imagecolorallocatealpha($img, 0, 0, 0, 30));
+	//on place le logo
+	file_put_contents($tmp_img,file_get_contents($logo_end));
+	if(preg_match('/.png$/i',$logo_end) > 0){
+		$img_src = @imagecreatefrompng($tmp_img);
+	}else{
+		$img_src = @imagecreatefromjpeg($tmp_img);
+	}
+	list($width, $height) = getimagesize($tmp_img);
+	//$size = getimagesize($tmp_img);
+	//on trouve la bonne taille pour l'image
+	$coef = get_redim_coef($width,$height, $agent_img_width_min, $agent_img_height_min, $agent_img_width_max, $agent_img_height_max);
+	$old_width = $width;
+	$old_height = $height;
+	$width 	= $coef*$width;
+	$height = $coef*$height;			
+	imagefilledrectangle($img, (($image_width-$width)/2)-2, $position_image-2, $width+(($image_width-$width)/2)+1, $height+$position_image+1, imagecolorallocate($img, 255, 255, 255));
+	@imagecopyresampled($img, $img_src, (($image_width-$width)/2),$position_image, 0, 0, $width,$height,$old_width,$old_height);
+//	imagefilledrectangle($img, (($image_width-$width)/2)-2, (($image_height-$height)/2)-2, $width+(($image_width-$width)/2)+1, $height+(($image_height-$height)/2)+1, imagecolorallocate($img, 255, 255, 255));
+//	@imagecopyresampled($img, $img_src, (($image_width-$width)/2),(($image_height-$height)/2), 0, 0, $width,$height,$old_width,$old_height);
+		
+	//$lines = array();
+	$size = get_text_length($lines[0]['font_size'],0, $font_file,$name);
+	if($size['width'] > $image_width){
+		$len = 45;
+		do{
+			$text  = substr($name,0,$len)."...";
+			$size = get_text_length($lines[0]['font_size']-4,0, $font_file,$text);
+//			print_r($size);
+			$len -= 5;
+		}while($size['width'] > $image_width);
+
+		$lines[0]['text'] = $text;
+	}else{
+		$lines[0]['text'] = $name;
+	}
+	$tmp = "";
+	if($phone != ""){ $lines[1]['text'] = "Tél.: ".$phone;}
+	if($ref != ""){ $lines[2]['text'] =  "Réf.: ".$ref ;}
+	if(count($lines) > 0) {
+		$size = get_text_length($lines[0]['font_size'],0, $font_file,$lines[0]['text']);
+		foreach($lines as $text){
+			$size = get_text_length($text['font_size'],0, $font_file,$text['text']);
+			write_text_image($img, $text['font_size'], 0, ($image_width-$size['width'])/2, $text['position'], imagecolorallocate($img, 255, 255, 255),  $font_file, $text['text']);
+			$position += $size['height']+$font_space;
+		}
+	}
+	@unlink($tmp_img);
+	imagepng($img,$path_file);
+	imagedestroy($img);
+	//if($get_path){ return PATH_VIDEO_LOGO.$tour."_end.png";}
+	//$url = URL_VIDEO_TMP_LOGO;
+	//$url = str_replace('#TYPE#','AGENCEPLUS',$url);
+	//$url = str_replace('#TOUR#',$tour,$url);
+	//$url = str_replace('#POS#','end',$url);
+	return $path_file;
+	//return URL_VIDEO_LOGO.$tour."_end.png";
+
+}	
+/**
+*		creation logo FR start / end
+*
+***/
+function create_startLogo_fr($tour,$logo,$path_file= "",$image_width = IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$tour."_start.png";}
+	if(file_exists($path_file)){ @unlink($path_file);}
+	//taille de la photo (ou logo) de l'agent
+	$agent_img_width_min = 100;
+	$agent_img_width_max = $image_width-10;
+	$agent_img_height_min = 100;
+	$agent_img_height_max = $image_height-10;
+	//position de l'image
+	
+	$img = imagecreatetruecolor($image_width,$image_height);
+//	$fond = imagecreate($image_width,$image_height);
+	imagefill($img, 0, 0, imagecolorallocatealpha($img, 255, 255, 255, 0));
+	@imagecopyresampled($img, $fond, 0, 0, 0, 0, $image_width,$image_height,$width,$height);
+	//on rajoute l'image de fond
+	$tmp_img = PATH_VIDEO_LOGO.$tour.".tmp.jpg";
+	//on place le logo 
+	file_put_contents($tmp_img,file_get_contents($logo));
+	if(preg_match('/.png$/i',$logo) > 0){
+		$img_src = @imagecreatefrompng($tmp_img);
+	}else{
+		$img_src = @imagecreatefromjpeg($tmp_img);
+	}
+	list($width, $height) = getimagesize($tmp_img);
+
+	//$size = getimagesize($tmp_img);
+	//on trouve la bonne taille pour l'image
+	$coef = get_redim_coef($width,$height, $agent_img_width_min, $agent_img_height_min, $agent_img_width_max, $agent_img_height_max);
+	
+	$old_width = $width;
+	$old_height = $height;
+	$width 	= $coef*$width;
+	$height = $coef*$height;			
+	//imagefilledrectangle($img, (($image_width-$width)/2)-2, $position_image-2, $width+(($image_width-$width)/2)+1, $height+$position_image+1, imagecolorallocate($img, 255, 255, 255));
+	@imagecopyresampled($img, $img_src, (($image_width-$width)/2),(($image_height-$height)/2), 0, 0, $width,$height,$old_width,$old_height);
+//	imagefilledrectangle($img, (($image_width-$width)/2)-2, (($image_height-$height)/2)-2, $width+(($image_width-$width)/2)+1, $height+(($image_height-$height)/2)+1, imagecolorallocate($img, 255, 255, 255));
+//	@imagecopyresampled($img, $img_src, (($image_width-$width)/2),(($image_height-$height)/2), 0, 0, $width,$height,$old_width,$old_height);
+
+	@unlink($tmp_img);
+	imagepng($img,$path_file);
+	imagedestroy($img);
+	//if($get_path) { return PATH_VIDEO_LOGO.$tour."_start.png";}
+	////return URL_VIDEO_LOGO.$tour."_start.png";
+  //
+	//$url = URL_VIDEO_TMP_LOGO;
+	//$url = str_replace('#TYPE#','FR',$url);
+	//$url = str_replace('#TOUR#',$tour,$url);
+	//$url = str_replace('#POS#','start',$url);
+	return $path_file;
+
+}	
+
+function create_endLogo_fr($tour, $lang, $logo_end, $name, $phone, $ref, $bgimg, $path_file = "",$image_width	= IMAGE_WIDTH,$image_height = IMAGE_HEIGHT, $font_file = FONT_FILE, $font_file_bold = FONT_FILE_BOLD){
+	if($path_file == ""){ $path_file = PATH_VIDEO_LOGO.$tour."_end.png";}
+	if(file_exists($path_file)){ @unlink($path_file);}
+	$text = array(
+		'FR' => array('tel'=> 'Tél.:', 'ref' => 'Réf.:'),
+		'EN' => array('tel'=> 'Tel.:', 'ref' => 'Ref.:'),
+	);
+	if(count($text[$lang]) == 0){ $lang = "EN";}
+	//taille de la photo (ou logo) de l'agent
+	$agent_img_width_min = 90;
+	$agent_img_width_max = 630;
+	$agent_img_height_min = 90;
+	$agent_img_height_max = 120;
+	//position de l'image
+	$position_image = 60;
+	//font
+	if($image_height > 420){
+		$lines = array(
+			array('font_size'=> 32, 'position'=> 250, 'text'=>""),
+			array('font_size'=> 25, 'position'=> 330, 'text'=>""),
+			array('font_size'=> 25, 'position'=> 420, 'text'=>"")
+		);
+	}else{
+		$lines = array(
+			array('font_size'=> 32, 'position'=> 250, 'text'=>""),
+			array('font_size'=> 25, 'position'=> 295, 'text'=>""),
+			array('font_size'=> 25, 'position'=> 340, 'text'=>"")
+		);		
+	}
+	
+	$img = imagecreatetruecolor($image_width,$image_height);
+	$tmp_img = PATH_VIDEO_LOGO.$tour.".tmp.jpg";
+	//on rajoute l'image de fond
+	$bgimg = $bgimg."&width=".$image_width."&height=".$image_height;
+	file_put_contents($tmp_img,file_get_contents($bgimg));
+	$width = $image_width;
+	$height = $image_height;
+	$fond = @imagecreatefromjpeg($tmp_img);
+	@imagecopyresampled($img, $fond, 0, 0, 0, 0, $image_width,$image_height,$width,$height);
+	imagedestroy($fond);
+	@unlink($tmp_img);
+	//on crée la partie supérieur
+	imagefilledrectangle($img, 0, 0, $image_width, $image_height, imagecolorallocatealpha($img, 0, 0, 0, 30));
+	//on place le logo
+	if($logo_end != ""){
+		file_put_contents($tmp_img,file_get_contents($logo_end));
+		if(preg_match('/.png$/i',$logo_end) > 0){
+			$img_src = @imagecreatefrompng($tmp_img);
+		}else{
+			$img_src = @imagecreatefromjpeg($tmp_img);
+		}
+		list($width, $height) = getimagesize($tmp_img);
+		//$size = getimagesize($tmp_img);
+		//on trouve la bonne taille pour l'image
+		$coef = get_redim_coef($width,$height, $agent_img_width_min, $agent_img_height_min, $agent_img_width_max, $agent_img_height_max);
+		$old_width = $width;
+		$old_height = $height;
+		$width 	= $coef*$width;
+		$height = $coef*$height;			
+		imagefilledrectangle($img, (($image_width-$width)/2)-2, $position_image-2, $width+(($image_width-$width)/2)+1, $height+$position_image+1, imagecolorallocate($img, 255, 255, 255));
+		@imagecopyresampled($img, $img_src, (($image_width-$width)/2),$position_image, 0, 0, $width,$height,$old_width,$old_height);
+	//	imagefilledrectangle($img, (($image_width-$width)/2)-2, (($image_height-$height)/2)-2, $width+(($image_width-$width)/2)+1, $height+(($image_height-$height)/2)+1, imagecolorallocate($img, 255, 255, 255));
+	//	@imagecopyresampled($img, $img_src, (($image_width-$width)/2),(($image_height-$height)/2), 0, 0, $width,$height,$old_width,$old_height);
+	}
+	
+	//$lines = array();
+	$size = get_text_length($lines[0]['font_size'],0, $font_file, $name);
+	if($size['width'] > $image_width){
+		do{
+			$size = get_text_length($lines[0]['font_size']-4,0, $font_file,$name);
+			$lines[0]['font_size'] -= 1;
+	//		echo $lines[0]['font_size']."(".$size['width']."/".$image_width.")<br />";
+		}while($size['width'] > ($image_width-(strlen($name)*2)));
+	}
+//	echo strlen($name);
+	$lines[0]['text'] = $name;
+//	exit;
+	$tmp = "";
+	if($phone != ""){ $lines[1]['text'] = $text[$lang]['tel']." ".$phone;}
+	if($ref != ""){ $lines[2]['text'] =  $text[$lang]['ref']." ".$ref ;}
+	if(count($lines) > 0) {
+		$size = get_text_length($lines[0]['font_size'],0, $font_file,$lines[0]['text']);
+		foreach($lines as $text){
+			$size = get_text_length($text['font_size'],0, $font_file, $text['text']);
+			write_text_image($img, $text['font_size'], 0, ($image_width-$size['width'])/2, $text['position'], imagecolorallocate($img, 255, 255, 255),  $font_file, $text['text']);
+			$position += $size['height']+$font_space;
+		}
+	}
+	@unlink($tmp_img);
+	imagepng($img,$path_file);
+	imagedestroy($img);
+	//if($get_path){ return PATH_VIDEO_LOGO.$tour."_end.png";}
+	//$url = URL_VIDEO_TMP_LOGO;
+	//$url = str_replace('#TYPE#','FR',$url);
+	//$url = str_replace('#TOUR#',$tour,$url);
+	//$url = str_replace('#POS#','end',$url);
+	return $path_file;
+	//return URL_VIDEO_LOGO.$tour."_end.png";
+
+}	
+
+
+?>

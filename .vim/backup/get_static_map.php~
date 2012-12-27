@@ -1,0 +1,40 @@
+<?php
+
+$center = $_REQUEST['center'];
+$zoom = $_REQUEST['zoom'];
+$size = $_REQUEST['size'];
+$maptype = $_REQUEST['maptype'];
+$key = $_REQUEST['key'];
+$openStreetMap = ($_REQUEST['osm'] == 'true');
+
+// RS 2011-06-01 : passage par geoloc.previsite.net pour eviter blacklist
+list($lat, $lon) = explode(',', $center, 2);
+$url_prev_geoloc = 'http://geoloc.previsite.net'.($openStreetMap ? '/O' : '').'/%LAT%_%LON%/%ZOOM%/%TYPE%.png?size='.$size;
+//if(!in_array($maptype, array('satellite', 'roadmap', 'hybrid', 'terrain', 'redgrey'))) $maptype = 'roadmap';
+if($maptype == "") $maptype = 'roadmap';
+$url_prev_geoloc = str_replace(
+	array('%LAT%', '%LON%', '%ZOOM%', '%TYPE%'),
+	array((float)$lat, (float)$lon, (int)$zoom, urlencode($maptype)),
+	$url_prev_geoloc
+);
+echo $url_prev_geoloc;exit;
+$content_image = @file_get_contents($url_prev_geoloc);
+
+
+header('Content-type: image/gif');
+if(!empty($content_image) && ($im=imagecreatefromstring($content_image))!==false) {
+	imagegif($im, null);
+} else {
+	$maptype_style = urlencode($maptype);
+	if($maptype == 'redgrey') {
+		$maptype_style = "&style=".urlencode("feature:all|saturation:-80")."&style=".urlencode("feature:poi.park|hue:0xcd2128|saturation:40"); 
+	}
+	$replace = array(
+		'search' => ARRAY('#CENTER#','#ZOOM#','#SIZE#','#MAPTYPE#','#KEY#'),
+		'replace'=> array(urlencode($center), urlencode($zoom), urlencode($size), $maptype_style, urlencode($key))
+	);
+	$url = str_replace($replace['search'], $replace['replace'], "http://maps.google.com/staticmap?center=#CENTER#&zoom=#ZOOM#&size=#SIZE#&maptype=#MAPTYPE#&key=#KEY#");
+	echo file_get_contents($url);
+}
+
+

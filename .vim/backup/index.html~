@@ -1,0 +1,67 @@
+<html>
+	<head>
+		<style type="text/css">
+			body{ font-family: Impact, Franklin gothic medium, Verdana, Geneva, Arial;}
+			.header{ 
+				margin: 10px 0;width:100%;height:130px;
+				border-top:10px solid black;border-bottom:10px solid black;
+			}
+			.header .logo{ float:left;margin:0;width:20%;}
+			.header .cat{ float:left;text-align:right;width:80%;list-style:none;background-color:green;}
+			.header .car ul{ margin-left:auto;}
+			.header .cat li{ background-color:red;}
+
+/*			div.header ul.cat li a{ background-repeat: no-repeat;text-decoration:none;display:block;}
+			div.header ul.cat a.connection{ background-image:url('img/logo_connexion_off.bmp');}
+			div.header ul.cat a.connection:hover { background-image:url('img/logo_connexion_on.bmp');}
+
+			div.header ul.cat a.register{ background-image:url('img/logo_senregistrer_off.bmp');}
+			div.header ul.cat a.register:hover { background-image:url('img/logo_senregistrer_on.bmp');}
+
+			div.header ul.cat a.register{ background-image:url('img/logo_senregistrer_off.bmp');}
+			div.header ul.cat a.register:hover { background-image:url('img/logo_senregistrer_on.bmp');}
+
+			div.header ul.cat a.price { background-image:url('img/logo_prix_off.bmp');}
+			div.header ul.cat a.price:hover { background-image:url('img/logo_prix_on.bmp');}
+
+			div.header ul.cat a.contact { background-image:url('img/logo_contact_off.bmp');}
+			div.header ul.cat a.contact:hover { background-image:url('img/logo_contact_on.bmp');}
+
+			div.header ul.cat a.about { background-image:url('img/logo_apropos_off.bmp');}
+			div.header ul.cat a.about:hover { background-image:url('img/logo_apropos_on.bmp');}
+*/		</style>
+	</head>
+	<body>
+		<div class="header">
+			<div class="logo">
+				<img src="img/logo_site_1000fois.bmp" />
+			</div>
+			<div class="cat">
+				<ul >
+					<li><a class="connection" href="#">&nbsp;</a></li>
+					<li><a class="register" href="#">&nbsp;</a></li>
+					<li><a class="price" href="#" >&nbsp;</a></li>
+					<li><a class="contact" href="#">&nbsp;</a></li>
+					<li><a class="about" href="#">&nbsp;</a></li>
+				</ul>
+			</div>
+		</div>
+		<div class="content"></div>
+		<div class="footer">
+			<div class="link">
+				<a href="#">Accueil</a>
+				<hr />
+				<a href="#">Le Concept</a>
+				<hr />
+				<a href="#">Prix</a>
+				<hr />
+				<a href="#">S'enregistrer</a>
+				<hr />
+				<a href="#">Mentions Légales</a>
+			</div>
+			<div class="copyright">
+				Copyright ¢ 2012 <span>1000fois.fr</span>. All Rights Reserved.
+			</div>
+		</div>
+	</body>
+</html>

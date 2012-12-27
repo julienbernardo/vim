@@ -1,0 +1,77 @@
+<?php
+require_once('DB.php');
+require_once 'HTTP/Request.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('previsite/GetDsn.php');
+require_once('/var/www/gateway.previsite.net/include/global.php');
+require_once('/var/www/gateway.previsite.net/include/function.php');
+require_once('/var/www/gateway.previsite.net/include/config_import.php');
+require_once('/var/www/gateway.previsite.net/include/function.db.php');
+require_once('/var/www/gateway.previsite.net/include/function.cron.php');
+require_once '/var/www/gateway.previsite.net/include/function.rets.php';
+require_once '/var/www/gateway.previsite.net/include/class.rets.php';
+require_once('/var/www/gateway.previsite.net/include/function.images.php');
+require_once('/var/www/gateway.previsite.net/include/function.import.data.php');
+require_once('/var/www/gateway.previsite.net/include/function.import.software.php');
+require_once('/var/www/gateway.previsite.net/include/function.ws.php');
+require_once('/var/www/gateway.previsite.net/include/function.tts.php');
+
+$voice	= ($_REQUEST['voice'] ? $_REQUEST['voice'] : "bruno");
+$id		= $_REQUEST['id'];
+$ids 	= $_REQUEST['ids'];
+$text	= $_REQUEST['text'];
+$todo	= $_REQUEST['todo'];
+$limit	= $_REQUEST['limit'];
+$noRedirection = ($_REQUEST['noredir'] == 'true');
+$out 	= "false";
+
+switch($todo){
+	case "post":
+		if(tts_post($id, $voice, $text)){ $out = "true";}
+		break;
+	case "del":
+		if(is_guid($id)){
+			exec("rm ".PATH_TTS_TODO."*".$id."*.txt");
+			$out = "true";
+		}
+		break;
+	case "count":
+ 		$out = tts_count();
+ 		break;
+ 	case "priority":
+ 	  	$ids = explode(';', $ids);
+		//print_r($ids);
+ 	  	if(count($ids) > 0){
+	 	  	foreach($ids as $id){
+		 	  	$exist = glob(PATH_TTS_TODO."*".$id."*.txt");
+				if($exist > 0 && file_exists($exist[0]) && preg_match('/^00000000000000_/i', basename($exist[0])) === 0){
+					$tour = explode("_", basename($exist[0], ".txt"));
+					$file = PATH_TTS_TODO."00000000000000_".$tour[1]."_".$tour[2].".txt";
+					@copy( $exist[0], $file);
+					if(file_exists($file)){ @unlink($exist[0]);}
+					
+		 		 	$out = "true";
+				}else{
+					$out = "file not found or already in upper priority";
+				}
+	 	  	}
+	 	 }
+	 	 if(!$noRedirection){
+		 	 header('location: /tts?todo=detail');
+		 	 exit;
+		 }
+		 break;
+ 	case "detail":
+ 		$files = glob(PATH_TTS_TODO."*.txt");
+ 		sort($files);
+ 		$out = count($files)." files waiting <br/>";
+ 		foreach($files as $file){
+ 			$infos = explode('_',basename($file,".txt"));
+ 			$out .= preg_replace('/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/i', '$1-$2-$3 $4:$5:$6', $infos[0])." - ".$infos[1]." - ".$infos[2]."<br />";
+ 		}
+ 		break;
+}	
+echo $out;
+exit;
+?>
+?>

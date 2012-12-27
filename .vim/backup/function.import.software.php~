@@ -1,0 +1,1168 @@
+<?php
+function import_software($data, $config, $workPath){
+	$logs = array(
+		'UPDATE' => array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array(), 'PLANS'=>array(), 'TRANSACTIONS'=>array()),
+		'DELETE' => array('USERS'=>array(), 'TOURS'=>array(), 'IMAGES'=>array(), 'PLANS'=>array(), 'TRANSACTIONS'=>array())
+	);
+	
+	//import in db
+	if($config['STEPS']['IMPORT_USERS'] == 1){
+		$logs['UPDATE']['USERS'] = import_software_users($data['UPDATE']['USERS'], $config);
+		if($config['STEPS']['DELETE_USERS'] == 1){
+			$logs['DELETE']['USERS'] = delete_software_users($data['DELETE']['USERS'], $config['ID_PORTAIL'], $config['PASSWORD_WS'], $config['CODE_IMPORT'], $config['DIFFUSIONS'], $config['OPTIONS']['DEBUG'] == 1);
+		}
+	}
+	
+	if($config['STEPS']['IMPORT_TOURS'] == 1 || $config['STEPS']['IMPORT_IMAGES'] == 1){
+		if($config['OPTIONS']['NEED_VIDEO'] == 1 && $config['OPTIONS']['TYPE_VIDEO'] == ""){ import_log('[CONFIG][ERROR] NEED_VIDEO: no type video specified', $config['CODE_IMPORT']);}
+		$tmp = import_software_tours($data['UPDATE']['TOURS'], $config, $workPath);
+		$logs['UPDATE']['TOURS'] 	= $tmp['TOURS'];
+		$logs['UPDATE']['IMAGES'] 	= $tmp['IMAGES'];
+		$logs['UPDATE']['PLANS'] 	= $tmp['PLANS'];
+		$logs['NOTIFICATIONS'] 		= $tmp['NOTIFICATIONS'];
+		$logs['DIFFUSIONS'] 		= $tmp['DIFFUSIONS'];
+		$logs['UNPUBLICATION']		= $tmp['UNPUBLICATION'];
+
+		if($config['STEPS']['DELETE_TOURS'] == 1){
+			$logs['DELETE']['TOURS'] = delete_software_tours($data['DELETE']['TOURS'], $config['ID_PORTAIL'], $config['PASSWORD_WS'], $config['CODE_IMPORT'], $config['DIFFUSIONS'], ($config['OPTIONS']['DEBUG'] == 1));
+		}	
+		
+		if($config['STEPS']['DELETE_IMAGES'] == 1){
+			$logs['DELETE']['IMAGES'] = delete_software_images($data['DELETE']['IMAGES'], $config['ID_PORTAIL'], $config['PASSWORD_WS'], $config['CODE_IMPORT'], $config['OPTIONS']['DEBUG'] == 1);
+		}
+	}
+	
+	if($config['STEPS']['IMPORT_TRANSACTIONS'] == 1){
+		$logs['UPDATE']['TRANSACTIONS'] = import_software_transactions($data['UPDATE']['TRANSACTIONS'], $config['CODE_IMPORT'], $config['OPTIONS']['DEBUG'] == 1);
+		if($config['STEPS']['DELETE_TRANSACTIONS'] == 1){
+			$logs['DELETE']['TRANSACTIONS'] = delete_software_transactions($data['DELETE']['TRANSACTIONS'], $config['CODE_IMPORT'], $config['OPTIONS']['DEBUG'] == 1);
+		}
+	}
+	return $logs;
+}
+
+function import_software_users($users, $config){
+	$return = array('FAILED' => array(), 'DONE' => array(), 'LOGO' => array(), 'DIFFUSIONS_LIMIT' => array());
+	$logs = array('update' => 0, 'insert' => 0);
+	
+	$partner_id = $config['ID_PORTAIL'];
+	$ws_password = $config['PASSWORD_WS'];
+	$script_name = $config['CODE_IMPORT'];
+	$diffusions = $config['DIFFUSIONS'];
+	$no_update_user_diffusion = ($config['OPTIONS']['NO_UPDATE_USER_DIFFUSION'] == 1);
+	$debug = ($config['OPTIONS']['DEBUG'] == 1);
+	$type_video = $config['OPTIONS']['TYPE_VIDEO'];
+	$update_allowed = ($config['STEPS']['UPDATE_USERS'] == 1);
+	
+	if(is_array($users) && count($users) > 0){
+		foreach($users as $user){
+			$update_allowed_user = $update_allowed;
+			if(count($config['USERS'][$user['USERCODE']]) > 0){
+				$update_allowed_user = ($config['USERS'][$user['USERCODE']]['ID_STATUT_USER'] > 0);
+			}
+			$only_reactivation = false;
+			if(!$update_allowed_user){
+				$params = array('partnerID' => $config['ID_PORTAIL'], 'password' => $config['PASSWORD_WS']);
+				$url_base = str_replace( '#USERCODE#', $user['USERCODE'], WS_GET_USER);
+				$response = make_ws_request($script_name, $url_base, $params, "GET");
+				if($debug){ import_log('[DEBUG] User getID:'.$user['USERCODE'].'  ('.make_ws_request($script_name, $url_base, $params, "GET", true).':'.$response.')',$script_name);}
+				$xml = @simplexml_load_string($response);
+				if(count($xml) > 0){
+					if(is_guid($xml->userID."")){
+						if($xml->userStatus."" == -1){
+							if($debug){ import_log('[DEBUG] user: '.$user['USERCODE'].' re-activation',$script_name);}
+							$only_reactivation = true;
+						}
+						if($debug){ import_log('[DEBUG] Update user: '.$user['USERCODE'].' unauthorized',$script_name);}
+						$return['DONE'][] = $user;
+						if(!$only_reactivation){
+							continue;
+						}
+					}
+				}
+			}
+
+			$url = str_replace('#USERCODE#', urlAPIencode($user['USERCODE']), WS_UPDATE_USER);
+			$params_conversion = array(
+				'Nom_script' => 'import_name',
+				'Nom_utilisateur' => 'usr_lastname',
+				'Prenom_utilisateur' => 'usr_firstname',
+				'Telephone_utilisateur' => 'usr_phone',
+				'Bio_utilisateur' => 'usr_bio',
+				'Qualite_utilisateur' => 'usr_title',
+				'Numero_liscence' => 'usr_liscence',
+				'Mobile_utilisateur' => 'usr_mobile',
+				'Email_utilisateur' => 'usr_email',
+				'Nom_societe' => 'cny_name',
+				'Siteweb_societe' => 'cny_www',
+				'Adresse' => 'cny_address',
+				'Ville' => 'cny_city',
+				'Code_postal' => 'cny_zip',
+				'Etat' => 'cny_state',
+				'Id_pays' => 'cny_country',
+				'Fax' => 'cny_fax',
+				'Telephone' => 'cny_phone',
+				'Latitude' => 'cny_lat',
+				'Longitude' => 'cny_lon',
+				'Login' => 'usr_login',
+				'Password' => 'usr_password',
+				'Email_societe' => 'cny_email',
+				'Profil_video' => 'opt_profil'
+			);
+			if($user['PROFIL_VIDEO'] == "" && $type_video != ""){ $user['PROFIL_VIDEO'] = $type_video;}
+			$params = array('partnerID' => $partner_id, 'password' => $ws_password);
+			if($only_reactivation){
+				$params[$params_conversion['Nom_script']] = $user['NOM_SCRIPT'];
+				$params['usr_reactivation'] = 'true';
+			}else{
+				foreach($user as $key=>$v){
+					if(!is_array($v)){
+						$k = ucfirst(strtolower($key));
+						if($params_conversion[$k] != ''){ $params[$params_conversion[$k]] = $v;}
+					}
+				}
+				if(is_array($user['COMPLEMENTS']) && count($user['COMPLEMENTS']) > 0){
+					foreach($user['COMPLEMENTS'] as $v){ $params[$v['FIELD']] = $v['VALUE'];}
+				}
+				if($user['OPTIONS']['DISABLED'] == true){
+					$params['usr_disabled'] = 1;
+				}
+			}
+			if($debug) import_log('[DEBUG][updateUser] User '.$user['USERCODE'].' ('.make_ws_request($script_name, $url, $params,"GET", true, true, !$only_reactivation).':'.$response.')', $script_name);
+			$response = make_ws_request($script_name,  $url, $params, "POST", false, true, !$only_reactivation);
+			$xml = @simplexml_load_string($response);
+			if(count($xml) > 0 && is_guid($xml->userID)){
+				$return['DONE'][] = $user;
+				if($xml->created.'' == $xml->updated.''){ $logs['insert']++;}
+				else{ $logs['update']++;}
+				if($only_reactivation){
+					continue;
+				}
+
+				$user['ID_UTILISATEUR'] = $xml->userID."";
+				$url = str_replace('#ID_USER#', urlAPIencode($xml->userID.""), WS_DIFFUSE_USER);
+				if(count($diffusions) > 0){
+					foreach($diffusions as $k=>$diffusion){
+						$diffusion_infos = replace_diffusions_usercode($user, $diffusion);
+						if($user['ONLY_DIFFUSION'] == true && $diffusion_infos['diffusion_forced'] == false){ 
+							if($debug){ import_log('[DEBUG][DIFFUSION] User '.$user['USERCODE'].' not need diffusion on '.$k.' / '.$diffusion['NOM_PORTAIL'], $script_name);}
+							continue;
+						}else if($user['ONLY_DIFFUSION'] == true && $debug){ import_log('[DEBUG][DIFFUSION] User '.$user['USERCODE'].' diffusion forced on '.$k.' / '.$diffusion['NOM_PORTAIL'], $script_name);}
+						if($diffusion_infos['usercode'] != ""){
+							$params = array(
+								'partner' => $diffusion['ID_PORTAIL'],
+								'password' => $diffusion_infos['password'],
+								'usercode' => $diffusion_infos['usercode'],
+								'prefixe_diffusion' => $diffusion_infos['prefixe_diffusion'],
+								'dsn_imap' => $diffusion_infos['dsn_imap'],
+								'pub_limit' => $diffusion_infos['pub_limit'],
+								'pub_limit_order' => $diffusion_infos['pub_limit_order'],
+								'autopublish' => 1,
+							);
+							if($no_update_user_diffusion) $params['no_update'] = 1;
+							$response = make_ws_request($script_name, $url, $params);
+							if($response != "true"){ import_log('[ERROR] User '.$user['USERCODE'].' diffusion on '.$k.' / '.$diffusion['NOM_PORTAIL'].' failed ('.make_ws_request($script_name, $url, $params, "GET", true).':'.$response.')', $script_name);}
+							else if($debug){ import_log('[DEBUG][DIFFUSION] User '.$user['USERCODE'].' diffusion on '.$k.' / '.$diffusion['NOM_PORTAIL'].' success ('.make_ws_request($script_name, $url, $params, "GET", true).':'.$response.')', $script_name);}
+						}else if($debug){ import_log('[DEBUG][ERROR] User:'.$user['USERCODE'].' diffusion, empty prefixe_portail for portail '.$k.' / '.$diffusion['NOM_PORTAIL'].' failed' ,$script_name);}
+					}
+				}
+				//Logo
+				$user_logo_suffixes = array('','_USER','_VIDEO');
+				foreach($user_logo_suffixes as $user_logo_suffixe){
+					if($user['LOGO_ACTION'.$user_logo_suffixe] != ""){
+						$type = "";
+						switch($user_logo_suffixe){
+							case "_USER": $type = "user";break;
+							case "_VIDEO": $type = "videologo";break;
+							default: $type = "agency";break;
+						}
+						$params = array(
+							"user" => $xml->userID."",
+	//						"partner" => $partner_id,
+							"type" => $type,
+							"a" => $user['LOGO_ACTION'.$user_logo_suffixe],
+							"url" => ""
+						);
+						$file = "";
+						if(preg_match('/^https?:\/\//i', $user['URL_LOGO'.$user_logo_suffixe]) > 0){
+							if($debug){ import_log("[DEBUG] LOGO HTTP:".$user['URL_LOGO'.$user_logo_suffixe], $script_name);}
+							$header = get_headers($user['URL_LOGO'.$user_logo_suffixe]);
+							$update_logo = (strpos($header[0],'404') === false);
+							$params['url'] = $user['URL_LOGO'.$user_logo_suffixe];								
+						}else if(preg_match('/^ftp:\/\//i', $user['URL_LOGO'.$user_logo_suffixe])){
+							if($debug){ import_log("[DEBUG] LOGO FTP:".$user['URL_LOGO'.$user_logo_suffixe], $script_name);}
+							if(preg_match('/^ftp:\/\/([^:]+):([^@]+)@([^:]+):([\d]+)(.+)$/i', $user['URL_LOGO'.$user_logo_suffixe], $result) > 0){
+								$content = get_content($user['URL_LOGO'.$user_logo_suffixe]);
+								if($content != ""){ 
+									$file = PATH_TMP.basename(rand().".jpg");
+									file_put_contents( $file, $content);
+								}
+							}else{
+								import_log("[ERROR] DOWNLOAD: wrong ftp format (url:".$user['URL_LOGO'.$user_logo_suffixe].")", $script_name);
+							}
+						}else{
+							$file = $user['URL_LOGO'.$user_logo_suffixe];
+							if($debug){ import_log("[DEBUG] LOGO FILE:".$file, $script_name);}
+						}
+						if($params["a"] == "delete" || ($params['a'] == "add" && ($params['url'] != "" || file_exists($file)))){
+							$http = new HTTP_Request(URL_UPLOAD_LOGO);
+							$http->setMethod("POST");
+							if($file != "" && file_exists($file)){
+								$http->addFile("file", $file);
+							}
+							foreach($params as $k=>$v){
+								$http->addPostData($k,$v);
+							}
+							$http->sendRequest();
+							if($http->getResponseBody() != "true"){
+								import_log("[ERROR] user:".$user['USERCODE']." ".strtoupper($params['a'])." LOGO ".$user['URL_LOGO'.$user_logo_suffixe]." FAILED (".make_ws_request($script_name, URL_UPLOAD_LOGO, $params, "GET", true).":".$http->getResponseBody().")", $script_name);
+								$return['FAILED'][] = $user;
+							}else{
+								 if($debug) import_log("[DEBUG] UPLOAD LOGO ".strtoupper($params['a'])." DONE (".make_ws_request($script_name, URL_UPLOAD_LOGO, $params, "GET", true).":".$http->getResponseBody().")", $script_name);
+							}
+						}
+					}
+				}
+			}else{ 
+				import_log('[ERROR] User update: '.$user['USERCODE'].' failed ('.make_ws_request($script_name, $url, $params, "GET", true, true, !$only_reactivation).':'.$response.')' ,$script_name);
+				$return['FAILED'][] = $user;
+			}
+		}
+		import_log('Users resume: '.$logs['insert'].' inserted / '.$logs['update'].' updated', $script_name);
+	}
+	return $return;
+}
+
+function import_software_tours(	$tours, $config, $workPath = PATH_TMP){
+	global $list_voices;
+	$return = array(
+		"TOURS" => array('DONE' => array(), 'FAILED' => array()), 
+		"IMAGES"=> array('DONE' => array(), 'FAILED' => array()), 
+		"PLANS" => array('DONE' => array(), 'FAILED' => array()), 
+		//'NOTIFICATIONS'=> array(), 
+		"DIFFUSIONS" => array(),
+		"UNPUBLICATION" => array(),
+	);
+	
+	$tab_bench = array(
+		'ws_update' => array(),
+		'ws_pub' => array(),
+		'ws_unpub' => array()
+	);
+	
+	$generate_tts = false;
+	$force_update_tts = false;
+//	$generate_video = false;
+	$need_video = false;
+	$type_video = "";
+	$only_still_image = false;
+	$nb_image_min_video = "";
+	$no_update_tour_locked = false;
+	$block_preupload = false;
+	$rediffuse_video = array();
+	$debug = false;
+	
+	$partner_id = $config['ID_PORTAIL'];
+	$password = $config['PASSWORD_WS'];
+	$script_name = $config['CODE_IMPORT'];
+	$diffusions = $config['DIFFUSIONS'];
+	if(isset($config['STEPS']['GENERATION_TTS'])){ $generate_tts = ($config['STEPS']['GENERATION_TTS'] == 1);}
+	if(isset($config['STEPS']['FORCE_UPDATE_TTS'])){ $force_update_tts = ($config['STEPS']['FORCE_UPDATE_TTS'] == 1);}
+	//if(isset($config['STEPS']['GENERATION_VIDEO'])){ $generate_video = ($config['STEPS']['GENERATION_VIDEO'] == 1);}
+	if(isset($config['OPTIONS']['NEED_VIDEO'])){ $need_video = ($config['OPTIONS']['NEED_VIDEO'] == 1);}
+	if(isset($config['OPTIONS']['TYPE_VIDEO'])){ $type_video = $config['OPTIONS']['TYPE_VIDEO'];}
+	if(isset($config['OPTIONS']['ONLY_STILL_IMAGE'])){ $only_still_image = ($config['OPTIONS']['ONLY_STILL_IMAGE'] == 1);}
+	if(isset($config['OPTIONS']['NO_UPDATE_TOUR_LOCKED'])){ $no_update_tour_locked = ($config['OPTIONS']['NO_UPDATE_TOUR_LOCKED'] == 1);}
+	if(isset($config['OPTIONS']['BLOCK_PREUPLOAD'])){ $block_preupload = ($config['OPTIONS']['BLOCK_PREUPLOAD'] == 1);}
+	if(isset($config['OPTIONS']['DEBUG'])){ $debug = ($config['OPTIONS']['DEBUG'] == 1);}
+	
+	$logs = array('update' => 0, 'insert' => 0, 'images' => 0, 'plans'=> 0, 'not_enough_image' => array() , 'images_preup' =>0, 'no_diffusion_images_locked' => array());
+	$users_options = array();
+	$aff_percent = false;
+	$nb_tour_done = 0;
+	$last_checkpoint = 0;
+	$url_upload = "upload.previsite.com";
+	$url_upload_images = str_replace('#URL#', $url_upload, URL_UPLOAD_IMAGE).($only_still_image ? "&type=still" : "");
+	$url_upload_plans = str_replace('#URL#', $url_upload, URL_UPLOAD_PLAN);
+	if($only_still_image && $debug){ import_log('[DEBUG] only still image url:'.$url_upload, $script_name);}
+	if($nb_image_min_video == "" || $nb_image_min_video < 1){ $nb_image_min_video = 1;}
+	if(is_array($tours) && count($tours) > 0){
+		$aff_percent = (count($tours) > 0);
+		foreach($tours as $tour){
+			if($aff_percent && ($last_checkpoint+count($tours)/5) < $nb_tour_done++){
+				import_log(round(($nb_tour_done/count($tours))*100).'% done', $script_name);
+				$last_checkpoint = $nb_tour_done;
+			}
+			$can_generate_sound = false;
+			$images_changed = false;
+			$description_changed = false;
+			$lock_tts = false;
+			$diffusion_already_done = array();
+			if($debug){ import_log('[DEBUG][GET TOUR INFOS] '.$tour['REF_PORTAIL'] ,$script_name);}
+			$tour_infos = get_tour_infos($script_name, $tour['REF_PORTAIL'], $partner_id, $password);
+			if(is_guid($tour_infos['id'])){
+				if($debug){ import_log('[DEBUG] Tour:'.$tour['REF_PORTAIL'].'  getTourInfos:'.get_tour_infos($script_name, $tour['REF_PORTAIL'], $partner_id, $password, true),$script_name);}
+				if($tour_infos['lock_tts'] == 1){
+					$lock_tts = true;
+					if($debug) import_log('[DEBUG] Tour:'.$tour['REF_PORTAIL'].' TTS locked (tour)', $script_name);
+				}
+				if($tour_infos['lock'] == 2 || ($tour_infos['lock'] > 0 && $no_update_tour_locked)){
+					import_log('Tour:'.$tour['REF_PORTAIL'].' locked',$script_name);
+					$return['TOURS']['FAILED'][] = $tour;
+					if(is_array($tour['IMAGES']) && count($tour['IMAGES']) > 0){ $return['IMAGES']['FAILED'] = merge($return['IMAGES']['FAILED'], $tour['IMAGES']);}
+					if(is_array($tour['PLANS']) && count($tour['PLANS']) > 0){ $return['PLANS']['FAILED'] = merge($return['PLANS']['FAILED'], $tour['PLANS']);}
+					continue;
+				}
+				$url_get_tour_diffusions = str_replace('#TOUR#', urlAPIencode($tour_infos['id']), WS_GET_TOUR_DIFFUSIONS);
+				$response = make_ws_request($script_name,  $url_get_tour_diffusions, "", "GET");
+				if($debug){ import_log('[DEBUG] Tour:'.$tour['REF_PORTAIL'].'  getTourDiffusions:('.$url_get_tour_diffusions.':'.$response.')', $script_name);}
+				$xml = @simplexml_load_string($response);
+				if($xml && count($xml) > 0){
+					foreach($xml->pub as $v){
+						$tmp = $v->attributes();
+						$diffusion_already_done[$tmp->partner.''] = $tmp->ref.'';
+					}
+				}
+			}
+
+			if(!is_array($users_options[$tour['USERCODE']])){
+				$users_options[$tour['USERCODE']] = array();
+				$params = array('partnerID' => $partner_id, 'password' => $password);
+				$url_base = str_replace( '#USERCODE#', $tour['USERCODE'], WS_GET_USER_OPTIONS);
+				$response = make_ws_request($script_name, $url_base, $params, "POST");
+				if($debug){ import_log('[DEBUG] User options:'.$tour['USERCODE'].'  ('.make_ws_request($script_name, $url_base, $params, "GET", true).':'.$response.')',$script_name);}
+				$xml = @simplexml_load_string($response);
+				if(count($xml) > 0){
+					$users_options[$tour['USERCODE']]['PROFIL_VIDEO'] = ($xml->profilvideo."" != "" ? $xml->profilvideo : $type_video);
+					$users_options[$tour['USERCODE']]['ID_MUSIQUE_VIDEO'] = $xml->defaultbgmusic."";
+					$users_options[$tour['USERCODE']]['REF_VOICE'] = $xml->defaultvoice."";
+					$users_options[$tour['USERCODE']]['BLOCK_TTS'] = $xml->blockttsauto.""; 
+				}
+			}
+
+			if($users_options[$tour['USERCODE']]['BLOCK_TTS'] == "1"){
+				$lock_tts = true;
+				if($debug) import_log('[DEBUG] Tour:'.$tour['REF_PORTAIL'].' TTS locked (user)', $script_name);
+			}
+
+			if($tour['ID_MUSIQUE_VIDEO'] == "" && $users_options[$tour['USERCODE']]['ID_MUSIQUE_VIDEO'] != ""){ $tour['ID_MUSIQUE_VIDEO'] = $users_options[$tour['USERCODE']]['ID_MUSIQUE_VIDEO'];}
+			if($tour['REF_VOICE'] == "" && $users_options[$tour['USERCODE']]['REF_VOICE'] != ""){ $tour['REF_VOICE'] = $users_options[$tour['USERCODE']]['REF_VOICE'];}
+			
+			if($generate_tts && !($tour['OPTIONS']['NO_TTS'] === true)){
+				$can_generate_sound = true;
+				if($tour['REF_VOICE'] == ""){  $tour['REF_VOICE'] = $list_voices[$tour['ID_LANGUE']];}
+			}else{
+				$tour['REF_VOICE'] = "";
+			}
+
+			if($tour['ONLY_IMAGES'] !== true && $tour['ONLY_PLANS'] !== true && $tour['ONLY_DIFFUSION'] !== true){
+				$url = str_replace('#REF_PORTAIL#', urlAPIencode($tour['REF_PORTAIL']), WS_UPDATE_TOUR);
+				$params_conversion = array(
+					'Usercode' => 'user',
+					'Id_pays' => 'country',
+					'Id_type_transaction' => 'transaction',
+					'Adresse' => 'address',
+					'Annee_construction' => 'year_built',
+					'Code_postal' => 'zip',
+					'Description' => 'description',
+					'Id_ascenseur' => 'elevator',
+					'Id_bien_amenage' => 'furnished',
+					'Id_cave' => 'cellar',
+					'Id_climatisation' => 'aircond',
+					'Id_digicode' => 'digicode',
+					'Id_exclusivite' => 'exclusive',
+					'Id_immeuble_recent' => 'recent_built',
+					'Id_neuf' => 'new_built',
+					'Id_internet_haut_debit' => 'internet_high',
+					'Id_interphone' => 'interphone',
+					'Id_piscine' => 'pool',
+					'Nom_visite' => 'title',
+					'Nombre_piece' => 'rooms',
+					'Nombre_chambre' => 'bedrooms',
+					'Nombre_salle_bain' => 'bathrooms',
+					'Nombre_demi_salle_bain' => 'half_bathrooms',
+					'Prix_bien' => 'price',
+					'Ref_devise' => 'currency',					
+					'Surface_habitable' => 'live_area',
+					'Surface_terrain' => 'field_area',
+					'Ville' => 'city',
+					'Voisinnage' => 'neighborhood',
+					'Url_annonce' => 'listing_url',
+					'Taxes' => 'rent_charges',
+					'Id_type_bien' => 'property_type',
+					'Charges' => 'rent_charges',
+					'Date_disponibilite' => 'availability_date',
+					'Equipements' => 'features',
+					'Frais_agence' => 'fee_agency',
+					'Id_amenagement_handicap' => 'disabled_people',
+					'Id_gardien' => 'doorman',
+					'Id_periodicite_loyer' => 'rent_period',
+					'Id_refait_neuf' => 'refurbished',
+					'Id_statut_listing' => 'listing_status',
+					'Id_travaux' => 'need_work',
+					'Id_type_chauffage' => 'heating_type',
+					'Id_type_cuisine' => 'kitchen_type',
+					'Id_unite_surface_habitable' => 'area_house_unit',
+					'Id_unite_surface_terrain' => 'area_field_unit',
+					'Montant_travaux' => 'amount_work',
+					'Nombre_terrasse' => 'terrace',
+					'Nombre_garage' => 'garages',
+					'Nombre_etages' => 'total_floor',
+					'Nombre_salle_eau' => 'half_bathrooms',
+					'Numero_etage' => 'num_floor',
+					'Numero_mls' => 'mls_id',
+					'Orientation' => 'orientation',
+					'Periodicite_location' => '',
+					'Ref_etat' => 'ref_state',
+					'Ref_visite' => 'ref_listing',
+					'Latitude' => 'latitude',
+					'Longitude' => 'longitude',
+					'Surface_sejour' => 'livingroom_area',
+					'Id_adresse_cachee' => 'hide_address',
+					'Id_langue' => 'language',
+					'Classe_batiment' => 'build_class',
+					'Date_derniere_verification' => 'lastcheck_date',
+					'Duree_bail_min' => 'lease_duration_min',
+					'Duree_bail_max' => 'lease_duration_max',
+					'Id_rail' => 'rail',
+					'Id_sous_location' => 'sublease',
+					'Id_unite_prix_surface' => 'price_surface_unit',
+					'Id_prix_negociable' => 'negotiable',
+					'Prix_min' => 'price_min',
+					'Prix_max' => 'price_max',
+					'Ref_portail_master' => 'ref_master',
+					'Surface_disponible' => 'available_area',
+					'Surface_totale_batiment' => 'total_build_area',
+					'Id_prestige' => 'luxury',
+					'Taxe_fonciere' => 'tax_property',
+					'Taxe_habitation' => 'tax_housing',
+					'Id_musique_video' => 'music',
+					'Ref_voice' => 'voice',
+					'Usercode_contact' => 'contact_users',
+					'Id_animaux' => 'animals',
+					'Caution' => 'property_bond',
+					'Description_video' => 'description_video',
+					'Dpe_lettre' => 'dpe_letter',
+					'Dpe_valeur' => 'dpe_value',
+					'Ges_lettre' => 'ges_letter',
+					'Ges_valeur' => 'ges_value',
+					'Cacher_localisation' => 'hide_geoloc'
+				);
+				$params = array('partnerID' => $partner_id, 'password' => $password, 'lock' => $tour_infos['lock'], 'import_name'=>$script_name);
+				foreach($tour as $key=>$v){
+					$k = ucfirst(strtolower($key));
+					if($k == 'Description_video' && $lock_tts){
+						if($debug) import_log('[DEBUG] Description video not accept', $script_name);
+						continue;
+					}
+					if($params_conversion[$k] != ''){ $params[$params_conversion[$k]] = $v;}
+				}
+				if(is_array($tour['COMPLEMENTS']) && count($tour['COMPLEMENTS']) > 0){
+					foreach($tour['COMPLEMENTS'] as $v){ $params[$v['FIELD']] = $v['VALUE'];}
+				}
+				//Modif: JB 2012-06-20 se fait automatiquement
+				//if($diffusion_already_done[$diffusions[ID_FACEBOOK]['ID']] != ""){ $params['facebook_update'] = 'true';}
+				
+				if($debug){ import_log('[DEBUG][BEFORE] Tour update url: ('.make_ws_request($script_name, $url, $params,"GET", true).')' ,$script_name);}
+
+				// RS 2012-07-10 : Ajout de log d eperf
+				$query_time = microtime(true);
+				$response = make_ws_request($script_name, $url, $params, "POST", false, true);
+				$query_time = ceil(1000*(microtime(true)-$query_time));
+				$tab_bench['ws_update'][] = ceil($query_time);
+
+				if($debug){
+					if(count($tab_bench['ws_update'])==BENCH_CALC_AVG) {
+						$avg_time = ceil((array_sum($tab_bench['ws_update'])/(float)BENCH_CALC_AVG));
+						if($avg_time>100) import_log('[BENCH] Average time to update '.BENCH_CALC_AVG.' last listings: '.$avg_time.'ms' ,$script_name);
+						$tab_bench['ws_update'] = array();
+					}
+				}
+				$xml = @simplexml_load_string($response);
+				if(count($xml) > 0 && $xml->success.'' == "true"){
+					if(!is_guid($tour_infos['id'])){ 
+						$tour['NEW']  = true;
+						$logs['insert']++;
+						$tour_infos = get_tour_infos($script_name, $tour['REF_PORTAIL'], $partner_id, $password);
+						$description_changed = true;
+						/** OLD CODE / géré par get_new_tour_with_images **/
+						//if(count($tour['IMAGES']) > 0){
+							//if(!is_array($return['NOTIFICATIONS'][$tour['USERCODE']])){ $return['NOTIFICATIONS'][$tour['USERCODE']] = array();}
+							//$return['NOTIFICATIONS'][$tour['USERCODE']][$tour['REF_PORTAIL']] = true;
+							//if($debug){ import_log('[DEBUG][ADD NOTIFICATION EMAIL] Tour: '.$tour['REF_PORTAIL'].' user: '.$tour['USERCODE'] ,$script_name);}
+						//}
+						/** OLD CODE / géré par get_new_tour_with_images **/
+					}else{ 
+						$description_changed = ($tour['DESCRIPTION'] != $tour_infos['desc']);
+						$logs['update']++;
+					}
+					$return['TOURS']['DONE'][] = $tour;
+					if($debug){ import_log('[DEBUG][SUCCESS] Tour update url: ('.make_ws_request($script_name, $url, $params, "GET", true).':'.$response.')' ,$script_name);}
+				}else{ 
+					import_log('[ERROR] Tour '.(!is_guid($tour_infos['id']) ? 'insert' : 'update').': '.$tour['REF_PORTAIL'].' failed ('.make_ws_request($script_name, $url, $params, "GET", true).':'.$response.')' ,$script_name);
+					$return['TOURS']['FAILED'][] = $tour;
+					if(!is_guid($tour_infos['id']) || preg_match( '/^No matching users and not allowed to change owner/i', $xml->errorMess.'') > 0){ 
+						if(is_array($tour['IMAGES']) && count($tour['IMAGES']) > 0){ $return['IMAGES']['FAILED'] = merge($return['IMAGES']['FAILED'], $tour['IMAGES']);}
+						if(is_array($tour['PLANS']) && count($tour['PLANS']) > 0){ $return['PLANS']['FAILED'] = merge($return['PLANS']['FAILED'], $tour['PLANS']);}
+						continue;
+					}
+				}
+				if($tour['DESCRIPTION_VIDEO'] == ""){ $tour['DESCRIPTION_VIDEO'] = $tour['DESCRIPTION'];}
+//				if((($tour['DESCRIPTION_VIDEO'] != "" && $generate_tts && $description_changed) || $force_update_tts) && $tour['REF_VOICE'] != "" && !($tour['OPTIONS']['NO_TTS'] === true)){
+				if((($tour['DESCRIPTION_VIDEO'] != "" && $description_changed) || $force_update_tts) && $tour['REF_VOICE'] != "" && $can_generate_sound && !$lock_tts){
+					$description = preg_replace("/<br *\/>/i", '', $tour['DESCRIPTION_VIDEO']);
+					$description = str_replace('\'\'', '\'', $description);
+					$replace = array(
+						'search' => array('#LANG#', '#TEXT#', '#VOICE#'),
+						'replace'=> array(urlencode($tour['ID_LANGUE']), urlencode($description), urlencode($tour['REF_VOICE']))
+					);
+					$url_post_tts = str_replace($replace['search'], $replace['replace'], URL_CLEANDESC);
+					$tour['DESCRIPTION_VIDEO'] = file_get_contents($url_post_tts);
+
+					if(!tts_post($tour_infos['id'], $tour['REF_VOICE'], $tour['DESCRIPTION_VIDEO'])){
+						import_log("[ERROR][TTS] ".$tour['REF_PORTAIL']." (".$url_post_tts.")", $script_name);
+					}else if($debug){
+						import_log("[DEBUG][TTS] ".$tour['REF_PORTAIL']."- DONE (".$url_post_tts.")", $script_name);
+					}
+				}else if($debug){
+					import_log('[TTS][DEBUG] '.$tour['REF_PORTAIL'].' - description:'.($tour['DESCRIPTION_VIDEO'] != "" ? "true" : "false").' generate:'.($generate_tts ? "true" : "false").' | changed:'.($description_changed ? "true" : "false").' | voice:'.($tour['REF_VOICE'] != "" ? "true" : "false").' | NO_TTS_ACTIVE:'.(!($tour['OPTIONS']['NO_TTS'] === true) ? 'false' : 'true')." | can generate sound:".($can_generate_sound ? "yes" : "no").' | TTS BLOCKED: '.($lock_tts ? "true" : "false"), $script_name);
+				}
+			}
+			
+			if(is_guid($tour_infos['id'])){
+				if($tour_infos['lock'] == 0){
+					$images_changed = (count($tour['IMAGES']) > 0);
+					$tmp = import_software_images($tour['IMAGES'], $tour_infos['id'], $tour_infos['user'], $url_upload_images, $script_name, "image", $block_preupload, $debug, $workPath);
+					$nb_images_inserted = $tmp['count'];
+					$logs['images_preup'] += $tmp['count_preup'];
+					//modif: 2012-07-02: JB // problème avec le merge (error fatal maximum time execution 5000sec)
+//					$return['IMAGES']['FAILED'] = merge($return['IMAGES']['FAILED'], $tmp['FAILED']);
+//					$return['IMAGES']['DONE'] = merge($return['IMAGES']['DONE'], $tmp['DONE']);
+					$listActions = array('FAILED', 'DONE');
+					foreach($listActions as $action){
+						for($i=0; $i < count($tmp[$action]);$i++){
+							$return['IMAGES'][$action][] = $tmp[$action][$i];
+						}
+					}
+					$tour_infos['nb_images'] += $nb_images_inserted;
+					$logs['images'] += $nb_images_inserted;
+					
+					$tmp = import_software_images($tour['PLANS'], $tour_infos['id'], $tour_infos['user'], $url_upload_plans, $script_name, "plan", $block_preupload,$debug, $workPath);
+					$logs['plans'] += $tmp['count'];
+//					$return['PLANS']['FAILED'] = merge($return['PLANS']['FAILED'], $tmp['FAILED']);
+//					$return['PLANS']['DONE'] = merge($return['PLANS']['DONE'], $tmp['DONE']);
+					$listActions = array('FAILED', 'DONE');
+					foreach($listActions as $action){
+						for($i=0; $i < count($tmp[$action]);$i++){
+							$return['PLANS'][$action][] = $tmp[$action][$i];
+						}
+					}
+				}else{ 
+					import_log('Tour: '.$tour['REF_PORTAIL'].' images locked', $script_name);
+					if(is_array($tour['IMAGES']) && count($tour['IMAGES']) > 0){ $return['IMAGES']['FAILED'] = merge($return['IMAGES']['FAILED'], $tour['IMAGES']);}
+					if(is_array($tour['PLANS']) && count($tour['PLANS']) > 0){ $return['PLANS']['FAILED'] = merge($return['PLANS']['FAILED'], $tour['PLANS']);}
+				}
+				
+				if($tour['OPTIONS']['NO_DIFFUSION'] == true){ 
+					if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.' need image & Tour: '.$tour['REF_PORTAIL'].' NO DIFFUSION', $script_name);}
+					continue;				
+				}
+				
+				$diffusion_video_done = false;
+				if(is_array($diffusions) && count($diffusions) > 0){
+					if($debug){ import_log('[DEBUG][DIFFUSION] Start '.count($diffusions).' portails found (Tour: '.$tour['REF_PORTAIL'].')', $script_name);}
+					foreach($diffusions as $k=>$row){
+						$isUserConf = false;
+						if(count($row['USERS'][$tour['USERCODE']]) > 0){
+							if($debug){ import_log('[DEBUG][DIFFUSION] USER CONF FOUND (Tour: '.$tour['REF_PORTAIL'].'/'.$tour['USERCODE'].')', $script_name);}
+							$row = $row['USERS'][$tour['USERCODE']];
+							$isUserConf = true;
+						}
+						if(!isset($row['PREFIXE_PORTAIL'])){
+							if($debug){ import_log('[DEBUG][DIFFUSION] Tour '.$tour['REF_PORTAIL'].'/'.$tour['USERCODE'].' not concerned by '.$k.' / '.$row['NOM_PORTAIL'], $script_name);}							
+							continue;
+						}
+						if($tour['ONLY_DIFFUSION'] == true && $row['ID_STATUT_IMPORT_DIFFUSION'] < 2){ 
+							if($debug){ import_log('[DEBUG][DIFFUSION] Tour '.$tour['REF_PORTAIL'].'/'.$tour['USERCODE'].' not need diffusion on '.$k.' / '.$row['NOM_PORTAIL'], $script_name);}
+							continue;
+						}else if($user['ONLY_DIFFUSION'] == true && $debug){ import_log('[DEBUG][DIFFUSION] tour '.$tour['REF_PORTAIL'].'/'.$user['USERCODE'].' diffusion forced on '.$k.' / '.$diffusion['NOM_PORTAIL'], $script_name);}
+						
+						if($config['OPTIONS']['OPTIONAL_TOUR_DIFFUSION'] == 1){
+							if(is_array($tour['DIFFUSIONS']) && count($tour['DIFFUSIONS']) > 0){
+								$tour['DIFFUSIONS_ALLOWED'][$k] = ($tour['DIFFUSIONS'][$k]['ALLOWED'] === true ? 1 : 0);
+							}else{ 
+								if($debug){ import_log('[DEBUG][DIFFUSION] Tour: '.$tour['REF_PORTAIL'].' no diffusion allowed for this tour', $script_name);}
+								break;
+							}
+						}
+						if($tour['DIFFUSIONS_ALLOWED'][$k] > 0){
+							if($config['OPTIONS']['DIFFERENTIAL_TOUR_DIFFUSION'] == 1){
+								if(count($tour['DIFFUSIONS'][$k]) > 0){
+									if($tour['DIFFUSIONS'][$k]['ONLINE'] === false){
+										if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' NEED TO BE OFFLINE', $script_name);}
+										if($diffusion_already_done[$row['ID_PORTAIL']] != ""){
+											$replace = array(
+												'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#MODE#'),
+												'replace' => array(urlencode($row['ID_PORTAIL']), urlencode($tour_infos['id']), urlencode($tour_infos['user']), 'auto')
+											);
+											$url_base = str_replace($replace['search'], $replace['replace'], URL_UNPUBLISH);
+
+											// RS 2012-07-10 : Ajout Bench
+											$query_time = microtime(true);
+											$result = file_get_contents($url_base);
+											$query_time = ceil(1000*(microtime(true)-$query_time));
+											$tab_bench['ws_unpub'][] = ceil($query_time);
+
+											if($debug){
+												if(count($tab_bench['ws_unpub'])==BENCH_CALC_AVG) {
+													$avg_time = ceil((array_sum($tab_bench['ws_unpub'])/(float)BENCH_CALC_AVG));
+													if($avg_time>100) import_log('[BENCH] Average time to unpublish '.BENCH_CALC_AVG.' last listings: '.$avg_time.'ms' ,$script_name);
+													$tab_bench['ws_unpub'] = array();
+												}
+											}
+
+											$return['UNPUBLICATION'][$row['NOM_PORTAIL']]['TOTAL']++;
+											if($result != "true"){
+												import_log('[UNPUBLICATION] tour:'.$tour['REF_PORTAIL'].' portail:'.$k.'('.$row['NOM_PORTAIL'].') return:'.$result.' ('.$url_base.':'.$result.')', $script_name);
+											}else{ 
+												if($debug){ import_log('[DEBUG][UNPUBLICATION] tour:'.$tour['REF_PORTAIL'].' portail:'.$k.'('.$row['NOM_PORTAIL'].') return:'.$result.' ('.$url_base.':'.$result.')', $script_name);}
+												$return['UNPUBLICATION'][$row['NOM_PORTAIL']]['DONE']++;
+											}
+										}else if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' ALREADY OFFLINE', $script_name);}
+										continue;
+									}
+									if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' NEED TO BE ONLINE', $script_name);}
+								}else{
+									import_log('[DIFFUSION][ERROR] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' ONLINE STATUS NOT FOUND', $script_name);										
+									continue;
+								}
+							}
+						
+							if($diffusion_already_done[$row['ID_PORTAIL']] == "" || $row['REDIFFUSE_VIDEO'] > 0){
+								if($debug && $diffusion_already_done[$row['ID_PORTAIL']] != "" && $row['REDIFFUSE_VIDEO'] > 0){
+									import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' REDIFFUSE', $script_name);
+								}
+								if($row['NB_IMAGES_LIMIT'] > 0){
+									if($tour_infos['lock'] > 0){
+										if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') need image & Tour: '.$tour['REF_PORTAIL'].' images locked', $script_name);}
+										$logs['no_diffusion_images_locked'][$tour_infos['id']] = true;
+										continue;
+									}else if($tour['OPTIONS']['NO_VIDEO'] == true){ 
+										if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') need image & Tour: '.$tour['REF_PORTAIL'].' No video', $script_name);}
+										continue;
+									}else if($tour_infos['nb_images'] < $nb_image_min_video){ 
+										//if($nb_image_min_video > 1 && $generate_video){ $logs['not_enough_image'][$tour_infos['id']] = true;}
+										if($nb_image_min_video > 1){ $logs['not_enough_image'][$tour_infos['id']] = true;}
+										if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') need image & Tour: '.$tour['REF_PORTAIL'].' Not enough image', $script_name);}		
+										continue;
+									}else if( preg_match('/^\d+$/i',$row['NB_IMAGES_LIMIT']) > 0 && $row['NB_IMAGES_LIMIT'] > 0 && $tour_infos['nb_images'] < $row['NB_IMAGES_LIMIT']){ 
+										//if($generate_video){ $logs['not_enough_image'][$tour_infos['id']] = true;}
+										$logs['not_enough_image'][$tour_infos['id']] = true;
+										if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') need image & Tour: '.$tour['REF_PORTAIL'].' Not enough image (minimum:'.$row['NB_IMAGES_LIMIT'].')', $script_name);}		
+										continue;
+									}/*else if(!$generate_video){
+										if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') & Tour: '.$tour['REF_PORTAIL'].' diffusion video not available', $script_name);}		
+										continue;
+									}*/
+									$diffusion_video_done = true;
+								}
+								$ref_portail = $tour['REF_PORTAIL'];
+								if(is_array($row['FILTERS']) && count($row['FILTERS']) > 0){
+									if($debug){ import_log('[DEBUG][DIFFUSION] FILTER FOUND portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.count($row['FILTERS']).' conditions', $script_name);}
+									$filters_ok = false;
+									foreach($row['FILTERS'] as $filter => $filter_value){
+										if(!is_array($filter_value)){ $filter_value = array($filter_value);}
+										if(in_array($tour[$filter], $filter_value, false)){ $filters_ok = true;}
+									}
+									if(!$filters_ok){
+										if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' not fill conditions', $script_name);}
+										continue;
+									}else if($debug){ 
+										import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' fill conditions', $script_name);
+									}
+								}
+								
+								if((int)$row['DIFFUSION_LIMIT'] > 0 && 
+									(($isUserConf && $return['DIFFUSIONS'][$row['NOM_PORTAIL']][$tour['USERCODE']] >= $row['DIFFUSION_LIMIT'])
+									 || (!$isUserConf && $return['DIFFUSIONS'][$row['NOM_PORTAIL']]['DONE'] >= $row['DIFFUSION_LIMIT']))
+								){
+									if($debug){ import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' too much diffusion ('.$return['DIFFUSIONS'][$row['NOM_PORTAIL']]['DONE'].' >= '.$row['DIFFUSION_LIMIT'].')', $script_name);}
+									continue;
+								}
+
+								if($row['REF_PORTAIL'] != ""){
+									$replace = array(
+										'search' => array('#ID#', '#USERCODE#', '#REF_PORTAIL#', '#LOGIN#', '#REF_VISITE#'),
+										'replace'=> array($tour_infos['id'], $tour['USERCODE'], $tour['REF_PORTAIL'], $tour['DIFFUSIONS'][$k]['LOGIN'], $tour['REF_VISITE'])
+									);
+									$ref_portail = str_replace($replace['search'], $replace['replace'], $row['REF_PORTAIL']);
+								}
+								if($ref_portail != ""){
+									$nom_visite = ($tour['DIFFUSIONS'][$k]['TITLE'] != "" ? $tour['DIFFUSIONS'][$k]['TITLE'] : str_replace("''" ,"'", $tour['NOM_VISITE']));
+									$replace = array(
+										'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#REF#', '#TITLE#', '#NEW#', '#NO_TTS#', '#REDIFFUSE#', '#MODE#'),
+										'replace' => array(urlencode($row['ID_PORTAIL']), urlencode($tour_infos['id']), urlencode($tour_infos['user']), urlencode($ref_portail), urlencode($nom_visite), '', urlencode(!$can_generate_sound ? 'true' : 'false'), ($row['REDIFFUSE_VIDEO'] > 0 ? 'true' : 'false'), 'auto')
+									);
+									$url_base = str_replace( $replace['search'], $replace['replace'], URL_PUBLISH);
+
+
+									// 2012-07-10 : Ajout Bench
+									$query_time = microtime(true);
+									$result = file_get_contents($url_base);
+									$query_time = ceil(1000*(microtime(true)-$query_time));
+									$tab_bench['ws_pub'][] = ceil($query_time);
+									if($debug){
+										if(count($tab_bench['ws_pub'])==BENCH_CALC_AVG) {
+											$avg_time = ceil((array_sum($tab_bench['ws_pub'])/(float)BENCH_CALC_AVG));
+											if($avg_time>100) import_log('[BENCH] Average time to publish '.BENCH_CALC_AVG.' last listings: '.$avg_time.'ms' ,$script_name);
+											$tab_bench['ws_pub'] = array();
+										}
+									}
+									if(!is_array($return['DIFFUSIONS'][$row['NOM_PORTAIL']])){ $return['DIFFUSIONS'][$row['NOM_PORTAIL']] = array('DONE' => 0, 'TOTAL'=> 0);}
+									$return['DIFFUSIONS'][$row['NOM_PORTAIL']]['TOTAL']++;
+									if($result != "true"){
+										import_log('[PUBLICATION][ERROR] tour:'.$ref_portail.($ref_portail != $tour['REF_PORTAIL'] ? '('.$tour['REF_PORTAIL'].')' : '').' portail:'.$k.'('.$row['NOM_PORTAIL'].') return:'.$result.' ('.$url_base.':'.$result.')', $script_name);
+									}else{
+										if($debug){ import_log('[DEBUG][PUBLICATION] tour:'.$ref_portail.($ref_portail != $tour['REF_PORTAIL'] ? '('.$tour['REF_PORTAIL'].')' : '').' portail:'.$k.'('.$row['NOM_PORTAIL'].') return:'.$result.' ('.$url_base.')', $script_name);}
+										$return['DIFFUSIONS'][$row['NOM_PORTAIL']]['DONE']++;
+										if($isUserConf){ $return['DIFFUSIONS'][$row['NOM_PORTAIL']][$tour['USERCODE']]++;}
+									}
+								}else if($debug){ 
+									import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' not diffused because ref_portail is empty', $script_name);
+								}
+							}else if($debug){ 
+								import_log('[DEBUG][DIFFUSION] portail:'.$k.'('.$row['NOM_PORTAIL'].') Tour: '.$tour['REF_PORTAIL'].' diffusion already done', $script_name);
+							}
+						}else if($debug){
+							import_log('[DEBUG][PUBLICATION] not allowed tour:'.$ref_portail.($ref_portail != $tour['REF_PORTAIL'] ? '('.$tour['REF_PORTAIL'].')' : '').' portail:'.$k.'('.$row['NOM_PORTAIL'].')', $script_name);
+						}
+					}
+				}
+				if($users_options[$tour['USERCODE']]['PROFIL_VIDEO'] != ""){ $type_video = $users_options[$tour['USERCODE']]['PROFIL_VIDEO'];}
+//				if($tour_infos['lock'] == 0 && $need_video && $type_video != "" && $generate_video && !$diffusion_video_done && $tour_infos['nb_images'] > 0){
+				if($tour_infos['lock'] == 0 && $need_video && $type_video != "" && !$diffusion_video_done && $tour_infos['nb_images'] > 0){
+					$replace = array(
+						'search' => array('#TOUR#', '#TYPE#'),
+						'replace' => array(urlencode($tour_infos['id']), urlencode($type_video))
+					);
+
+					$url_base = str_replace( $replace['search'], $replace['replace'], URL_GENERATION_VIDEO);
+					$result = file_get_contents($url_base);
+					if($result != "true"){ import_log('[ERROR][GENERATION_VIDEO]  tour:'.$tour['REF_PORTAIL'].' ('.$url_base.':'.$result.')', $script_name);}
+					else if($debug){ import_log('[DEBUG][GENERATION_VIDEO] tour:'.$tour['REF_PORTAIL'].' ('.$url_base.':'.$result.')', $script_name);}
+				}else if($debug){ 
+//					import_log('[GENERATION_VIDEO][DEBUG] Verrou:'.$tour_infos['lock'].' need_video:'.($need_video  ? "true" : "false")." type_video:".($type_video != "" ? "true" : "false")." generate_video:".($generate_video  ? "true" : "false")." diffusion done:".(!$diffusion_video_done  ? "true" : "false")." nbimages:".($tour_infos['nb_images'] > 0  ? "true" : "false"), $script_name);
+					import_log('[GENERATION_VIDEO][DEBUG] Verrou:'.$tour_infos['lock'].' need_video:'.($need_video  ? "true" : "false")." type_video:".($type_video != "" ? "true" : "false")." diffusion done:".(!$diffusion_video_done  ? "true" : "false")." nbimages:".($tour_infos['nb_images'] > 0  ? "true" : "false"), $script_name);
+				}
+			}else{ 
+				import_log('[ERROR] Tour: '.$tour['REF_PORTAIL'].' not found ('.get_tour_infos($script_name, $tour['REF_PORTAIL'], $partner_id, $password, true).')', $script_name);
+				$return['TOURS']['FAILED'][] = $tour;
+				if(!is_guid($tour_infos['id'])){ 
+					if(is_array($tour['IMAGES']) && count($tour['IMAGES']) > 0){ $return['IMAGES']['FAILED'] = merge($return['IMAGES']['FAILED'], $tour['IMAGES']);}
+					if(is_array($tour['PLANS']) && count($tour['PLANS']) > 0){ $return['PLANS']['FAILED'] = merge($return['PLANS']['FAILED'], $tour['PLANS']);}
+				}
+			}
+		}
+		import_log('Tours resume: '.$logs['insert'].' inserted / '.$logs['update'].' updated / '.count($return['TOURS']['FAILED']).' failed', $script_name);
+		import_log('Images resume: '.$logs['images'].' uploaded'.(count($logs['not_enough_image']) > 0 ? ' / '.count($logs['not_enough_image']).' tours with less than '.$nb_image_min_video.' images': '').($logs['images_preup'] > 0 ? ' / '.$logs['images_preup'].' images pre-uploaded': '').(count($logs['no_diffusion_images_locked']) > 0 ? ' / '.count($logs['no_diffusion_images_locked']).' tours with images locked': '').' / '.count($return['IMAGES']['FAILED']).' failed', $script_name);
+		import_log('Plans resume: '.$logs['plans'].' uploaded / '.count($return['PLANS']['FAILED']).' failed', $script_name);
+		/** OLD CODE / géré par get_new_tour_with_images **/
+		//if(count($return['NOTIFICATIONS']) > 0){
+			//import_log('Notifications resume: '.count($return['NOTIFICATIONS']).' todo', $script_name);
+		//}
+		/** OLD CODE / géré par get_new_tour_with_images **/
+	}
+	
+	// Stats finales
+	if($debug){
+		if(!empty($tab_bench['ws_update'])) {
+			$avg_time = ceil((array_sum($tab_bench['ws_update'])/(float)count($tab_bench['ws_update'])));
+			if($avg_time>100) import_log('[BENCH] Final Average time to update '.count($tab_bench['ws_update']).' last listings: '.$avg_time.'ms' ,$script_name);
+		}		
+		if(!empty($tab_bench['ws_pub'])) {
+			$avg_time = ceil((array_sum($tab_bench['ws_pub'])/(float)count($tab_bench['ws_pub'])));
+			if($avg_time>100) import_log('[BENCH] Final Average time to publish '.count($tab_bench['ws_pub']).' last listings: '.$avg_time.'ms' ,$script_name);
+		}
+		if(!empty($tab_bench['ws_unpub'])) {
+			$avg_time = ceil((array_sum($tab_bench['ws_unpub'])/(float)count($tab_bench['ws_unpub'])));
+			if($avg_time>100) import_log('[BENCH] Final Average time to unpublish '.count($tab_bench['ws_unpub']).' last listings: '.$avg_time.'ms' ,$script_name);
+		}
+	}
+	return $return;
+}
+
+function import_software_images($images, $id_tour, $id_user, $url_upload_images, $script_name, $type ="image", $block_preupload = false, $debug = false, $workPath = PATH_TMP){
+	$return = array('count' => 0, 'FAILED'=> array(), 'DONE'=> array(), 'count_preup'=>0);
+	$tab_bench = array(
+		'get_image' => array(),
+		'preupload' => array()
+	);
+	
+	if(is_array($images) && count($images) > 0){
+		ksort($images);
+		foreach($images as $pos_img=>$image){
+			$file = $image['FILE_IMAGE'];
+			if($file == "" || !file_exists($file)){
+			
+				// RS 2012-07-11 : Ajout log
+				$query_time = microtime(true);
+
+				if(preg_match('/^https?:\/\//i', $image['URL_IMAGE']) > 0){
+					$header = get_headers($image['URL_IMAGE']);
+					
+					if(strpos($header[0],'404') === false) {
+						$file = $workPath.basename(rand().".jpg");
+						get_content($image['URL_IMAGE'], $file);
+					}
+					//
+				
+				}else if(preg_match('/^ftp:\/\//i', $image['URL_IMAGE'])){
+					if(preg_match('/^ftp:\/\/([^:]+):([^@]+)@([^:]+):([\d]+)(.+)$/i', $image['URL_IMAGE'], $result) > 0){
+						$content = get_content($image['URL_IMAGE']);
+						if($content != ""){ 
+							$file = $workPath.basename(rand().".jpg");
+							file_put_contents( $file, $content);
+						}
+						unset($content);
+					}else{ import_log("[ERROR] DOWNLOAD: wrong ftp format (url:".$image['URL_IMAGE'].")", $script_name);}
+				}else{ $file = $image['URL_IMAGE'];}
+			
+				$query_time = ceil(1000*(microtime(true)-$query_time));
+				$tab_bench['get_image'][] = ceil($query_time);
+				if($debug){
+					if(count($tab_bench['get_image'])==BENCH_CALC_AVG) {
+						$avg_time = ceil((array_sum($tab_bench['get_image'])/(float)BENCH_CALC_AVG));
+						if($avg_time>100) import_log('[BENCH] Average time to get '.BENCH_CALC_AVG.' images: '.$avg_time.'ms' ,$script_name);
+						$tab_bench['get_image'] = array();
+					}
+				}
+
+			} else if($debug){	import_log("[DEBUG] use field FILE_IMAGE:".$file, $script_name);}
+			if($debug){ import_log("[DEBUG] file_tmp:".$file."(src:".$image['URL_IMAGE'].")", $script_name);}
+
+			// modif RS 2011-03-24 
+			// Warning: fread() [function.fread]: Length parameter must be greater than 0 in /var/www/_libs/pear/HTTP/Request.php on line 823
+			//  url:http://www.laforet-immobilier-bayonne.com/uploads/photos/184/vente/7384-01-50600860-b.jpg) - (PID 22035 ram usage: 4063kb)
+			// 2011-03-24 16:34:21 [ERROR] UPLOAD: 
+
+			// Ajout de filesize pour tester si fichier local
+			if($file != "" && file_exists($file) && @filesize($file)>0){
+                // modif RS : convert !JPEG -> JPEG
+			    $tab_infos = @getimagesize($file);
+			    switch($tab_infos[2]) {
+				    case IMAGETYPE_BMP:
+				    	$new_file = $workPath.basename(strtolower($file),'.bmp').'.jpg';
+			    		if(imageBmp2Jpg($file, $new_file)){
+				    		if($debug){ import_log("[DEBUG][CONVERSION] BMP conversion format image:".basename($file)."->".basename($new_file), $script_name);}
+				    		$file = $new_file;
+			    		}
+			    		break;
+			        case IMAGETYPE_GIF:
+			        case IMAGETYPE_PNG:		        
+				        if($debug){ import_log("[DEBUG][CONVERSION] conversion format image", $script_name);}
+			            if( ($im=imagecreatefromstring(@file_get_contents($file))) !== false) {
+			                imagejpeg($im, $file, 100);
+			                imagedestroy($im);
+			            }
+			            break;
+			    }
+   				// Modif JB+RS 2012-06-19 : Parce que c'est mieux comme ça (comportement par défaut + APPEND_IMAGES obsolete)
+//				if(!$image['APPEND_IMAGES'] && $type == "image" && !$block_preupload){
+				if($type == "image" && !$block_preupload){
+					$replace = array(
+						'search' => array('#MD5#', '#ID#', '#POIDS#', '#TITRE#'),
+						'replace' => array(urlencode(md5(file_get_contents($file))), urlencode($id_tour), urlencode($image['POIDS']), urlencode($image['TITRE_IMAGE']))
+					);
+
+					$url = str_replace($replace['search'], $replace['replace'], URL_PREUPLOAD_IMAGE);
+					if(count($images) == $pos_img){ $url .= "&count=true";}
+
+
+					// RS 2012-07-11 : Ajout log
+					$query_time = microtime(true);
+
+					$response = file_get_contents($url);
+
+					$query_time = ceil(1000*(microtime(true)-$query_time));
+					$tab_bench['preupload'][] = ceil($query_time);
+					if($debug){
+						if(count($tab_bench['preupload'])==BENCH_CALC_AVG) {
+							$avg_time = ceil((array_sum($tab_bench['preupload'])/(float)BENCH_CALC_AVG));
+							if($avg_time>100) import_log('[BENCH] Average time to check pre-upload from last '.BENCH_CALC_AVG.' images: '.$avg_time.'ms' ,$script_name);
+							$tab_bench['preupload'] = array();
+						}
+					}
+
+					if($response == "true"){ 
+						if($debug){ import_log("[DEBUG][PRE-UPLOAD] ".$image['REF_PORTAIL']."-".$image['POIDS']." (url:".$url.":".$response.")", $script_name);}
+						$return['count_preup']++;
+						$return['DONE'][] = $image;
+						continue;
+					}
+					if($debug){ import_log("[DEBUG][PRE-UPLOAD] ".$image['REF_PORTAIL']."-".$image['POIDS']." (url:".$url.":".$response.")", $script_name);}
+				}
+
+				$replace = array(
+					'search' => array('#LABEL#', '#ORDER#', '#DESCRIPTOR#'),
+					'replace' => array( urlencode($image['TITRE_IMAGE']),  urlencode($image['POIDS']), urlencode($id_tour.'$'.$id_user.($type == "image" ? '$H1$0$0' : "")))
+				);
+
+				$url  = str_replace($replace['search'], $replace['replace'], $url_upload_images);
+				// flag images import
+				$url .= '&img_import=1';
+				
+				// Modif RS 2011-07-05 : N'ecraser que les images des imports, ne pas toucher au VV uploadées manuellement par le client
+   				// Modif JB+RS 2012-06-19 : Parce que c'est mieux comme ça (comportement par défaut + APPEND_IMAGES obsolete)
+				//if(!isset($image['APPEND_IMAGES'])) 
+				//$image['APPEND_IMAGES'] = true;
+				
+				//if($image['APPEND_IMAGES']) $url .= '&replace_import_only=1';
+				$url .= '&replace_import_only=1';
+				if($debug){ import_log("[DEBUG] URL_UPLOAD: url:".$url, $script_name);}
+
+				$http = new HTTP_Request($url);
+				$http->setMethod("POST");
+				$http->addFile("file", $file);
+				$http->sendRequest();
+				if($image['KEEP_IMAGE'] != true){ @unlink($file);}
+				if($http->getResponseBody() != ""){
+					import_log("[ERROR] UPLOAD: ".$http->getResponseBody()."(url:".$image['URL_IMAGE'].")", $script_name);
+					$return['FAILED'][] = $image;
+				}else{
+					if($debug){ import_log("[DEBUG] UPLOAD: ".$http->getResponseBody()."(url:".$file.")", $script_name);}
+					$return['count']++;
+					$return['DONE'][] = $image;
+				}
+				unset($http);
+			}else{ 
+				import_log('[ERROR] REF_PORTAIL:'.$image['REF_PORTAIL'].':'.$image['POIDS'].' unfound photo: '.$image['URL_IMAGE'].'('.$file.')' , $script_name);
+				$return['FAILED'][] = $image;
+			}
+		}
+	}
+	
+	if($debug){
+		// Stats finales si pas atteint le palier
+		if(!empty($tab_bench['get_image'])) {
+			$avg_time = ceil((array_sum($tab_bench['get_image'])/(float)count($tab_bench['get_image'])));
+			if($avg_time>100) import_log('[BENCH] Final Average time to get '.count($tab_bench['get_image']).' images: '.$avg_time.'ms' ,$script_name);
+		}
+		if(!empty($tab_bench['preupload'])) {
+			$avg_time = ceil((array_sum($tab_bench['preupload'])/(float)count($tab_bench['preupload'])));
+			if($avg_time>100) import_log('[BENCH] Final Average time to check pre-upload from last '.count($tab_bench['preupload']).' images: '.$avg_time.'ms' ,$script_name);
+		}
+	}
+	
+	return $return;
+}
+
+function import_software_transactions( $transactions, $script_name, $debug =false){
+	$return = array('FAILED' => array(),'DONE' => array());
+	$logs = array('update' => 0);
+	$params_conversion = array(
+		'Usercode' => 'usercode',
+		'Ref_portail' => 'ref_portail',
+		'Id_pays' => 'id_pays',
+		'Id_type_bien' => 'id_type_bien',
+		'Id_type_transaction' => 'id_type_transaction',
+		'Nom_script' => 'nom_script',
+		'Adresse' => 'adresse',
+		'Code_postal' => 'code_postal',
+		'Nom_visite' => 'nom_visite',
+		'Ref_etat' => 'ref_etat',
+		'Ville' => 'ville',
+		'Latitude' => 'latitude',
+		'Longitude' => 'longitude'
+	);
+	$url = str_replace('#SCRIPT_NAME#', $script_name, URL_TRANSACTIONS_ADD);
+	if(is_array($transactions) && count($transactions) > 0){
+		foreach($transactions as $transaction){
+			foreach($transaction as $key=>$v){
+				$k = ucfirst(strtolower($key));
+				if($params_conversion[$k] != ''){ $params[$params_conversion[$k]] = $v;}
+			}
+			$response = make_ws_request($script_name, $url, $params);
+			if($response == "true"){ 
+				if($debug) import_log('[DEBUG] Transaction update: '.$transaction['REF_PORTAIL'].' SUCCES ('.make_ws_request($script_name, $url, $params,"GET", true).':'.$response.')' ,$script_name);
+				$logs['update']++;
+				$return['DONE'][] = $transaction;
+			}else{ 
+				import_log('[ERROR] Transaction update: '.$transaction['REF_PORTAIL'].' failed ('.make_ws_request($script_name, $url, $params,"GET", true).':'.$response.')' ,$script_name);
+				$return['FAILED'][] = $transaction;
+			}
+		}
+		import_log('Transactions resume: '.$logs['update'].' updated', $script_name);
+	}
+	return $return;
+}
+
+/**
+* DELETE
+***/
+function delete_software_users($users, $partner_id, $password, $script_name, $diffusions, $debug = false){
+	$return = array();
+	$nb_deleted = 0;
+	if(is_array($users) && count($users) > 0){
+		$nb_user_done = 0;
+		$last_checkpoint = 0;
+		foreach($users as $user){
+			if(($last_checkpoint+count($users)/5) < $nb_user_done++){
+				import_log(round(($nb_user_done/count($users))*100).'% done', $script_name);
+				$last_checkpoint = $nb_user_done;
+			}
+			$url = str_replace('#USERCODE#', urlAPIencode($user['USERCODE']), WS_DELETE_USER);
+			$params = array('partnerID' => $partner_id, 'password' => $password, 'delete' => true, /*'full' => true,*/ 'import_name'=>$script_name);
+			$response = make_ws_request($script_name, $url, $params, "GET", false, true, false);
+			$xml = @simplexml_load_string($response);
+			if(count($xml) > 0 && $xml->success.'' == "true"){
+				$done = true;
+				$nb_deleted++;
+				if($debug) import_log('[DEBUG] User: '.$user['USERCODE'].' delete success ('.make_ws_request($script_name, $url, $params,"GET", true, true, false).':'.$response.')', $script_name);
+			}else{
+				$done =  false;
+				import_log('[ERROR] User: '.$user['USERCODE'].' delete failed ('.make_ws_request($script_name, $url, $params,"GET", true, true, false).':'.$response.')', $script_name);
+			}
+			$return[]= array('USERCODE' => $user['USERCODE'], 'NOM_SCRIPT' => $user['NOM_SCRIPT'], 'DONE' => $done);
+		}
+		import_log($nb_deleted.'/'.count($users).' users deleted', $script_name);
+	}
+	return $return;
+}
+
+function delete_software_tours($tours, $partner_id, $password, $script_name, $diffusions, $debug = false){
+	$return = array();
+	$nb_deleted = 0;
+	if(is_array($tours) && count($tours) > 0){
+		$nb_tour_done = 0;
+		$last_checkpoint = 0;
+		foreach($tours as $tour){
+			if(($last_checkpoint+count($tours)/5) < $nb_tour_done++){
+				import_log(round(($nb_tour_done/count($tours))*100).'% done', $script_name);
+				$last_checkpoint = $nb_tour_done;
+			}
+			$done = false;
+			$tour_infos = get_tour_infos($script_name, $tour['REF_PORTAIL'], $partner_id, $password);
+			if(is_guid($tour_infos['id'])){
+				if($tour_infos['lock'] == 0 ){
+/*					if(is_array($diffusions) && count($diffusions) > 0){
+						foreach($diffusions as $k=>$row){
+							if(count($row['USERS'][$tour['USERCODE']]) > 0){
+								$row = $row['USERS'][$tour['USERCODE']];
+							}
+							if($tour['DIFFUSIONS_ALLOWED'][$k] > 0){
+								$replace = array(
+									'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#MODE#'),
+									'replace' => array(urlencode($row['ID_PORTAIL']), urlencode($tour_infos['id']), urlencode($tour_infos['user']), 'auto')
+								);
+								$url_base = str_replace($replace['search'], $replace['replace'], URL_UNPUBLISH);
+								$result = file_get_contents($url_base);
+								if($result != "true"){
+									import_log('[UNPUBLICATION] tour:'.$tour['REF_PORTAIL'].' portail:'.$k.'('.$row['NOM_PORTAIL'].') return:'.$result.' ('.$url_base.')', $script_name);
+									continue;
+								}else if($debug){
+									import_log('[DEBUG][UNPUBLICATION] tour:'.$tour['REF_PORTAIL'].' portail:'.$k.'('.$row['NOM_PORTAIL'].') return:'.$result.' ('.$url_base.')', $script_name);
+								}
+							}else if($debug){ import_log('[DEBUG][UNPUBLICATION] not allowed tour:'.$tour['REF_PORTAIL'].'('.$row['NOM_PORTAIL'].') portail:'.$k, $script_name); }
+						}
+					}
+ */	
+					$url = str_replace('#REF_PORTAIL#', urlAPIencode($tour['REF_PORTAIL']), WS_DELETE_TOUR);
+					$params = array('partnerID' => $partner_id, 'password' => $password, 'delete' => true, 'import_name'=>$script_name);
+					$response = make_ws_request($script_name, $url, $params, "GET");
+					$xml = @simplexml_load_string($response);
+					if(count($xml) > 0 && $xml->success.'' == "true"){
+						$done = true;
+						$nb_deleted++;
+						if($debug) import_log('[DEBUG] Tour: '.$tour['REF_PORTAIL'].' delete success ('.make_ws_request($script_name, $url, $params, "GET", true).':'.$response.')', $script_name);
+					}else{
+						$done =  false;
+						import_log('[ERROR] Tour: '.$tour['REF_PORTAIL'].' delete failed ('.make_ws_request($script_name, $url, $params, "GET", true).':'.$response.')', $script_name);
+					}
+				}else{ import_log('[DELETE][TOUR] tour:'.$tour['REF_PORTAIL'].' locked ('.get_tour_infos($script_name, $tour['REF_PORTAIL'], $partner_id, $password, true).')', $script_name);}
+			}else{ 
+				import_log('[DELETE][TOUR] tour:'.$tour['REF_PORTAIL'].' not found in software ('.get_tour_infos($script_name, $tour['REF_PORTAIL'], $partner_id, $password, true).')', $script_name);
+				$done = true;
+			}
+			$return[]= array('REF_PORTAIL' => $tour['REF_PORTAIL'], 'NOM_SCRIPT' => $tour['NOM_SCRIPT'], 'DONE' => $done);
+		}
+		import_log($nb_deleted.'/'.count($tours).' tours deleted', $script_name);
+	}
+	return $return;
+}
+
+function delete_software_images($images, $partner_id, $password, $script_name, $debug = false){
+	$return = array();
+	$nb_deleted = 0;
+	$tours_infos = array();
+	if(is_array($images) && count($images) > 0){
+		$nb_image_done = 0;
+		$last_checkpoint = 0;
+		foreach($images as $image){
+			if(($last_checkpoint+count($images)/5) < $nb_image_done++){
+				import_log(round(($nb_image_done/count($images))*100).'% done', $script_name);
+				$last_checkpoint = $nb_image_done;
+			}
+			$done = false;
+			if(!is_array($tours_infos[$image['REF_PORTAIL']])){ 
+				$tours_infos[$image['REF_PORTAIL']] = get_tour_infos($script_name, $image['REF_PORTAIL'], $partner_id, $password);
+				if($tours_infos[$image['REF_PORTAIL']]['lock'] > 0){
+					import_log('[DELETE][IMAGE] tour:'.$image['REF_PORTAIL'].' locked', $script_name);
+				}
+			}
+			if($tours_infos[$image['REF_PORTAIL']]['lock'] == 0){
+				$replace = array(
+					'search' => array('#REF_PORTAIL#', '#ORDER#'),
+					'replace' => array(urlAPIencode($image['REF_PORTAIL']), urlencode($image['POIDS']))
+				);
+				$url = str_replace($replace['search'], $replace['replace'], WS_DELETE_IMAGE);
+				$params = array('partnerID' => $partner_id, 'password' => $password, 'delete' => true, 'import_name'=>$script_name);
+				$params['replace_import_only'] = '1';
+
+				$response = make_ws_request($script_name, $url, $params, "GET");
+				$xml = @simplexml_load_string($response);
+				if(count($xml) > 0 && $xml->success.'' == "true"){
+					$done = true;
+					$nb_deleted++;
+					if($debug) import_log('[DEBUG] Image: '.$image['REF_PORTAIL'].'/'.$image['POIDS'].' delete success ('.make_ws_request($script_name, $url, $params,"GET", true).':'.$response.')', $script_name);				
+				}else{
+					$done = false;
+					import_log('[ERROR] Image: '.$image['REF_PORTAIL'].'/'.$image['POIDS'].' delete failed ('.make_ws_request($script_name, $url, $params,"GET", true).':'.$response.')', $script_name);
+				}
+			}
+			$return[]= array('REF_PORTAIL' => $image['REF_PORTAIL'], 'POIDS' => $image['POIDS'], 'NOM_SCRIPT' => $image['NOM_SCRIPT'], 'DONE' => $done);
+		}
+		import_log($nb_deleted.'/'.count($images).' images deleted', $script_name);
+	}
+	return $return;
+}
+
+function delete_software_transactions($transactions, $script_name, $debug= false){
+	$return = array();
+	$nb_deleted = 0;
+	$url = str_replace('#SCRIPT_NAME#', $script_name, URL_TRANSACTIONS_DEL);
+	if(is_array($transactions) && count($transactions) > 0){
+		$nb_transaction_done = 0;
+		$last_checkpoint = 0;
+		foreach($transactions as $transaction){
+			if(($last_checkpoint+count($transactions)/5) < $nb_transaction_done++){
+				import_log(round(($nb_transaction_done/count($transactions))*100).'% done', $script_name);
+				$last_checkpoint = $nb_transaction_done;
+			}
+			$done = false;
+			$params = array('ref_portail'=> $transaction['REF_PORTAIL']);
+			$response = make_ws_request($script_name, $url, $params, "POST");
+			if($response != "true"){ 
+				$done =  false;
+				import_log('[ERROR] Transaction: '.$transaction['REF_PORTAIL'].' delete failed ('.make_ws_request($script_name, $url, $params,"GET", true).':'.$response.')', $script_name);
+			}else{ 
+				$done = true;
+				$nb_deleted++;
+				if($debug) import_log('[DEBUG] Transaction: '.$transaction['REF_PORTAIL'].' delete success ('.make_ws_request($script_name, $url, $params,"GET", true).':'.$response.')', $script_name);
+			}
+			$return[]= array('REF_PORTAIL' => $transaction['REF_PORTAIL'], 'NOM_SCRIPT' => $transaction['NOM_SCRIPT'], 'DONE' => $done);
+		}
+		import_log($nb_deleted.'/'.count($transactions).' transactions deleted', $script_name);
+	}
+	return $return;
+}
+?>

@@ -1,0 +1,120 @@
+<?php
+
+require_once 'DB.php';
+require_once '../include/fonctions.php';
+require_once '../include/global.php';
+require_once 'previsite/GetDsn.php';
+
+$tour = is_guid($_POST['id'])   ? $_POST['id']   : $_GET['id'];
+$site = !empty($_POST['site'])  ? $_POST['site'] : $_GET['site'];
+$type = !empty($_POST['type'])  ? $_POST['type'] : $_GET['type'];
+$ref  = !empty($_POST['ref'])   ? $_POST['ref']  : $_GET['ref'];
+$code = !empty($_POST['code'])  ? $_POST['code'] : $_GET['code'];
+$type = !empty($_POST['type'])  ? $_POST['type'] : $_GET['type'];
+$distrib = !empty($_POST['distrib'])  ? $_POST['distrib'] : $_GET['distrib'];
+
+if(!empty($_POST)) {
+	$log_file = PATH_TMP.'update_video_status.txt';
+	$row = date('Y-m-d H:i:s').' - '.implode('|', array_keys($_POST))."\n".implode('|', array_values($_POST))."\n\n";
+
+	if(!is_file($log_file) || @filesize($log_file) > 10000000) {
+		$handle = @fopen($log_file, 'w');
+	} else {
+		$handle = @fopen($log_file, 'a');
+	}
+	if($handle !== false) {
+		fwrite($handle, $row);
+		fclose($handle);
+	}
+}
+
+if(!is_guid($tour)) die('missing id');
+
+$getdsn = new GetDsn();
+$dsn = $getdsn->byTourId($tour);
+
+if(!empty($dsn)) $db = DB::connect($dsn);
+
+if(PEAR::isError($db)) die('not found');
+
+
+$replace = array(
+	'search' => array('#TYPE#', '#SITE#'),
+	'replace' => array(urlencode($type), urlencode($site))
+);
+
+$url = str_replace($replace['search'], $replace['replace'], URL_DIFFUSION_VIDEO_GET_PARTNER);
+$partner = file_get_contents($url);
+
+if(is_guid($partner)) {
+	// old_ref = tourID
+	if((int)$code === 0){
+		if(update_publication_reference($partner, $tour, $tour, $ref)) echo 'true';
+		else echo 'error';
+	} else if((int)$code != 4){
+		if(notify_publication_error($partner, $tour, ($ref != "" ? $ref : $tour), 'VIDPUBLISH'.$code)) echo 'true';
+		else echo 'notify_false';
+	}
+} else {
+	echo 'unknown partner';
+}
+
+
+function update_publication_reference($partner, $tour, $old_ref, $new_ref) {
+	global $db;
+	$result = false;
+	if(is_guid($partner) && is_guid($tour) && !empty($old_ref) && !empty($new_ref)) {
+		$sql = 'SELECT TOP 1 ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND REF_PORTAIL=N? AND ID_VISITE=? ORDER BY ID_STATUT_DIFFUSION DESC, DATE_DIFFUSION DESC';
+		$id_diff = $db->getOne($sql, array($partner, $old_ref, $tour));
+		if(!is_guid($id_diff)) {
+			$sql = 'SELECT TOP 1 ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND ID_VISITE=? ORDER BY ID_STATUT_DIFFUSION DESC, DATE_DIFFUSION DESC';
+			$id_diff = $db->getOne($sql, array($partner, $tour));
+		}
+
+		if(is_guid($id_diff)) {
+			// prevent multi-diffusion
+//			$sql = 'UPDATE DIFFUSION_PORTAIL SET DATE_DIFFUSION=GETDATE(), ID_STATUT_DIFFUSION=-1 WHERE ID_DIFFUSION_PORTAIL<> ? AND ID_PORTAIL= ?  AND REF_PORTAIL=N?  AND ID_VISITE=?';
+			$sql = 'UPDATE DIFFUSION_PORTAIL SET DATE_DIFFUSION=GETDATE(), ID_STATUT_DIFFUSION=-1 WHERE ID_DIFFUSION_PORTAIL<> ? AND ID_PORTAIL= ? AND ID_VISITE=?';
+//			$db->query($sql, array($id_diff, $partner, /*$old_ref, */$tour));
+			$db->query($sql, array($id_diff, $partner, $tour));
+			$status = 1;
+			if($partner == "59C4948B-DB6D-FDAF-E15D-CD67B8347126" || $partner = "1876B6F8-6894-1335-44C5-D984D5C8E04E"){
+				$status = 2;
+			}
+			$sql = 'UPDATE DIFFUSION_PORTAIL SET DATE_DIFFUSION=GETDATE(), REF_PORTAIL=N?, ID_STATUT_DIFFUSION=? WHERE ID_DIFFUSION_PORTAIL=?';
+			$db->query($sql, array($new_ref, $status, $id_diff));
+
+			$result = $db->affectedRows() > 0;
+		}
+	}
+	return $result;
+}
+
+
+function notify_publication_error($partner, $tour, $ref, $error_code=null) {
+	global $db;
+	$result = false;
+	if($ref == ""){ $ref = $tour;}
+	if(is_guid($partner) && is_guid($tour) && !empty($ref)) {
+		$sql = 'SELECT ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND REF_PORTAIL=N? AND ID_VISITE=? AND ID_STATUT_DIFFUSION>0';
+		$diff = $db->getOne($sql, array($partner, $ref, $tour));
+
+		if(!is_guid($diff)) {
+			$sql = 'SELECT ID_DIFFUSION_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL=? AND REF_PORTAIL=N? AND ID_VISITE=? AND ID_STATUT_DIFFUSION>0';
+			$diff = $db->getOne($sql, array($partner, $tour, $tour));
+		}
+
+		if(is_guid($diff)) {
+			$sql = 'UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=-1, DATE_DIFFUSION=GETDATE() WHERE ID_DIFFUSION_PORTAIL=?';
+			$db->query($sql, array($diff));
+			$result = $db->affectedRows()>0;
+
+			// Ajout error code dans DIFFUSION_PORTAIL_OPTION
+			if($result) {
+				$sql = 'INSERT INTO DIFFUSION_PORTAIL_OPTION(ID_DIFFUSION_PORTAIL, REF_OPTION, VALEUR_OPTION) VALUES(?, ?, ?)';
+				$db->query($sql, array($diff, 'PUBLICATIONERRORCODE', $error_code));
+			}
+		}
+	}
+	return $result;
+}

@@ -1,0 +1,189 @@
+<?php
+/* code includes */
+require_once('./include/fonctions.php');
+require_once('./include/fonction.db.php');
+require_once('./include/fonction.converter.php');
+require_once('./include/fonction.images.php');
+require_once('./include/fonction.stupeflix.php');
+require_once('./include/fonction.stupeflix.createxml.php');
+require_once('./include/global.php');
+require_once('./include/stupeflix/stupeflix.php');
+require_once('./include/stupeflix/key.php');
+require_once('previsite/GetDsn.php');
+require_once('DB.php');
+require_once('HTTP/Request.php');
+
+$id			= $_REQUEST['id'];
+$tour		= $_REQUEST['tour'];
+$distrib	= $_REQUEST['distrib'];
+$todo 		= $_REQUEST['todo'];
+$type		= strtoupper($_REQUEST['type']);
+$site		= ($_REQUEST['site'] != "" ? strtoupper($_REQUEST['site']) : 'YOUTUBE' );
+$login 		= $_REQUEST['login'];
+$pwd		= $_REQUEST['pwd'];
+
+$url_back = URL_HOST."detail_video.php?id=".$id."&tour=".$tour."&distrib=".$distrib;
+
+include("include/security.php");
+$getDsn = new GetDsn();
+if(is_guid($tour)){ $tourDsn = $getDsn->byTourID($tour);}
+if(is_guid($distrib) && $tourDsn == ""){$tourDsn = $getDsn->byDistrib($distrib);}
+$db_data['pool'][$db_data['name']]['DSN'] = $tourDsn;
+if(!is_guid($id)){
+	header('location:'.$url_back);
+	exit;
+}
+
+$tab_video	= get_diffusion_infos( $id, $site, $login);
+
+if(!is_guid($tab_video['ID_VISITE'])){
+	$tab_video = get_video_infos($id);
+	$tab_video['TITLE_DIFFUSION'] = $tab_video['NOM_VISITE'];
+}
+$tour = $tab_video['ID_VISITE'];
+$distrib = $tab_video['ID_DISTRIBUTEUR'];
+if(count($tab_video) > 0){
+	$type 	= $tab_video['TYPE_VIDEO'];
+	$corp	= (preg_match('/_CORP$/i', $tab_video['TYPE_VIDEO']) > 0);
+	$site 	= $tab_video['SITE_DIFFUSION'];
+	$login 	= $tab_video['LOGIN_DIFFUSION'];
+	$pwd 	= $tab_video['PASSWORD_DIFFUSION'];
+	$auto	= $tab_video['AUTO'];
+	$title	= $tab_video['TITLE_DIFFUSION'];
+	$url_notification	= $tab_video['URL_NOTIFICATION_DIFFUSION'];
+}
+if($login == ""){
+	$login 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['LOGIN']; 
+	$pwd 	= $videos_options['TYPE'][strtoupper($type)]['DIFFUSION']['AUTH'][$site]['PASSWORD']; 
+}
+
+$url_manage = URL_HOST."manage_channel.php?id=".$id."&distrib=".$distrib."&login=".urlencode($login)."&password=".urlencode($pwd)."&site=".$site;
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Previsite Video</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<link href="/images/video.ico" rel="shortcut icon" />
+	<link href="/images/video.ico" rel="icon" type="image/x-icon" />
+	<link href="styles/styles.css" rel="stylesheet" type="text/css" />
+	<link href="styles/conv.css" rel="stylesheet" type="text/css" />
+	<script type="text/javascript" src="/scripts/prototype-1.5.0.js"></script>
+	<script type="text/javascript" src="/scripts/AC_RunActiveContent.js"></script>
+</head>
+<body>
+	<div id="barre">&nbsp;</div>
+	<div id="global">
+		<div id="logo"><a href="/"><img src="/images/logo_video.png" alt="Video" border="0" /></a></div>
+		<div id="contact">&nbsp;</div>
+		<div id="content">
+			<div id="content_header"></div>
+			<div id="content_text" class="h_auto">
+		    	<div>
+					<div class="h1">Previsite Vidéo</div>
+					<?php include('./pages/link.php');?>
+				</div>
+				<div align="center" class="marg_t_30">
+					<table>
+						<tr><td>Video : </td><td><input class="w_300" type="text" name="id" id="id" value="<?=$id;?>" /></td></tr>
+						<tr><td>Tour : </td><td><input class="w_300" type="text" name="tour" id="tour" value="<?=$tour;?>" /></td></tr>
+						<tr><td>Login : </td><td><input class="w_300" type="text" name="login" id="login" value="<?=$login;?>" /></td></tr>
+						<tr><td>Password : </td><td><input class="w_300" type="text" name="password" id="password" value="<?=$pwd;?>" /></td></tr>
+						<tr><td>Title : </td><td><input class="w_300" type="text" name="title" id="title" value="<?=$title;?>" /></td></tr>
+						<tr><td>Notification : </td><td><input class="w_300" type="text" name="notification" id="notification" value="<?=$url_notification;?>" /></td></tr>
+						<tr><td>Type: </td><td><?=$type;?><input type="hidden" id="type" value="<?=$type;?>" /></td></tr>
+						<tr><td>Site : </td>
+							<td>
+								<select id="site" name="site" class="w_300">
+<?php
+	if($site == ""){ $site = "YOUTUBE";}
+	$tab_sites = $videos_options['DIFFUSION'];
+	sort($tab_sites); 
+	foreach($tab_sites as $k=>$v){
+?>
+									<option value="<?=$v;?>" <?=($v == $site ? "selected" : "" );?>><?=ucfirst(strtolower($v));?></option>
+<?php					
+	}
+?>
+							 	</select>
+							</td>
+						</tr>
+						<tr><td>Action: </td>
+							<td>
+								<select name="action" class="w_300" id="action">
+									<option value="check" selected>Check</option>
+									<option value="delete">Delete</option>
+									<option value="diffusion">Diffuse</option>
+									<option value="edit">Edit</option>
+									<option value="error">Error</option>
+									<option value="fix">Fix</option>
+								</select>
+							</td>
+						</tr>
+						<tr>
+							<td colspan="2" align="right">
+							<input type="checkbox" name="auto" id="auto" value="true" <?=($auto > 0 ? "checked" : "");?> /> <span style="cursor:pointer" onclick="$('auto').checked = !$('auto').checked;">Auto</span>
+							<input type="checkbox" name="force" id="force" value="true" /> <span style="cursor:pointer" onclick="$('force').checked = !$('force').checked;">Force</span>
+							<input type="checkbox" name="debug" id="debug" value="true" /> <span style="cursor:pointer" onclick="$('debug').checked = !$('debug').checked;">Debug</span>
+							<input type="checkbox" name="corp" id="corp" value="true" <?=($corp > 0 ? "checked" : "");?> /> <span style="cursor:pointer" onclick="$('corp').checked = !$('corp').checked;">Corp</span>
+							<input type="checkbox" name="json" id="json" value="true" > <span style="cursor:pointer" onclick="$('json').checked = !$('json').checked;">json</span>
+							</td>
+					</table>
+					<div align="center" class="marg_t_10"><input type="button" value="Try" onclick="launchDiffusion()" /></div>
+				</div>
+				
+				<div id="wait" align="center" class="w_max marg_b_30 marg_t_30 disp_no"><img src="/images/ajax_wait.gif" alt="" /></div>
+				<div id="result" align="center" class="w_max marg_b_10"></div>
+				
+				<br />
+				<br />
+			    <div class="w_max">
+				<div align="center"><a href="<?=$url_manage;?>"  align="center">Manage Channel</a></div>
+			   </div>
+				<br />
+				<br />
+				<br />
+				<div align="center"><span class="underline cursor" onclick="history.back();">back</span></div>
+			</div>
+			<script type="text/javascript">
+				function launchDiffusion(){
+					var id 		= $('id').value;
+					var login 	= $('login').value;
+					var password= $('password').value;
+					var site 	= $('site').value;
+					var title 	= $('title').value;
+					var action 	= $('action').value;
+					var type 	= $('type').value+($('corp').checked ? '_CORP' : '');
+					type = type.replace('_CORP_CORP', '_CORP');
+					var notification = $('notification').value;
+					var force  	= ($('force').checked ? 'true' : '');
+					var mode  	= ($('auto').checked ? 'auto' : '');
+					var debug  	= ($('debug').checked ? 'true' : '');
+					var json  	= ($('json').checked ? 'true' : '');
+					
+					if(id != "" && login != "" && password != "" && site != "" && action != ""){
+						$('result').style.display='none';
+						$('wait').style.display = 'block';
+						var params="id="+id+"&login="+login+"&password="+password+"&site="+site+"&todo="+action+"&notification="+notification+"&force="+force+"&mode="+mode+"&title="+title+"&type="+type+"&debug="+debug+"&distrib=<?=$distrib;?>&tour=<?=$tour;?>";
+						new Ajax.Request('diffusion.php', {
+							asynchronous: true,
+							method: 'post',
+							postBody: params,
+							onComplete: function(t) {
+								$('wait').style.display = 'none';
+								$('result').innerHTML = '<textarea class=" h_200" style="width:99%;">'+t.responseText+'</textarea>';
+								$('result').style.display='block';
+							}
+					    });
+					}else{
+						alert('Please fill all the form');
+					}
+				}
+			</script>
+		    <div id="content_footer">    	
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+

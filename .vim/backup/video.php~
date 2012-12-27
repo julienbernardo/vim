@@ -1,0 +1,280 @@
+<?php
+function video($scriptName, $workPath, $config, $debug = false){
+	global $db_data;
+	global $_REQUEST;
+
+	$logs_global = array();
+	$portail_to_site = array(
+		'38429EA1-8BAD-1795-807E-B46BCF131567' => 'DAILYMOTION',
+		'812F1D71-043D-282E-640E-2B3F66072949' => 'DAILYMOTION',
+		//'E6030F50-7739-10C3-054C-27C3F035F3B6' => 'KEWEGO',
+		'B7B5060D-ADBA-2E30-9DAD-A8730E47A9D0' => 'METACAFE',
+		//'B18D4B31-EC0C-934B-953F-CFD48ADECC81' => 'VIEWTHISHOME',
+		'0C46A1AA-BC6C-A377-5B5D-9683B0F381A9' => 'WATTV',
+		//'B1CBDD27-BF97-2449-B047-D7C9BAF3AD8F' => 'YAHOO',
+		'59C4948B-DB6D-FDAF-E15D-CD67B8347126' => 'YOUTUBE',
+		'1876B6F8-6894-1335-44C5-D984D5C8E04E' => 'YOUTUBE',
+		'A7D2ED18-84B5-E063-65B8-4A23DF54FC0A' => 'YOUTUBE',
+	);	
+	$site_is_block = array(
+		'YOUTUBE' => array(
+			'too_many_recent_calls',
+			'Error writing request to server',
+			'CAPTCHA challenge issued by server',
+			'Service Unavailable',
+			'Authentication with Google failed',
+			'disabled_in_maintenance_mode',
+		),
+		'DAILYMOTION' => array(
+			'Platform abuse suspected \(account block for 24h\)',
+			'You reached your upload rate limit',
+			'403. You reached your upload rate limit, please slow down. \(access_forbidden\)', 
+			'Login failed',
+		),
+	);
+
+	$action = array('publish' => true, 'check' => true, 'unpublish' => true);
+
+	//debug
+	$isTest = ($_REQUEST['test'] != "");
+	if($isTest || $debug ){
+		foreach($action as $k=>$v){
+			$action[$k] = ($_REQUEST['action'] == $k);
+		}
+		$debug = true;
+		$config['DNS'] = array('odbtp(mssql)://previsite_account:travel001@10.0.4.11/PREVISITE_REALESTATE?unicode=yes');
+		$config['PARTNERS'] = array('59C4948B-DB6D-FDAF-E15D-CD67B8347126');
+		$debug_id = $_REQUEST['id'];
+	}
+
+	$site_authorized = array();
+	foreach($config['PARTNERS'] as $portail){
+		$site_authorized[$portail_to_site[$portail]] = true;
+	}
+	$site_authorized = array_keys($site_authorized);
+	//diffuse
+	for($k=0; $k < count($config['DNS']); $k++){
+		sql_disconnect("video", $scriptName, $debug);
+		$dsn = preg_replace('/.+@\d+.\d+.\d+.([^\/]+).+/i', '$1', $config['DNS'][$k]);
+		$db_data['pool']['video'] = array('STATUS'=>'normal','NAME'=>'video','DSN'=> $config['DNS'][$k]); 
+		$first_log = true;
+		for($i=0; $i < count($config['PARTNERS']); $i++){
+			$id_portail = $config['PARTNERS'][$i];
+			$nom_portail = "";
+			if($action['publish']){
+				//get list user to diffuse
+				$sql = "SELECT DISTINCT UTILISATEUR.ID_UTILISATEUR,NOM_UTILISATEUR, LIMITE_DIFFUSION, ORDRE_DIFFUSION 
+					FROM DIFFUSION_PORTAIL INNER JOIN VISITE ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE 
+					INNER JOIN UTILISATEUR ON UTILISATEUR.ID_UTILISATEUR=VISITE.ID_UTILISATEUR 
+					INNER JOIN CLIENT_PORTAIL ON CLIENT_PORTAIL.ID_PORTAIL=DIFFUSION_PORTAIL.ID_PORTAIL AND UTILISATEUR.ID_UTILISATEUR=CLIENT_PORTAIL.ID_UTILISATEUR 
+					WHERE ID_STATUT_VISITE > 0 AND NB_ACTIVE_IMAGE > 0 AND ID_STATUT_DIFFUSION IN (0) AND ID_STATUT_UTILISATEUR > 0 AND DIFFUSION_PORTAIL.ID_PORTAIL='".$id_portail."' ".(is_guid($debug_id) ? " AND DIFFUSION_PORTAIL.ID_VISITE='".$debug_id."'" : "");
+				$users = video_sqlQuery($sql, $scriptName, $debug);
+				$logs = array('DONE' => 0, 'FAILED' => 0 , 'TOTAL'=> 0, 'USERS' => 0);
+				if(count($users) > 0){
+					if($first_log){
+						$first_log = false;
+						video_log('--------------', $scriptName, $isTest);
+						video_log('[DSN] '.$dsn.' START ', $scriptName, $isTest);
+					}
+					$nom_portail = video_getNomPortail($scriptName, $id_portail, $debug);
+					if(!is_array($logs_global[$nom_portail])) $logs_global[$nom_portail] = array('USERS' => 0, 'DONE' => 0, 'FAILED' => 0, 'TOTAL' => 0);
+					$logs_global[$nom_portail]['USERS'] += count($users);
+					$logs['USERS'] = count($users);
+					video_log('[TO DO] '.count($users).' users found ('.$nom_portail.'/'.$dsn.')', $scriptName, $isTest);
+					foreach($users as $user){
+						$nb_tour_to_diffuse	= 0;
+						if($user['LIMITE_DIFFUSION'] > 0){
+							$sql = "SELECT count(*) FROM DIFFUSION_PORTAIL INNER JOIN VISITE ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE WHERE ID_STATUT_VISITE > 0 AND NB_ACTIVE_IMAGE > 0 AND ID_STATUT_DIFFUSION > 0 AND DIFFUSION_PORTAIL.ID_PORTAIL='".$id_portail."' AND ID_UTILISATEUR='".$user['ID_UTILISATEUR']."' ".(is_guid($debug_id) ? " AND DIFFUSION_PORTAIL.ID_VISITE='".$debug_id."'" : "");
+							$nb_tour_diffused = video_sqlGetOne($sql, $scriptName, $debug);
+							$nb_tour_to_diffuse = ($nb_tour_diffused - $user['LIMITE_DIFFUSION']);
+						}
+
+						$sql = "SELECT VISITE.ID_VISITE, REF_PORTAIL, ID_STATUT_DIFFUSION,
+							(SELECT VALEUR_OPTION FROM DIFFUSION_PORTAIL_OPTION WHERE REF_OPTION='NO_TTS' AND ID_DIFFUSION_PORTAIL=DIFFUSION_PORTAIL.ID_DIFFUSION_PORTAIL) NO_TTS,
+							(SELECT VALEUR_OPTION FROM DIFFUSION_PORTAIL_OPTION WHERE REF_OPTION='REDIFFUSE' AND ID_DIFFUSION_PORTAIL=DIFFUSION_PORTAIL.ID_DIFFUSION_PORTAIL) REDIFFUSE,
+							(SELECT VALEUR_OPTION FROM DIFFUSION_PORTAIL_OPTION WHERE REF_OPTION='TITLE' AND ID_DIFFUSION_PORTAIL=DIFFUSION_PORTAIL.ID_DIFFUSION_PORTAIL) TITLE
+							FROM DIFFUSION_PORTAIL INNER JOIN VISITE ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE WHERE ID_STATUT_VISITE > 0 AND NB_ACTIVE_IMAGE > 0 AND ID_STATUT_DIFFUSION IN (0) AND ID_PORTAIL='".$id_portail."' AND ID_UTILISATEUR='".$user['ID_UTILISATEUR']."' ".(is_guid($debug_id) ? " AND DIFFUSION_PORTAIL.ID_VISITE='".$debug_id."'" : "")." ORDER BY ";
+						switch($user['ORDER_DIFFUSION']){
+						case "DATE_ASC":
+							$sql .= 'DATE_MODIFICATION_VISITE ASC';
+							break;
+						case "PRIX_ASC":
+							$sql .= 'PRIX_BIEN ASC';
+							break;
+						case "PRIX_DESC":
+							$sql .= 'PRIX_BIEN DESC';
+							break;
+						case "DATE_DESC":
+						default:
+							$sql .= 'DATE_MODIFICATION_VISITE ASC';
+							break;
+						}
+						$tours = video_sqlQuery($sql, $scriptName, $debug);
+						sql_disconnect("video", $scriptName, $debug);
+						if(count($tours) > 0){
+							foreach($tours as $tour){
+								if($tour['ID_STATUT_DIFFUSION'] == 0 && $user['LIMITE_DIFFUSION'] > 0 && --$nb_tour_to_diffuse <= 0) continue;
+								$logs['TOTAL']++;
+								$logs_global[$nom_portail]['TOTAL']++;
+								$replace = array(
+									'search' => array('#PARTNER#', '#TOUR#', '#USER#', '#REF#', '#TITLE#', '#NEW#', '#NO_TTS#', '#REDIFFUSE#', '#MODE#'),
+									'replace' => array(urlencode($id_portail), urlencode($tour['ID_VISITE']), urlencode($user['ID_UTILISATEUR']), urlencode($tour['REF_PORTAIL']), urlencode($tour['TITLE']), '', urlencode($tour['NO_TTS']), ($tour['ID_STATUT_DIFFUSION'] == 0 ? $tour['REDIFFUSE'] : ''), 'auto')
+								);
+
+								$url_base = str_replace( $replace['search'], $replace['replace'], URL_PUBLISH)."&action=do";
+								if($isTest){
+									echo $url_base." <br />";
+									$result = "true";
+								}else{
+									$result = file_get_contents($url_base);
+								}
+								if($result != "true"){ 
+									$logs['FAILED']++;
+									$logs_global[$nom_portail]['FAILED']++;
+								}else{ 
+									$logs['DONE']++;
+									$logs_global[$nom_portail]['DONE']++;
+								}
+							}
+						}
+					}
+					//sleep(60);
+				}
+				if($logs['TOTAL'] > 0){
+					video_log('[RESUME]['.$dsn.'] '.$logs['DONE'].'/'.$logs['TOTAL'].' tours diffused for '.$logs['USERS'].' users. ('.$nom_portail.'/'.$dsn.')', $scriptName, $isTest);
+				}
+			}
+
+			if($action['check'] && $portail_to_site[$id_portail] == "YOUTUBE"){
+				$nom_portail = "";
+				$sql = "SELECT ID_DIFFUSION_PORTAIL, REF_PORTAIL FROM DIFFUSION_PORTAIL WHERE ID_PORTAIL='".$id_portail."'  AND ID_STATUT_DIFFUSION=2 AND REF_PORTAIL!= CONVERT(CHAR(255), ID_VISITE) ".(is_guid($debug_id) ? " AND DIFFUSION_PORTAIL.ID_VISITE='".$debug_id."'" : "");			
+				$tours = video_sqlQuery($sql, $scriptName, $debug);
+				$nom_portail = video_getNomPortail($scriptName, $id_portail, $debug)."_CHECK";
+				if(!is_array($logs_global[$nom_portail])) $logs_global[$nom_portail] = array();
+				if(count($tours) > 0){
+					video_log('[INFOS] '.count($tours).' videos waiting check', $scriptName, $isTest);
+					$logs = array('DONE' => 0, 'FAILED' => 0 , 'TOTAL'=> 0, 'REDIFFUSE' => 0);
+					$last_checkpoint = 0;
+					$nb_done = 0;
+					foreach($tours as $pos=>$row){
+						if(($last_checkpoint+count($tours)/5) < ++$nb_done){
+							video_log(round(($nb_done/count($tours))*100).'% done', $scriptName, $isTest);
+							$last_checkpoint = $nb_done;
+						}
+						$url_base = "http://www.youtube.com/watch?v=".$row['REF_PORTAIL'];
+						$req = new HTTP_Request($url_base);
+						$req->setMethod('GET');
+						$req->sendRequest();
+						if(preg_match('/(Cette vidéo est une copie|This video is a duplicate of a previously uploaded video)/i', $req->getResponseBody()) > 0){
+							$sql = "SELECT ID_VIDEO  FROM VIDEO_DIFFUSION WHERE URL_VIDEO_DIFFUSION='".$url_base."' AND SITE_DIFFUSION='YOUTUBE' AND RESULT_CODE_DIFFUSION=0 AND ID_STATUT_DIFFUSION > 1";
+							$id_video = video_sqlGetOne($sql, $scriptName, $debug);
+							if(is_guid($id_video)){
+/*								$sql = "UPDATE VIDEO SET ID_STATUT_VIDEO=2, DATE_MODIFICATION_VIDEO ='".date('Y-m-d H:i:s')."' where id_video='".$id_video."'";
+								video_makeQuery($sql, $scriptName, $debug);
+								$sql = "UPDATE VIDEO_DIFFUSION SET ID_STATUT_DIFFUSION=3, DATE_MODIFICATION_DIFFUSION='".date('Y-m-d H:i:s')."' WHERE URL_VIDEO_DIFFUSION='".$url_base."' AND SITE_DIFFUSION='YOUTUBE' AND RESULT_CODE_DIFFUSION=0 AND ID_STATUT_DIFFUSION=2 AND ID_VIDEO='".$id_video."'";
+								video_makeQuery($sql, $scriptName, $debug);
+								$url_base = str_replace('#ID#', $id_video, URL_VIDEO_CRON_CHECK);
+								if(file_get_contents($url_base) != "true"){
+									$sql = "UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=0,date_diffusion='".date('Y-m-d H:i:s')."' WHERE ID_DIFFUSION_PORTAIL='".$row['ID_DIFFUSION_PORTAIL']."'";
+									video_makeQuery($sql, $scriptName, $debug);
+								}
+ */
+								video_log('[REDIFFUSE] video to rediffuse: '.$row['ID_DIFFUSION_PORTAIL'].' / '.$url_base.' ('.$dsn.')', $scriptName, $isTest);
+								$logs['REDIFFUSE']++;
+							}else{
+								video_log('[ERROR] video not found for diffusion: '.$row['ID_DIFFUSION_PORTAIL'].' / '.$url_base.' ('.$dsn.')', $scriptName, $isTest);
+							}
+						}else if($req->getResponseCode() == '200'  && preg_match('/This video is currently being processed/i', $req->getResponseBody()) == 0){
+							$sql = "UPDATE DIFFUSION_PORTAIL SET ID_STATUT_DIFFUSION=1,date_diffusion='".date('Y-m-d H:i:s')."' WHERE ID_DIFFUSION_PORTAIL='".$row['ID_DIFFUSION_PORTAIL']."'";
+							video_makeQuery($sql, $scriptName, $debug);
+							$logs['DONE']++;
+							$logs_global['WAITING_DONE']++;
+						}
+						$logs['TOTAL']++;
+						$logs_global['WAITING']++;
+					}
+					video_log('[RESUME]['.$dsn.'] '.$logs['DONE'].'/'.$logs['TOTAL'].' url checked and '.$logs['REDIFFUSE'].'/'.$logs['TOTAL'].' video regenerate ('.$nom_portail.'/'.$dsn.')', $scriptName, $isTest);
+				}
+			}
+
+			if($action['unpublish']){
+				$nom_portail = "";
+				$sql = "SELECT VISITE.ID_VISITE,ID_UTILISATEUR, REF_PORTAIL FROM DIFFUSION_PORTAIL INNER JOIN VISITE ON VISITE.ID_VISITE=DIFFUSION_PORTAIL.ID_VISITE INNER JOIN PORTAIL ON PORTAIL.ID_PORTAIL=DIFFUSION_PORTAIL.ID_PORTAIL WHERE (ID_STATUT_DIFFUSION=-2 OR (ID_STATUT_DIFFUSION=1 and ID_STATUT_VISITE < 0)) AND PORTAIL.ID_PORTAIL='".$id_portail."'".(is_guid($debug_id) ? " AND DIFFUSION_PORTAIL.ID_VISITE='".$debug_id."'" : "");
+				$tours = video_sqlQuery($sql, $scriptName, $debug);
+				if(count($tours) > 0){
+					if($nom_portail == "") $nom_portail = video_getNomPortail($scriptName, $id_portail, $debug, $scriptName, $isTest);
+					if(!is_array($logs_global[$nom_portail])) $logs_global[$nom_portail] = array();
+
+					$logs = array('DONE' => 0, 'FAILED' => 0 , 'TOTAL'=> 0, 'USERS' => 0);
+					video_log("[INFOS][".$dsn."] ".$nom_portail.": ".count($tours)." video to unpublish", $scriptName, $isTest);
+					$last_checkpoint = 0;
+					$nb_done = 0;
+					foreach($tours as $pos=>$row){
+						if(($last_checkpoint+count($tours)/5) < ++$nb_done){
+							video_log(round(($nb_done/count($tours))*100).'% done', $scriptName, $isTest);
+							$last_checkpoint = $nb_done;
+						}
+						$replace = array(
+							'search' => array('#TOUR#', '#USER#', '#PARTNER#', '#MODE#'),
+							'replace' => array($row['ID_VISITE'], $row['ID_UTILISATEUR'], $id_portail, 'auto'),
+						);
+						$url_base = str_replace( $replace['search'], $replace['replace'], URL_UNPUBLISH);
+						if($isTest){
+							echo $url_base." <br />";
+							$result = "true";
+						}else{
+							$result = file_get_contents($url_base);
+						}
+						if($result == "true"){ 
+							$logs['DONE']++;
+							$logs_global[$nom_portail]['DELETED_DONE']++;
+						}else if($result != "false"){
+							video_log("[ERROR] unpublish tour:".$row['ID_VISITE']." failed (".$url_base."/".$result.")", $scriptName, $isTest);
+						}
+						$logs['TOTAL']++;
+						$logs_global[$nom_portail]['DELETED']++;
+					}
+					video_log('[RESUME]['.$dsn.'] '.$logs['DONE'].'/'.$logs['TOTAL'].' tours unpublish ('.$nom_portail.'/'.$dsn.')', $scriptName, $isTest);
+				}
+			}
+		}
+	}
+	if(count($logs_global) == 0) $logs_global = array('DONE' => 0, 'FAILED' => '0', 'TOTAL' => '0');
+
+	return $logs_global;
+}
+
+function video_getNomPortail($scriptName, $id_portail, $debug){
+	$sql = "SELECT NOM_PORTAIL FROM PORTAIL WHERE ID_PORTAIL='".$id_portail."'";
+	return video_sqlGetOne($sql, $scriptName, $debug);
+}
+
+function video_makeQuery($sql, $script_name, $debug, $r =0){
+	global $_REQUEST;
+	$result = sql_query( $sql, 'video', preg_replace('/^export_/i', '',$script_name), $debug, "export", $r, ($_REQUEST['test'] != "" ? 1000 : 0));
+	return $result;
+}
+
+function video_sqlQuery($sql, $script_name, $debug, $r = 0){
+	global $_REQUEST;
+	$return = array();
+	$result = video_makeQuery($sql, $script_name, $debug, $r);
+	if($r == 0){
+		while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $return[] = $r;}
+	}else{ $return = $result;}
+	return $return;	
+}
+
+function video_sqlGetOne($sql, $script_name, $debug){
+	$return = video_sqlQuery($sql, $script_name, $debug, 1);
+	return $return;	
+}
+
+function video_log($text, $scriptName, $isTest = false){
+	if($isTest){
+		echo $text."<br />";
+	}else{
+		import_log($text, $scriptName, $isTest);
+	}
+}
+?>

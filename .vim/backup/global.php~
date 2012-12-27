@@ -1,0 +1,250 @@
+<?php
+$api_servers = array('10.0.4.81','10.0.4.82','10.0.4.83');
+define('SMTP_MAIL',                 "10.0.4.241");          // Serveur SMTP
+define('PATH_WWW',                  "/var/www/");           // Repertoire des sites
+define('FILE_VERSION',              "_version.txt");        // Fichier de version
+define('FILE_CHANGELOG',            "_changelog.txt");      // Fichier des logs de version
+define('FILE_ERRORPHP',             "errorphp.txt");        // Fichier d'erreurs php
+define('FILE_TMP',                  "/tmp");                
+define('FILE_CACHE',                "/cache");                
+define('FILE_RSSYNC',               "rssync*");
+
+define('USE_MEMCACHE', function_exists('memcache_connect'));
+define('IP_MEMCACHE', '10.0.4.61');
+define('IP_MEMCACHE2', '10.0.4.62');
+
+define('ID_REALTRANSAC', 'EC1714EB-83BA-E2E1-143C-3B7F5DC20339');
+define('ID_PREVISITE_IL' , '4EB12F04-E57E-5968-21C8-74B070F8FDDB');
+define('ID_CITYA' , '95B5ABA3-9A9D-F5FA-C8A5-010468554C31');
+define('ID_WATTV' , '0C46A1AA-BC6C-A377-5B5D-9683B0F381A9');
+define('ID_YAHOO' , 'B1CBDD27-BF97-2449-B047-D7C9BAF3AD8F');
+define('ID_KEWEGO', 'E6030F50-7739-10C3-054C-27C3F035F3B6');
+define('ID_OPENMEDIABUNDLE', '63B328C0-0AE3-4FA5-8BF3-B00F59775156');
+define('ID_PERICLES_BUNDLE', 'BD0B07C4-779A-433C-85E9-E322611F9FBF');
+define('ID_LAFORET_CORP', '77137AA0-7C52-1F41-6CE4-BEC832D2BD9D');
+define('ID_LG_IMMOSTREET_CH', '4472C6DB-0F66-33FD-58AD-2B035C80C0C4');
+define('ID_LGIMMOSTRCH', '4472C6DB-0F66-33FD-58AD-2B035C80C0C4');
+define('ID_GRUPOUNION', '6063D1A3-A575-F265-FDCA-52B2699D5098');
+define('ID_ADSDECK', '8D7F3449-08B6-0554-3C6B-0E567B37C93C');
+define('ID_WPOSTIN', '19A2E13B-D292-AD02-0549-27AF56F7ACA6');
+define('ID_SEGUNDAMANO', '9ABBE05A-6DDF-9069-5FCD-7FA0CC62C56C');
+define('ID_LEBONCOIN' , '80E55BC7-C6EA-BFE7-C7DB-D3C94B132285');
+define('ID_TRULIA' , '87EBE945-2751-16E5-D971-4459E3410ECC');
+define('ID_ZILLOW' , 'DDD1B1DD-C1BB-874B-322E-27465D5F2276');
+define('ID_CLASSADV' , '712DAE63-4C09-FB10-9695-177DB5C41250');
+define('ID_CLASSIFIEDADVENTURES' , '712DAE63-4C09-FB10-9695-177DB5C41250');
+define('ID_ADCLIP' , 'DC2F8C50-0750-51D2-9954-EA26DE4F096C');
+define('ID_MITULA' , '01C76FD6-FE2C-05A3-4E18-73407A11FC5B');
+define('ID_LOCANTO' , '783F6881-3055-74D3-3183-8D578B2B1736');
+define('ID_VIVASTREET' , '1F7987FA-6155-EF1F-9E6D-3E1F02AC9B5A');
+define('ID_RIGHTMOVE' , '30DDA510-3718-974A-40A8-9FDEE6204787');
+define('ID_IDEALISTA' , 'CF2F97AC-1B9D-0B94-3CB4-739F290ABC8E');
+define('ID_IDEALISTAGM' , '7768D1E2-6966-C0C6-D078-1586F6F3FCF4');
+define('ID_IDEALISTA_GM' , '7768D1E2-6966-C0C6-D078-1586F6F3FCF4');
+define('ID_LGSELOGER' , 'F0259E38-9E97-F30D-9D1F-4B88E6EB75DB');
+define('ID_LGTRULIA' , 'CED615EC-9E5A-EA18-C22D-E12AE927F3DC');
+define('ID_LG_TRULIA' , 'CED615EC-9E5A-EA18-C22D-E12AE927F3DC');
+define('ID_OLX' , '7B056BB9-BB68-B193-9D7C-28C1819F9C8E');
+define('ID_IMMOSCOUT' , 'D89FA112-8A55-342C-D29F-DBCA4055A5B2');
+define('ID_99ACRES' , '73A8FA2D-902C-D186-5F92-4C2FF6466A9A');
+define('ID_REALESTATECOJP' , '3D76A756-E61B-3902-EBF8-57B9CCE2C31D');
+define('ID_REALESTATE_CO_JP' , '3D76A756-E61B-3902-EBF8-57B9CCE2C31D');
+define('ID_HOMEIN' , '2DC75E30-B140-DEB9-A248-0D7328A6E71C');
+define('ID_REALESTATELB' , 'A13A304A-FAAE-0146-C57F-44DDB68767E9');
+define('ID_REALESTATE_COM_LB' , 'A13A304A-FAAE-0146-C57F-44DDB68767E9');
+define('ID_IPROPSG' , '12271412-6DE4-C5FD-156D-E7CB548FD787');
+define('ID_IPROPMY' , '7DC79995-6EA1-D803-7DA2-47329C7F81B8');
+define('ID_LG_IPROPERTY_MY' , '12271412-6DE4-C5FD-156D-E7CB548FD787');
+define('ID_IPROPERTY_SG', '7DC79995-6EA1-D803-7DA2-47329C7F81B8');
+define('ID_PROPFINDER' , 'DCEC1C84-82E0-1644-74EE-F50B50A14C00');
+define('ID_PROPERTYFINDER' , 'DCEC1C84-82E0-1644-74EE-F50B50A14C00');
+define('ID_SPIRIT24_GR' , 'D79FCD76-DA09-9BE0-F321-C66291777E11');
+define('ID_SPITI24' , 'D79FCD76-DA09-9BE0-F321-C66291777E11');
+define('ID_DOMAVIN' , '84713D2B-B1B8-33E1-EB2F-A09518E50D98');
+define('ID_METROSCUBICOS' , 'EA9A7996-9875-4257-BF6E-B9EF3F383A74');
+define('ID_GOHOME' , '0D576B65-417E-CDB3-B56E-82E6535EE7AA');
+define('ID_PRIVPROP' , 'FCCD205A-FA97-CF83-99BA-937134003BCD');
+define('ID_PRIVATE_PROPERTY', 'FCCD205A-FA97-CF83-99BA-937134003BCD');
+define('ID_LG_IMMOBILIARE_IT' , '1F800B1B-6A8C-F555-D9E8-9802B9CFA75B');
+define('ID_LGIMMOIT' , '1F800B1B-6A8C-F555-D9E8-9802B9CFA75B');
+define('ID_DOMAINCOM' , '72C95173-B883-3C3C-AC86-F766C540C44C');
+define('ID_DOMAIN_COM' , '72C95173-B883-3C3C-AC86-F766C540C44C');
+define('ID_ENORMO' , '4471FFC0-A96C-D041-77EF-D62C4B63E993');
+define('ID_OFERTY' , 'FBE8719B-EC89-3DEF-5FCE-4DAA5BF813EB');
+define('ID_LUXURY', 'EC1714EB-83BA-E2E1-143C-3B7F5DC20339');
+define('ID_OODLE', '939F39CF-1C56-5C50-CDE9-BFECAB0FA819');
+define('ID_KIJIJI', '7C31A093-1471-63A1-856E-5605BA980E2B');
+define('ID_TROVIT', '90B17372-5734-C0AA-D67F-D139E176E8CE');
+define('ID_FB_WALL', 'A47CFC83-DB74-13CA-82C8-E3D981A0F5BA');
+define('ID_CHINASPLASH', '00FDEFFE-4289-09C4-6E66-0F013B5B1963');
+define('ID_VIVAREAL', '5CD4538D-F917-0A32-BFF2-051316193924');
+define('ID_REALTOR', 'F98D6CFA-E7E4-9F63-0249-C16C38A8C477');
+define('ID_LG_REALTOR_COM', 'F98D6CFA-E7E4-9F63-0249-C16C38A8C477');
+//define('ID_WORLDPOSTING', '19A2E13B-D292-AD02-0549-27AF56F7ACA6');
+define('ID_MYLISTING', 'C3187B7F-3F56-86C5-EF9D-BFECE5CC7FFA');
+define('ID_YOUTUBE', '59C4948B-DB6D-FDAF-E15D-CD67B8347126');
+define('ID_YOUTUBEUS', '59C4948B-DB6D-FDAF-E15D-CD67B8347126');
+//define('ID_YOUTUBEUS', 'A7D2ED18-84B5-E063-65B8-4A23DF54FC0A');
+define('ID_YOUTUBECORP', '1876B6F8-6894-1335-44C5-D984D5C8E04E');
+define('ID_YAKAZ', '12406C50-3552-E00E-CC8B-EA21D6DF25B4');
+define('ID_FACEBOOK', '191F4B45-53AD-2D10-DBE2-E7479443BBE7');
+define('ID_TWITTER', 'E5607DDA-327B-2432-8A43-C5E25D54432C');
+define('ID_DAILYMOTION', '38429EA1-8BAD-1795-807E-B46BCF131567');
+define('ID_MERCADOLIBRE', 'A7F20B04-6D2D-2E10-3D65-5C926131F12C');
+define('ID_KERMARREC', '91569B4A-21D7-E6F1-BD3C-6CCE2A89ECE3');
+define('ID_ERIC_MEY', '4EBABA0E-3821-EE94-4F31-3B0B5F23D83F');
+define('ID_CRAIGSLISTEXP', '79775614-56AD-211C-2492-262B9131751B');
+define('ID_C21FR', '57C7AD3B-5148-3279-6AD8-5E3F40DE4C3A');
+define('ID_C21FR_PROP', '03206339-4A4B-F5B6-CC77-45752CAE29A9');
+define('ID_PINTEREST', 'D210429F-4C95-FB13-59F1-896693018F15');
+define('ID_PINTEREST_CORP', 'DC44AC31-705D-E2E1-62C0-313E43300788');
+define('ID_PINTEREST_IMAGE', '62A6035A-1C90-5036-04C4-C85731D1CFDC');
+define('ID_CUSTOM_URL', '51CE4B96-7977-E3DA-E90A-B242F7078EA6');
+
+// Ajout RS pour les exports
+define('DSN_GATEWAY', 'odbtp(mssql)://previsite_account:travel001@10.0.4.211/PREVISITE_GATEWAY?unicode=yes');
+define('DSN_SOFTWARE', 'odbtp(mssql)://previsite_account:travel001@10.0.4.11/PREVISITE_REALESTATE?unicode=yes');
+define('DSN_SQL01EU', 'odbtp(mssql)://previsite_account:travel001@10.0.4.211/PREVISITE_SOFTWARE?unicode=yes');
+define('DSN_SQL01US', 'odbtp(mssql)://previsite_account:travel001@10.0.4.213/PREVISITE_SOFTWARE?unicode=yes');
+define('DSN_SQL07EU', 'odbtp(mssql)://previsite_account:travel001@10.0.4.17/PREVISITE_SOFTWARE?unicode=yes');
+define('DSN_SQL09EU', 'odbtp(mssql)://previsite_account:travel001@10.0.4.19/PREVISITE_SOFTWARE?unicode=yes');
+define('DSN_SQL11EU', 'odbtp(mssql)://previsite_account:travel001@10.0.4.21/PREVISITE_SOFTWARE?unicode=yes');
+define('URL_MEDIA', 'http://media.previsite.com/%PATH%/%SIZE%/%ID%.jpg');
+define('URL_MEDIA_EXT', 'http://media.previsite.com/%PATH%/%SIZE%/%ID%.%EXT%');
+define('SIZE_THUMB', 'crop_160x106');
+define('SIZE_STILL', 'max_1024x1024');
+
+define('BENCH_CALC_AVG', 500);
+
+define('PATH_FTP',					'/mnt/ftp/');
+define('PATH_FTP_150',					'/mnt/ftp_150/');
+define('PATH_FTP_151',					'/mnt/ftp_151/');
+
+define('PATH_FTP_ARCHIVES',			PATH_FTP.'_archives/');
+define('PATH_FTP_ARCHIVES_150',			PATH_FTP_150.'_archives/');
+define('PATH_FTP_ARCHIVES_151',			PATH_FTP_151.'_archives/');
+
+define('PATH_FTP_EXPORTS',			PATH_FTP.'_exports/');
+define('PATH_FTP_EXPORTS_150',			PATH_FTP_150.'_exports/');
+define('PATH_FTP_EXPORTS_151',			PATH_FTP_151.'_exports/');
+
+define('PREFIXE_EXPORT', 			'export_');
+
+define('PATH_CACHE', PATH_FTP.'_cache_import/');
+define('PATH_CACHE_150', PATH_FTP_150.'_cache_import/');
+define('PATH_CACHE_151', PATH_FTP_151.'_cache_import/');
+
+define('PATH_CACHE_EXPORT', PATH_FTP.'_cache_export/');
+define('PATH_CACHE_EXPORT_150', PATH_FTP_150.'_cache_export/');
+define('PATH_CACHE_EXPORT_151', PATH_FTP_151.'_cache_export/');
+
+define('PATH_LOG',	PATH_FTP.'_log/');
+define('PATH_LOG_150',	PATH_FTP_150.'_log/');
+define('PATH_LOG_151',	PATH_FTP_151.'_log/');
+
+DEFINE('PATH_TTS', PATH_FTP.'tts/');
+DEFINE('PATH_TTS_TODO', PATH_TTS.'todo/');
+define('PATH_MAIN', 			'/var/www/gateway2.previsite.net/');
+define('PATH_IMPORT_OLD_CONFIG', '/var/www/gateway.previsite.net/include/');
+define('PATH_INCLUDE', 			PATH_MAIN.'include/');
+
+define('PATH_EXPORT', 			PATH_MAIN.'export/');
+define('PATH_IMPORT', 			PATH_MAIN.'import/');
+//define('PATH_IMPORT_CONFIG', 	PATH_IMPORT.'config/');
+define('PATH_IMPORT_LOGOS', 	PATH_IMPORT.'logos/');
+
+define('PATH_EXPORT', 			PATH_MAIN.'/export/');
+
+define('PATH_TMP',				'/tmp/');
+//define('PATH_LOG',				PATH_TMP.'log/');
+define('CRON_LOG_FILE', 		PATH_LOG.'cron2_log_#NAME#-#DATE#.txt');
+define('CRON_LAST_EXECUTION',	PATH_LOG.'cron_#NAME#.txt');
+define('ERROR_LOG_FILE', 		PATH_LOG.'errorphp.#SCRIPT#.txt');
+
+define('URL_HOST',			'http://gateway2.previsite.net/');
+define('URL_MANAGE_SCRIPT', URL_HOST.'manage_#TYPE#?script=#SCRIPT#');
+define('URL_MANAGE_SCRIPT_USER', URL_HOST.'manage_user?script=#SCRIPT#&usercode=#USERCODE#');
+
+// Twitter
+define('URL_BITLY', 'http://api.bit.ly/v3/shorten?longUrl=%URL%&apiKey=R_3bfddc65e03e222284648168eb5e25a4&login=previsite&format=json');
+define('TWITTER_CONSUMER_KEY', 'gLOWUsFLmoEYGNLOjkWWOQ');
+define('TWITTER_CONSUMER_SECRET', '7HXTzp1F4gxUhjKknN5vHBpQ76DdPv4go2WzAmXcQ');
+
+define('URL_PREUPLOAD_IMAGE', 'http://api.previsite.com/rest/image/#MD5#/#ID#?order=#POIDS#&label=#TITRE#&replace_import_only=1');
+define('URL_UPLOAD_IMAGE',	'http://#URL#/upload.php?descriptor=#DESCRIPTOR#&label=#LABEL#&order=#ORDER#');
+define('URL_UPLOAD_PLAN',	'http://#URL#/floorplan.php?descriptor=#DESCRIPTOR#&label=#LABEL#&order=#ORDER#');
+define('URL_UPLOAD_LOGO',	'http://upload.previsite.net/user_logo.php');
+
+define('SERVER_DEV', false);
+define('WS_URL', 'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/rest/');
+define('WS_GET_USER', 		WS_URL.'p/user/#USERCODE#');
+define('WS_UPDATE_USER', 	WS_URL.'p/user/#USERCODE#');
+define('WS_DIFFUSE_USER', 	WS_URL.'user/#ID_USER#');
+define('WS_DELETE_USER', 	WS_URL.'p/user/#USERCODE#');
+define('WS_GET_USER_OPTIONS', WS_URL.'p/user_opt/#USERCODE#');
+define('WS_GET_USER_TOUR', 	WS_URL.'p/listings/#USERCODE#');
+define('WS_UPDATE_TOUR', 	WS_URL.'p/tour/#REF_PORTAIL#');
+define('WS_GET_TOUR', 		WS_URL.'p/listing/#REF_PORTAIL#');
+define('WS_DELETE_TOUR', 	WS_URL.'p/tour/#REF_PORTAIL#');
+define('WS_GET_TOUR_DIFFUSIONS', 	WS_URL.'pub/#TOUR#');
+define('WS_DELETE_IMAGE',	WS_URL.'p/images/#REF_PORTAIL#/#ORDER#');
+define('WS_URL_UPDATE_DIFF', WS_URL.'publication/#ID#');
+define('WS_URL_UPDATE_DIFFUSION', WS_URL.'shortpub/#ID#?method=post&reference=#REF#&status=#STATUS#&pub_error_mess=#MSG#&url_listing=#URL#&expiration=#EXPIRATION#');
+define('WS_UPDATE_TOUR_STANDALONE', WS_URL.'tour/#TOUR#');
+
+
+define('URL_TRANSACTIONS', 	   'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/geoloc/import_transactions_biens.php');
+define('URL_TRANSACTIONS_ADD', URL_TRANSACTIONS.'?todo=add&nom_script=#SCRIPT_NAME#');
+define('URL_TRANSACTIONS_DEL', URL_TRANSACTIONS.'?todo=delete&nom_script=#SCRIPT_NAME#');
+
+define('URL_PUBLISH',	 	'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/publication/software_publish.php?tour=#TOUR#&user=#USER#&ref=#REF#&title=#TITLE#&partner=#PARTNER#&mode=#MODE#&new=#NEW#&no_tts=#NO_TTS#&rediffuse=#REDIFFUSE#');
+define('URL_PUBLISHRR',	 	'http://'.(SERVER_DEV ? 'dev.' : '').'api'.(SERVER_DEV ? '' : 'rr').'.previsite.com/publication/software_publish.php?tour=#TOUR#&user=#USER#&ref=#REF#&title=#TITLE#&partner=#PARTNER#&mode=#MODE#&new=#NEW#&no_tts=#NO_TTS#&rediffuse=#REDIFFUSE#');
+define('URL_UNPUBLISH',	 	'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/publication/software_unpublish.php?tour=#TOUR#&user=#USER#&partner=#PARTNER#&mode=#MODE#');
+
+define('URL_INSERT_EMAIL', 'http://api.previsite.com/emailing/insert.php');
+
+define('URL_PINTEREST_COVER', 	'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/pinterest/cover.php?id=#TOUR#&todo=#TODO#');
+define('URL_TOUR', 				'http://'.(SERVER_DEV ? 'dev.' : '').'tour.previsite.com/#TOUR#');
+
+define('URL_SOUND',		 	'http://gateway.previsite.net/tts.php');
+define('URL_SOUND_POST', 	URL_SOUND.'?todo=post&id=#ID#&voice=#VOICE#&text=#TEXT#');
+define('URL_SOUND_DETAIL', 	URL_SOUND.'?todo=detail');
+define('URL_SOUND_COUNT', 	URL_SOUND.'?todo=count');
+define('URL_TTS_POST_NOTIFICATION', 'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/tts/?todo=post&id=#ID#');
+define('URL_CLEANDESC', 	'http://api.previsite.com/clean_description/?text=#TEXT#&lang=#LANG#&voice=#VOICE#');
+
+//---------------------WORLDPOSTING
+define('URL_AD_PORTAIL','http://pvt.fm/pub/#PUB#');
+define('URL_AD_PORTAIL_WP','http://wpost.in/p/#PUB#');
+define('DOMAIN_MAIL_WP','@wpost.in');
+define('PREFIX_MAIL_WP','wp');
+
+define('MD5_UPDATE_IN_PROGRESS',	'update in progress');
+define('MD5_UPDATE_FAILED', 		'#TABLE# update failed');
+define('MD5_DELETE', 				'#TABLE# deleted');
+
+define('URL_GENERATION_VIDEO', 'http://api.previsite.com/diffusion/generate_video.php?tour=#TOUR#&type=#TYPE#');
+DEFINE('URL_PUBLISH_VIDEO', 'http://api.previsite.com/diffusion/?debug=&force=&tour=#TOUR#&login=#LOGIN#&mode=auto&notification=http%3A%2F%2Fapi.previsite.com%2Fpublication%2Fnotification.php&password=#PASSWORD#&site=#SITE#&title=#TITLE#&todo=diffusion&type=#TYPE#');
+DEFINE('URL_UNPUBLISH_VIDEO', 'http://api.previsite.com/diffusion/?debug=&force=&tour=#TOUR#&site=#SITE#&todo=delete&type=#TYPE#');
+DEFINE('URL_VIDEO_CRON_COUNT', 'http://video.previsite.net/cron.php?todo=count');
+DEFINE('URL_VIDEO_CRON_CHECK', 'http://video.previsite.net/cron.php?todo=check&id=#ID#');
+DEFINE('URL_VIDEO_CRON_DETAIL', 'http://video.previsite.net/detail_cron.php');
+
+define('URL_NOTIFICATION_EMAIL', 'http://'.(SERVER_DEV ? 'dev.' : '').'api.previsite.com/emailing/index.php');
+
+define('PRIVATE_KEY', PATH_MAIN.'/include/key.pem');
+
+set_time_limit(5000);
+
+$list_voices = array('EN'=>'heather', 'ES'=>'maria', 'FR'=>'bruno', 'IT'=>'chiara', 'PT'=>'ester', 'NL'=>'femke', 'DE'=>'klaus' );
+$list_srv = array("dev" => "", "eu" => "10.0.4.150", "us" => "10.0.4.151");
+//$list_srv = array("dev" => "", "oldus" => "10.0.4.82", "eu" => "10.0.4.150", "us" => "10.0.4.151");
+
+$db_data['name'] = 'gateway';
+$db_data['pool'][$db_data['name']]['NAME'] = $db_data['name']; 
+$db_data['pool'][$db_data['name']]['DSN'] = DSN_GATEWAY; 
+
+if(!file_exists(PATH_TMP)){ mkdir(PATH_TMP);}
+if(!file_exists(PATH_LOG)){ mkdir(PATH_LOG);}
+if(!file_exists(PATH_TTS_TODO)){ mkdir(PATH_TTS_TODO);}
+?>

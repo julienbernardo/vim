@@ -1,0 +1,200 @@
+<?php
+require_once('DB.php');
+require_once 'HTTP/Request.php';
+require_once 'phpmailer2/class.phpmailer.php';
+require_once('include/global.php');
+require_once('include/function.php');
+require_once('include/function.db.php');
+require_once('include/function.cron.php');
+require_once('include/function.ws.php');
+require_once('previsite/GetDsn.php');
+
+$todo 		= $_REQUEST['todo'];
+$id_portail = $_REQUEST['id_portail'];
+$usercode	= $_REQUEST['usercode'];
+$debug 		= ($_REQUEST['debug'] == 'true');
+
+$out = array('success' => false);
+
+switch($todo){
+	//http://gateway2.previsite.net/synchro?todo=get_import&id_portail=D580B51E-E85D-A925-17F7-05B3BA21DD36
+	case "get_import":
+		if(is_guid($id_portail)){
+			$types = array('export', 'import');
+			foreach($types as $type){
+				$uType = strtoupper($type);
+				$out[$type] = array();
+			
+				$sql = "SELECT ".$uType.".CODE_".$uType.", ID_STATUT_".$uType." FROM ".$uType
+					.($type == "export" ? " INNER JOIN EXPORT_PORTAIL ON EXPORT_PORTAIL.CODE_EXPORT=EXPORT.CODE_EXPORT" : "")
+					." WHERE ID_PORTAIL='".$id_portail."'";
+			
+				$result = db_query($sql, $db_data['name']);
+				while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $out[$type][$r['CODE_'.$uType]] = array('ACTIVATE' => $r['ID_STATUT_'.$uType]);}
+				if(count($out[$type]) > 0){
+					$out['success'] = true;
+					foreach($out[$type] as $k=>$v){
+						$exec = getLastExecution($k, $type);
+						for($i = 0; $i < count($exec); $i++){
+							if($exec[$i]['ID_STATUT_CRON_EXECUTION'] > -1){
+								$explode = explode(';', $exec[$i]['RESUME_CRON']);
+								$data = array();
+								foreach($explode as $v){
+									if(preg_match('/^([^:]+):([1-9][0-9]*)\/([1-9][0-9]*)$/i', $v, $result) > 0){
+										$data[(preg_match( '/^(USERS|TOURS|IMAGES|PLANS|TRANSACTIONS)$/i', $result[1]) > 0 ? 'DATA' : 'DIFFUSION')][$result[1]] = array('DONE' => $result[2], 'TOTAL' => $result[3]);
+									}
+								}
+								$tmp = array(
+									'DATE_DEBUT' => $exec[$i]['DATE_DEBUT_CRON'],
+									'DATE_FIN' => $exec[$i]['DATE_FIN_CRON'],
+									'DURATION' => duration_between($exec[$i]['DATE_DEBUT_CRON'], $exec[$i]['DATE_FIN_CRON']),
+								);
+								if(count($data['DATA']) > 0){ $tmp['DATA'] = $data['DATA'];}
+								if(count($data['DIFFUSION']) > 0){ $tmp['DIFFUSION'] = $data['DIFFUSION'];}
+							
+								$out[$type][$k][] = $tmp;
+							}
+						}
+					}
+				}else{ unset($out[$type]);}//$out['error'] = $type." not found";}
+			}
+		}else{ $out['error'] = "Missing id_portail";}
+		break;
+	//http://gateway2.previsite.net/synchro?todo=user_conf&id_portail=D580B51E-E85D-A925-17F7-05B3BA21DD36&usercode=bibi
+	case "user_conf":
+		if(is_guid($id_portail) && $usercode != ""){
+			$out['import'] = array();
+			$sql = "SELECT CODE_IMPORT FROM IMPORT WHERE ID_PORTAIL='".$id_portail."'";
+			$result = db_query($sql, $db_data['name']);
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $out['import'][$r['CODE_IMPORT']] = array();}
+			if(count($out['import']) > 0){
+				$out['success'] = true;
+				foreach($out['import'] as $k=>$v){
+					$options = getImportOptions($k);
+					$out['import'][$k]['overwrite'] = (count($options['STEPS']) > 0 && count($options['STEPS']['UPDATE_USERS']) > 0 && $options['STEPS']['UPDATE_USERS']['VALEUR_IMPORT_OPTION'] == 1);
+					$users = getScriptUsers($k, true, true);
+					if(count($users[$usercode]) > 0 && $users[$usercode]['ID_STATUT_USER'] > -1){
+						$diffusions = getScriptDiffusions($k, true, true);
+						$diffusions_list = array();
+						foreach($diffusions as $diff_key => $diff_value){
+							if(is_array($diff_value['USERS']) && count($diff_value['USERS'][$usercode]) > 0){
+								$diffusions_list[$diff_key] = $diff_value['USERS'][$usercode];
+							}else if($diff_value['ID_STATUT_IMPORT_DIFFUSION'] > 0){
+								unset($diff_value['USERS']);
+								$diffusions_list[] = $diff_value;
+							}
+						}
+						$out['import'][$k] = array(
+							'overwrite' => ($users[$usercode]['ID_STATUT_USER'] > 0),
+							'last_update' => ($users[$usercode]['DATE_MODIFICATION_USER']),
+							'diffusions' => $diffusions_list,
+						);
+					}
+				}
+			}else{ $out['error'] = "import not found";}
+		}else{ $out['error'] = "Missing id_portail or usercode";}
+		break;
+	//http://gateway2.previsite.net/synchro?todo=save_diffusion&id_portail=D580B51E-E85D-A925-17F7-05B3BA21DD36&usercode=bibi
+	case "save_diffusion":
+		if(is_guid($id_portail) && $usercode != ""){
+			$sql = "SELECT CODE_IMPORT FROM IMPORT WHERE ID_PORTAIL='".$id_portail."'";
+			$result = db_query($sql, $db_data['name']);
+			while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $out['import'][] = $r['CODE_IMPORT'];}
+			if(count($out['import']) > 0){
+				foreach($out['import'] as $k){
+					$config = getConfigImport($k);
+					$keys = array_keys($config['DIFFUSIONS']);
+					for($i=0; $i < count($keys); $i++){
+						if(count($config['DIFFUSIONS'][$keys[$i]]['USERS']) > 0){
+							$tmp = array();
+							$subkeys = array_keys($config['DIFFUSIONS'][$keys[$i]]['USERS']);
+							for($k = 0; $k < count($subkeys); $k++){
+								$tmp[strtoupper($subkeys[$k])] = $config['DIFFUSIONS'][$keys[$i]]['USERS'][$subkeys[$k]];
+							}
+							$config['DIFFUSIONS'][$keys[$i]]['USERS'] = $tmp;
+						}
+					}
+					$params = array('partnerID' => $config['ID_PORTAIL'], 'password' => $config['PASSWORD_WS']);
+					$url_base = str_replace( '#USERCODE#', $usercode, WS_GET_USER);
+					$response = make_ws_request($config['CODE_IMPORT'], $url_base, $params, "GET");
+					$xml = @simplexml_load_string($response);
+					if(count($xml) > 0){
+						if(is_guid($xml->userID."")){
+							$id_user = $xml->userID."";
+							//get informations
+							$db_data['name'] = 'software';
+							$getDsn = new GetDsn(array('MEMCACHED' => true));
+							$dsn = $getDsn->byUserID($id_user);
+							$db_data['pool']['software'] = array('STATUS'=>'normal', 'NAME'=>'software', 'DSN'=> $dsn);
+							
+							$portals = array();
+							$sql = "SELECT PORTAIL.ID_PORTAIL, PREFIXE_PORTAIL, PASSWORD_PORTAIL, PREFIXE_DIFFUSION, LIMITE_DIFFUSION, ORDRE_DIFFUSION, DSN_IMAP, ID_TYPE_BUNDLE, ID_TYPE_PORTAIL, CLIENT_PORTAIL.ID_AUTOPUBLICATION FROM CLIENT_PORTAIL INNER JOIN PORTAIL ON PORTAIL.ID_PORTAIL=CLIENT_PORTAIL.ID_PORTAIL WHERE ID_UTILISATEUR='".$id_user."' AND PORTAIL.ID_PORTAIL!='".$id_portail."' AND PREFIXE_PORTAIL != ''";
+							$result = db_query($sql, "software");
+							while($r = $result->fetchRow(DB_FETCHMODE_ASSOC)){ $portals[] = $r;}
+							db_close();
+							//update gateway2
+							$db_data['name'] = 'gateway';
+							$sql = "SELECT USERCODE FROM IMPORT_USER WHERE CODE_IMPORT='".$config['CODE_IMPORT']."' AND USERCODE='".fix_text($usercode,50)."'";
+
+							$result = db_getOne($sql, $db_data['name']);
+							if($result != ""){
+								$sql = "UPDATE IMPORT_USER SET ID_STATUT_USER='0', ID_FORCE_UPDATE='0', DATE_MODIFICATION_USER='".date('Y-m-d H:i:s')."' WHERE CODE_IMPORT='".fix_text($config['CODE_IMPORT'])."' AND USERCODE='".fix_text($usercode, 50)."'";
+							}else{
+								$sql = "INSERT INTO IMPORT_USER(USERCODE, CODE_IMPORT, ID_STATUT_USER, DATE_CREATION_USER, DATE_MODIFICATION_USER, ID_FORCE_UPDATE)
+     VALUES('".fix_text($usercode, 50)."', '".fix_text($config['CODE_IMPORT'], 50)."', '0', '".date('Y-m-d H:i:s')."', '".date('Y-m-d H:i:s')."', '0')";
+							}
+							db_query($sql, $db_data['name']) ;
+							$options = array('PREFIXE_DIFFUSION' => 'PREFIXE_DIFFUSION', 'LIMITE_DIFFUSION' => 'LIMIT', 'ORDRE_DIFFUSION' => 'LIMIT_ORDER', 'DSN_IMAP' => 'DSN_IMAP');
+							$list_portal_id = array();
+							for( $i=0; $i < count($portals); $i++){
+								$list_portal_id[] = $portals[$i]['ID_PORTAIL'];
+								$user_conf = array();
+								if(count($config['DIFFUSIONS'][$portals[$i]['ID_PORTAIL']]) > 0){
+									if(count($config['DIFFUSIONS'][$portals[$i]['ID_PORTAIL']]['USERS'][strtoupper($usercode)]) > 0){
+										$user_conf = $config['DIFFUSIONS'][$portals[$i]['ID_PORTAIL']]['USERS'][strtoupper($usercode)];
+									}
+								}
+								if($portals[$i]['ID_TYPE_BUNDLE']==1 && $portals[$i]['ID_TYPE_PORTAIL']==8 && $user_conf['NB_IMAGES_LIMIT'] == 0){
+									$portals[$i]['LIMIT'] = 1;
+								}else{
+									$portals[$i]['LIMIT'] = $user_conf['NB_IMAGES_LIMIT'];
+								}
+								$portals[$i]['ID_STATUT_IMPORT_USER_DIFFUSION'] = ($portals[$i]['ID_AUTOPUBLICATION'] > 0 ? 2 : -1);
+								//if(count($config['DIFFUSIONS'][$portals[$i]['ID_PORTAIL']]) > 0 && count($config['DIFFUSIONS'][$portals[$i]['ID_PORTAIL']]['USERS'][$usercode]) > 0){
+								if(count($user_conf) > 0){
+									if($user_conf['REDIFFUSE_VIDEO'] == '1') $portals[$i]['ID_STATUT_IMPORT_USER_DIFFUSION'] = 1;
+									$sql = "UPDATE IMPORT_USER_DIFFUSION SET PREFIXE_PORTAIL='".fix_text($portals[$i]['PREFIXE_PORTAIL'], 150)."', PASSWORD_PORTAIL='".fix_text($portals[$i]['PASSWORD_PORTAIL'], 150)."', NB_IMAGES_LIMIT='".$portals[$i]['LIMIT']."', DATE_MODIFICATION_IMPORT_USER_DIFFUSION='".date('Y-m-d H:i:s')."', ID_STATUT_IMPORT_USER_DIFFUSION='".$portals[$i]['ID_STATUT_IMPORT_USER_DIFFUSION']."' WHERE ID_PORTAIL='".fix_text($portals[$i]['ID_PORTAIL'])."' AND CODE_IMPORT='".fix_text($config['CODE_IMPORT'],50)."' AND USERCODE='".fix_text($user_conf['USERCODE'], 50)."'";
+								}else{
+									$sql = "INSERT INTO IMPORT_USER_DIFFUSION(ID_PORTAIL, USERCODE, CODE_IMPORT, PREFIXE_PORTAIL, PASSWORD_PORTAIL, NB_IMAGES_LIMIT, DATE_MODIFICATION_IMPORT_USER_DIFFUSION, ID_STATUT_IMPORT_USER_DIFFUSION, DATE_CREATION_IMPORT_USER_DIFFUSION) VALUES ('".fix_text($portals[$i]['ID_PORTAIL'])."', '".fix_text($usercode, 50)."', '".fix_text($config['CODE_IMPORT'], 50)."', '".fix_text($portals[$i]['PREFIXE_PORTAIL'], 150)."', '".fix_text($portals[$i]['PASSWORD_PORTAIL'], 150)."', '".fix_int($portals[$i]['LIMIT'])."', '".date('Y-m-d H:i:s')."', '".$portals[$i]['ID_STATUT_IMPORT_USER_DIFFUSION']."', '".date('Y-m-d H:i:s')."')";
+								}
+								db_query($sql, $db_data['name']);
+								foreach($options as $option_src => $option_dst){
+									if($portals[$i][$option_src] != ""){
+										if(isset($user_conf[$option_dst]) > 0){
+											$sql = "UPDATE IMPORT_USER_DIFFUSION_OPTION SET VALEUR_IMPORT_OPTION='".fix_text($portals[$i][$option_src], 250)."' WHERE ID_PORTAIL='".$portals[$i]['ID_PORTAIL']."' AND CODE_IMPORT='".fix_text($config['CODE_IMPORT'], 50)."' AND USERCODE='".fix_text($usercode, 50)."' AND REF_IMPORT_OPTION='".fix_text($option_dst, 50)."'";
+										}else{
+											$sql = "INSERT INTO IMPORT_USER_DIFFUSION_OPTION(ID_PORTAIL, CODE_IMPORT, USERCODE, REF_IMPORT_OPTION, VALEUR_IMPORT_OPTION) VALUES('".fix_text($portals[$i]['ID_PORTAIL'])."', '".fix_text($config['CODE_IMPORT'], 50)."', '".fix_text($usercode, 50)."', '".fix_text($option_dst, 50)."', '".fix_text($portals[$i][$option_src], 250)."')";
+										}
+										db_query($sql, $db_data['name']);
+									}
+								}
+								$out['success'] = true;
+							}
+							if(count($list_portal_id) > 0){
+								$sql = "UPDATE IMPORT_USER_DIFFUSION SET ID_STATUT_IMPORT_USER_DIFFUSION='-1' WHERE ID_PORTAIL NOT IN ('".implode("', '",$list_portal_id)."') AND CODE_IMPORT='".fix_text($config['CODE_IMPORT'], 50)."' AND USERCODE='".fix_text($usercode,50)."'";
+								db_query($sql, $db_data['name']);
+							}
+							db_close();
+						}else{ $out['error'] = "User not found";}
+					}else{ $out['error'] = "WS get_user error";}
+				}
+			}else{ $out['error'] = "Import not found";}
+		}else{ $out['error'] = "Missing id_portail or usercode";}
+		break;
+}
+
+echo (!$debug ? json_encode($out) : print_r($out));
+exit;
+?>
+
+
